@@ -1,10 +1,14 @@
 package ru.vasev.glasses.speech
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
+import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.File
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -15,6 +19,10 @@ enum class VoiceStatus { READY, NOT_DOWNLOADED, UNSUPPORTED }
 class Speaker(context: Context) {
 
     private val ready = CompletableDeferred<Boolean>()
+    private val cacheDir = context.cacheDir
+
+    @Volatile
+    private var player: MediaPlayer? = null
 
     @Volatile
     private var pending: (() -> Unit)? = null
@@ -27,6 +35,7 @@ class Speaker(context: Context) {
     }
 
     init {
+        tts.setAudioAttributes(ATTRIBUTES)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 pendingStart?.invoke()
@@ -72,8 +81,60 @@ class Speaker(context: Context) {
         }
     }
 
+    /**
+     * Говорит [text] строго через устройство [device] (например, динамик телефона при подключённой гарнитуре).
+     * TextToSpeech не умеет выбирать устройство, поэтому речь синтезируется в файл и проигрывается MediaPlayer
+     * с `setPreferredDevice` и атрибутами медиа (громкость медиа, а не звонка).
+     * [onRouted] получает устройство, на котором звук реально идёт: в момент старта и при каждой смене маршрута.
+     */
+    suspend fun speakTo(
+        text: String,
+        locale: Locale,
+        device: AudioDeviceInfo,
+        onStart: () -> Unit = {},
+        onRouted: (AudioDeviceInfo?) -> Unit = {},
+    ) {
+        if (!ready.await()) throw SpeechException("Синтез речи недоступен на телефоне.")
+        val lang = tts.setLanguage(locale)
+        if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
+            throw SpeechException("Нет голоса для языка «${locale.getDisplayLanguage(RUSSIAN)}».")
+        }
+        val file = File(cacheDir, "tts_out.wav")
+        // 1. Синтез в файл.
+        suspendCancellableCoroutine { cont ->
+            pending = { if (cont.isActive) cont.resume(Unit) }
+            cont.invokeOnCancellation { tts.stop() }
+            tts.synthesizeToFile(text, null, file, UUID.randomUUID().toString())
+        }
+        // 2. Воспроизведение на выбранное устройство.
+        val player = MediaPlayer()
+        this.player = player
+        try {
+            player.setAudioAttributes(MEDIA_ATTRIBUTES)
+            player.setDataSource(file.absolutePath)
+            player.prepare()
+            player.setPreferredDevice(device)
+            player.addOnRoutingChangedListener({ routing -> onRouted(routing.routedDevice) }, null)
+            suspendCancellableCoroutine { cont ->
+                player.setOnCompletionListener { if (cont.isActive) cont.resume(Unit) }
+                player.setOnErrorListener { _, _, _ ->
+                    if (cont.isActive) cont.resume(Unit)
+                    true
+                }
+                cont.invokeOnCancellation { runCatching { player.stop() } }
+                player.start()
+                onStart()
+                onRouted(player.routedDevice)
+            }
+        } finally {
+            this.player = null
+            player.release()
+        }
+    }
+
     fun stop() {
         tts.stop()
+        player?.let { runCatching { it.stop() } }
         finish()
     }
 
@@ -93,5 +154,17 @@ class Speaker(context: Context) {
 
     companion object {
         val RUSSIAN: Locale = Locale.forLanguageTag("ru-RU")
+
+        /** Речь ассистента: обычный медиа-маршрут (при подключённой гарнитуре — в неё). */
+        val ATTRIBUTES: AudioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANT)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+
+        /** Речь для собеседника через динамик: громкость медиа. */
+        val MEDIA_ATTRIBUTES: AudioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
     }
 }

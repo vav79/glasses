@@ -5,7 +5,9 @@ import android.util.Log
 import com.meta.wearable.dat.core.Wearables
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.speech.AudioOutput
+import ru.vasev.glasses.speech.AudioRouter
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
+import ru.vasev.glasses.speech.RoutedSpeechSource
 import ru.vasev.glasses.speech.PhoneSpeakerOutput
 import ru.vasev.glasses.speech.Speaker
 import ru.vasev.glasses.speech.SpeechSource
@@ -28,9 +30,10 @@ class GlassesApp : Application() {
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)
-        speechSource = PhoneMicSpeechSource(this)
+        val router = AudioRouter(this)
+        speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), router)
         speaker = Speaker(this)
-        audioOutput = PhoneSpeakerOutput(speaker)
+        audioOutput = PhoneSpeakerOutput(speaker, router)
     }
 
     companion object {

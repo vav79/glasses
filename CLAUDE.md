@@ -54,7 +54,13 @@ DAT SDK берётся из Maven Central, GitHub-токен не нужен. К
 
 **Звук — через сменные интерфейсы** (`speech/`), это точка будущего перехода на очки:
 - `SpeechSource.listen(languageTag)` → `Heard(text, endOfSpeechAt)`. Реализация `PhoneMicSpeechSource` — системный `SpeechRecognizer`, **один экземпляр на всё время работы**: пересоздание на каждую фразу даёт `ERROR_SERVER_DISCONNECTED` (код 11), который обрывает непрерывный режим. `SpeechException.noSpeech` / `.transient` — тишина и временные сбои, их непрерывный режим проглатывает.
-- `AudioOutput.speak(text, locale, channel)` возвращается после `onDone` TTS. Каналы `ME` («мне», в будущем — очки) и `PARTNER` (динамик телефона). Сейчас `PhoneSpeakerOutput` шлёт оба в динамик.
+- `AudioOutput.speak(text, locale, channel)` возвращается после `onDone` TTS. Каналы `ME` («мне») и `PARTNER` (собеседнику).
+
+**Bluetooth-гарнитура** (репетиция перед очками — они подключаются так же, по HFP + A2DP) — `AudioRouter`, `RoutedSpeechSource`, `PhoneSpeakerOutput`; логи под тегом `Audio`:
+- `Talker.USER` (ассистент, «Я отвечаю») слушается микрофоном гарнитуры: `setCommunicationDevice(SCO)` + `MODE_IN_COMMUNICATION`, распознаватель Google при этом пишет с гарнитуры. `Talker.PARTNER` — всегда микрофон телефона.
+- Канал `ME` — обычный медиа-маршрут (A2DP в гарнитуру). Канал `PARTNER` при подключённой гарнитуре — синтез в файл и `MediaPlayer.setPreferredDevice(встроенный динамик)` с `USAGE_MEDIA`: TTS не умеет выбирать устройство.
+- **Ловушка:** после `clearCommunicationDevice()` SCO разрывается асинхронно (на Galaxy S25 + Buds Core ~1,5 с). Пока он жив, телефон «в звонке», и звук уходит в гарнитуру с громкостью звонка, хотя `routedDevice` рапортует динамик. Поэтому `releaseMic()` запускает ожидание (событие разрыва SCO + смена устройства связи, таймаут 3 с), а вывод перед воспроизведением вызывает `awaitRouteSettled()`; ожидание перекрывается временем перевода.
+- Гарнитура отключилась или не включила микрофон за 4 с — молча работаем через телефон.
 
 **Claude** (`claude/`): `Anthropic` — общий клиент официального Java SDK и перевод ошибок SDK в русские сообщения. `ClaudeClient` (ассистент): adaptive thinking по умолчанию, effort `low`, автоматический кэш (`cacheControl` на уровне запроса), server-side fallback (`server-side-fallback-2026-07-01`, `fallbacks: "default"`). `Translator` — Haiku 5.5, `max_tokens` 300, без fallback (у Haiku его нет; отказ → `null` → «перевод недоступен»).
 

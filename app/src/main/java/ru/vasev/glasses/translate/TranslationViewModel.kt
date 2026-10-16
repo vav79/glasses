@@ -20,6 +20,7 @@ import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Heard
 import ru.vasev.glasses.speech.Speaker
 import ru.vasev.glasses.speech.SpeechException
+import ru.vasev.glasses.speech.Talker
 import ru.vasev.glasses.speech.VoiceStatus
 import java.util.Locale
 
@@ -155,7 +156,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
             if (preset != null) {
                 Heard(preset, SystemClock.elapsedRealtime())
             } else {
-                speech.listen(sourceTag) { partial -> _state.update { it.copy(pending = partial) } }
+                speech.listen(sourceTag, if (who == Who.PARTNER) Talker.PARTNER else Talker.USER) { partial -> _state.update { it.copy(pending = partial) } }
             }
         } catch (e: SpeechException) {
             if ((e.noSpeech || e.transient) && quietNoSpeech) {

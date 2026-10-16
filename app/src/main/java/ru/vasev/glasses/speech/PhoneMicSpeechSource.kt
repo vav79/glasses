@@ -21,7 +21,7 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
 
     private var recognizer: SpeechRecognizer? = null
 
-    override suspend fun listen(languageTag: String, onPartial: (String) -> Unit): Heard {
+    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit): Heard {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             throw SpeechException("На телефоне нет службы распознавания речи (нужно приложение Google).")
         }

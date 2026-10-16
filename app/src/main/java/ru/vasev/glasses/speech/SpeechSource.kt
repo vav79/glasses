@@ -14,11 +14,26 @@ class SpeechException(
 /** Распознанная фраза; [endOfSpeechAt] — момент конца речи (SystemClock.elapsedRealtime) для замера задержки. */
 data class Heard(val text: String, val endOfSpeechAt: Long)
 
+/** Кто говорит: [USER] — владелец (гарнитура/очки, если подключены), [PARTNER] — собеседник (микрофон телефона). */
+enum class Talker { USER, PARTNER }
+
 /**
- * Источник распознанной речи. Сейчас — микрофон телефона через SpeechRecognizer.
+ * Источник распознанной речи. Сейчас — SpeechRecognizer с микрофона телефона или Bluetooth-гарнитуры.
  * Позже сюда встанет звук с очков: DAT Speech или PCM из in-stream audio.
  */
 interface SpeechSource {
-    /** Слушает одну фразу на языке [languageTag] (BCP-47, например "tr-TR"). */
-    suspend fun listen(languageTag: String, onPartial: (String) -> Unit = {}): Heard
+    /** Слушает одну фразу на языке [languageTag] (BCP-47, например "tr-TR"), сказанную [talker]. */
+    suspend fun listen(languageTag: String, talker: Talker = Talker.USER, onPartial: (String) -> Unit = {}): Heard
+}
+
+/** Перед фразой выбирает микрофон через [router], после — отключает микрофон гарнитуры. */
+class RoutedSpeechSource(private val inner: SpeechSource, private val router: AudioRouter) : SpeechSource {
+    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit): Heard {
+        router.routeMic(talker)
+        return try {
+            inner.listen(languageTag, talker, onPartial)
+        } finally {
+            router.releaseMic()
+        }
+    }
 }
