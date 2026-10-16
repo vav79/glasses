@@ -4,10 +4,23 @@ import android.app.Application
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
 import ru.vasev.glasses.glasses.GlassesManager
+import ru.vasev.glasses.speech.AudioOutput
+import ru.vasev.glasses.speech.PhoneMicSpeechSource
+import ru.vasev.glasses.speech.PhoneSpeakerOutput
+import ru.vasev.glasses.speech.Speaker
+import ru.vasev.glasses.speech.SpeechSource
 
 class GlassesApp : Application() {
 
     lateinit var glasses: GlassesManager
+        private set
+
+    /** Общие для ассистента и переводчика источник речи и вывод звука — чтобы вкладки не спорили за звук. */
+    lateinit var speechSource: SpeechSource
+        private set
+    lateinit var audioOutput: AudioOutput
+        private set
+    lateinit var speaker: Speaker
         private set
 
     override fun onCreate() {
@@ -15,6 +28,9 @@ class GlassesApp : Application() {
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)
+        speechSource = PhoneMicSpeechSource(this)
+        speaker = Speaker(this)
+        audioOutput = PhoneSpeakerOutput(speaker)
     }
 
     companion object {

@@ -2,14 +2,7 @@ package ru.vasev.glasses.claude
 
 import android.util.Base64
 import android.util.Log
-import com.anthropic.client.AnthropicClient
-import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.core.JsonValue
-import com.anthropic.errors.AnthropicIoException
-import com.anthropic.errors.AnthropicServiceException
-import com.anthropic.errors.PermissionDeniedException
-import com.anthropic.errors.RateLimitException
-import com.anthropic.errors.UnauthorizedException
 import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.CacheControlEphemeral
 import com.anthropic.models.messages.ContentBlockParam
@@ -18,34 +11,20 @@ import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.OutputConfig
 import com.anthropic.models.messages.StopReason
 import com.anthropic.models.messages.TextBlockParam
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import ru.vasev.glasses.BuildConfig
 import ru.vasev.glasses.GlassesApp.Companion.TAG
-import java.time.Duration
-
-class ClaudeException(message: String) : Exception(message)
+import ru.vasev.glasses.claude.Anthropic.text
 
 /** Короткие голосовые ответы Claude через официальный Java SDK (Messages API). */
-class ClaudeClient(private val apiKey: String = BuildConfig.ANTHROPIC_API_KEY) {
+class ClaudeClient {
 
-    val hasApiKey: Boolean get() = apiKey.isNotBlank()
-
-    private val client: AnthropicClient by lazy {
-        AnthropicOkHttpClient.builder()
-            .apiKey(apiKey)
-            .timeout(Duration.ofSeconds(60))
-            .build()
-    }
+    val hasApiKey: Boolean get() = Anthropic.hasApiKey
 
     /**
      * Отправляет разговор ([turns] заканчивается новым вопросом пользователя) и возвращает текст ответа.
      * В историю ответы Claude попадают только текстом — без thinking-блоков, поэтому обрезка истории
      * и замена старых снимков на «[фото]» не ломают проверку целостности истории на стороне API.
      */
-    suspend fun ask(turns: List<Turn>): String = withContext(Dispatchers.IO) {
-        if (!hasApiKey) throw ClaudeException("Не задан API-ключ Anthropic (anthropic_api_key в local.properties).")
-
+    suspend fun ask(turns: List<Turn>): String {
         val builder = MessageCreateParams.builder()
             .model(MODEL)
             .maxTokens(2048L)
@@ -67,19 +46,7 @@ class ClaudeClient(private val apiKey: String = BuildConfig.ANTHROPIC_API_KEY) {
             .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"))
             .build()
 
-        val message = try {
-            client.messages().create(params)
-        } catch (e: UnauthorizedException) {
-            throw ClaudeException("Неверный API-ключ Anthropic.")
-        } catch (e: PermissionDeniedException) {
-            throw ClaudeException("API-ключ не имеет доступа к модели $MODEL.")
-        } catch (e: RateLimitException) {
-            throw ClaudeException("Слишком много запросов к Claude, подождите немного.")
-        } catch (e: AnthropicServiceException) {
-            throw ClaudeException("Ошибка Claude API (${e.statusCode()}).")
-        } catch (e: AnthropicIoException) {
-            throw ClaudeException("Нет связи с Claude. Проверьте интернет.")
-        }
+        val message = Anthropic.create(params)
 
         val usage = message.usage()
         Log.d(
@@ -89,12 +56,9 @@ class ClaudeClient(private val apiKey: String = BuildConfig.ANTHROPIC_API_KEY) {
         )
 
         if (message.stopReason().orElse(null) == StopReason.REFUSAL) {
-            return@withContext "Извините, на это я ответить не могу."
+            return "Извините, на это я ответить не могу."
         }
-        message.content()
-            .mapNotNull { block -> block.text().orElse(null)?.text() }
-            .joinToString(" ")
-            .trim()
+        return message.text()
             .ifEmpty { throw ClaudeException("Claude вернул пустой ответ.") }
     }
 

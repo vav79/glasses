@@ -20,8 +20,8 @@ import ru.vasev.glasses.GlassesApp.Companion.TAG
 import ru.vasev.glasses.claude.ClaudeClient
 import ru.vasev.glasses.claude.Conversation
 import ru.vasev.glasses.glasses.GlassesStatus
+import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Speaker
-import ru.vasev.glasses.speech.SpeechInput
 
 enum class Phase(val label: String) {
     IDLE(""),
@@ -52,8 +52,8 @@ data class UiState(
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val glasses = (app as GlassesApp).glasses
-    private val speech = SpeechInput(app)
-    private val speaker = Speaker(app)
+    private val speech = (app as GlassesApp).speechSource
+    private val audio = (app as GlassesApp).audioOutput
     private val claude = ClaudeClient()
 
     // История живёт только в памяти: перезапуск приложения начинает разговор заново.
@@ -86,7 +86,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stop() {
         job?.cancel()
-        speaker.stop()
+        audio.stop()
         _state.update { it.copy(phase = Phase.IDLE, pendingQuestion = "", pendingFrame = null) }
     }
 
@@ -98,7 +98,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun run(withFrame: Boolean, presetQuestion: String? = null) {
         job?.cancel()
-        speaker.stop()
+        audio.stop()
         job = viewModelScope.launch {
             if (lastActivity != 0L && SystemClock.elapsedRealtime() - lastActivity >= IDLE_RESET_MS) {
                 resetConversation()
@@ -116,13 +116,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                 setPhase(Phase.LISTENING)
                 val question = presetQuestion
-                    ?: speech.listen { partial -> _state.update { it.copy(pendingQuestion = partial) } }
+                    ?: speech.listen(RU_TAG) { partial -> _state.update { it.copy(pendingQuestion = partial) } }.text
                 _state.update { it.copy(pendingQuestion = question) }
 
                 if (Conversation.isResetCommand(question)) {
                     resetConversation()
                     setPhase(Phase.SPEAKING)
-                    speaker.speak("Начинаем новый разговор.")
+                    audio.speak("Начинаем новый разговор.", Speaker.RUSSIAN, AudioChannel.ME)
                     setPhase(Phase.IDLE)
                     return@launch
                 }
@@ -136,7 +136,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 touch()
 
                 setPhase(Phase.SPEAKING)
-                speaker.speak(answer)
+                audio.speak(answer, Speaker.RUSSIAN, AudioChannel.ME)
                 setPhase(Phase.IDLE)
             } catch (e: CancellationException) {
                 throw e
@@ -177,10 +177,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun setPhase(phase: Phase) = _state.update { it.copy(phase = phase) }
 
     override fun onCleared() {
-        speaker.shutdown()
+        audio.stop()
     }
 
     private companion object {
         const val IDLE_RESET_MS = 5 * 60 * 1000L
+        const val RU_TAG = "ru-RU"
     }
 }
