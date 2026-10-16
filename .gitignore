@@ -1,0 +1,12 @@
+# Секреты: ключ Anthropic и путь к SDK
+local.properties
+
+.gradle/
+.kotlin/
+build/
+/captures
+.idea/
+*.iml
+.DS_Store
+.externalNativeBuild
+.cxx
