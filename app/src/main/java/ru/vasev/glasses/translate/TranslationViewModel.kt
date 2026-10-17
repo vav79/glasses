@@ -10,12 +10,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp
-import ru.vasev.glasses.claude.Anthropic
+import ru.vasev.glasses.llm.LlmException
+import ru.vasev.glasses.llm.ModelSpec
+import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Heard
 import ru.vasev.glasses.speech.Speaker
@@ -32,7 +36,8 @@ enum class TranslatePhase(val label: String) {
     SPEAKING("Озвучиваю перевод…"),
 }
 
-data class FeedLine(val id: Long, val line: Line)
+/** Реплика в ленте; [model] — метка модели, которая перевела. */
+data class FeedLine(val id: Long, val line: Line, val model: String = "")
 
 data class TranslateUiState(
     val language: PartnerLanguage = PartnerLanguage.ENGLISH,
@@ -52,7 +57,8 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
 
     private val speech = (app as GlassesApp).speechSource
     private val audio = (app as GlassesApp).audioOutput
-    private val translator = Translator()
+    private val llm = (app as GlassesApp).llm
+    private val translator = Translator(llm)
     private val prefs = app.getSharedPreferences("translate", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(
@@ -65,7 +71,10 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     )
     val state: StateFlow<TranslateUiState> = _state.asStateFlow()
 
-    val hasApiKey: StateFlow<Boolean> get() = Anthropic.hasApiKey
+    /** Модель «Перевода» и есть ли для неё ключ. */
+    val model: StateFlow<ModelSpec> = llm.model(Role.TRANSLATION)
+    val hasApiKey: StateFlow<Boolean> = llm.ready(Role.TRANSLATION)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, (app as GlassesApp).apiKeys.has(model.value.provider))
 
     private val lines = mutableListOf<Line>()
     private var nextId = 0L
@@ -126,6 +135,11 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: SpeechException) {
                 Log.d(LOG_TAG, "Speech: ${e.message}")
                 _state.update { it.copy(error = e.message) }
+            } catch (e: LlmException) {
+                // «Нет интернета» и т. п. — ещё и голосом, но только мне (канал ME), не собеседнику.
+                Log.w(LOG_TAG, "LLM: ${e.message}")
+                _state.update { it.copy(error = e.message, phase = TranslatePhase.SPEAKING) }
+                runCatching { audio.speak(e.message.orEmpty(), Speaker.RUSSIAN, AudioChannel.ME) }
             } catch (e: Exception) {
                 Log.w(LOG_TAG, "Translation failed", e)
                 _state.update { it.copy(error = e.message ?: "Что-то пошло не так.") }
@@ -178,13 +192,15 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
 
         _state.update { it.copy(phase = TranslatePhase.TRANSLATING, pending = heard.text) }
         val prompt = TranslationPrompt.build(language, who, heard.text, lines)
-        val translation = translator.translate(prompt)
+        val answer = translator.translate(prompt)
+        val translation = answer.text
         val tTranslated = SystemClock.elapsedRealtime()
-        Log.d(LOG_TAG, "[$who] translate=${tTranslated - tRecognized}ms result=\"$translation\"")
+        Log.d(LOG_TAG, "[$who] translate=${tTranslated - tRecognized}ms model=${answer.model.id} result=\"$translation\"")
 
         val line = Line(who, heard.text, translation)
         lines += line
-        _state.update { it.copy(feed = it.feed + FeedLine(nextId++, line), pending = "", pendingWho = null) }
+        // Запасная модель в переводе — только меткой: лишняя фраза вслух сломала бы разговор.
+        _state.update { it.copy(feed = it.feed + FeedLine(nextId++, line, answer.label), pending = "", pendingWho = null) }
         if (translation == null) return
 
         val targetLocale: Locale = if (who == Who.PARTNER) Speaker.RUSSIAN else language.locale

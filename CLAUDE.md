@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Проект
 
-Android-приложение (Kotlin, Jetpack Compose, интерфейс на русском) для очков Ray-Ban Meta Gen 2 на базе Meta Wearables Device Access Toolkit (DAT SDK 1.0.1) и Claude API. Package `ru.vasev.glasses`, minSdk 29, сборка только под `arm64-v8a`. Очков пока нет: всё проверяется через MockDeviceKit (переключатель «Симулятор / настоящие очки» в приложении).
+Android-приложение (Kotlin, Jetpack Compose, интерфейс на русском) для очков Ray-Ban Meta Gen 2 на базе Meta Wearables Device Access Toolkit (DAT SDK 1.0.1) и ИИ-провайдеров (Claude API; DeepSeek как альтернатива и запасной вариант). Package `ru.vasev.glasses`, minSdk 29, сборка только под `arm64-v8a`. Очков пока нет: всё проверяется через MockDeviceKit (переключатель «Симулятор / настоящие очки» в приложении).
 
-Две вкладки:
-- **Ассистент** — голосовой вопрос → Claude (`claude-sonnet-5-5`) → ответ голосом; «Что я вижу» добавляет снимок с камеры очков. Память разговора и кэш промпта.
-- **Перевод** — живой перевод разговора с собеседником (9 языков) через `claude-haiku-5-5`.
+Три вкладки:
+- **Ассистент** — голосовой вопрос → модель (по умолчанию `claude-sonnet-5-5`) → ответ голосом; «Что я вижу» добавляет снимок с камеры очков. Память разговора и кэш промпта.
+- **Перевод** — живой перевод разговора с собеседником (9 языков), по умолчанию `claude-haiku-5-5`.
+- **Настройки** — ключи провайдеров, модель для каждой роли, запасная модель.
 
 ## Команды
 
@@ -24,7 +25,7 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 
 `adb` не в PATH: `$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe`. Тестовый телефон — Galaxy S25 Ultra. Если `adb devices` пуст, а Windows видит только «USB Composite Device» без «ADB Interface», на телефоне выключилась отладка по USB (Samsung сбрасывает её; ещё мешает «Автоблокировщик»).
 
-Логи: `adb logcat -s Glasses:D Translate:D`. `Glasses` — ассистент и расход токенов (`Claude usage: … cache_read=…`), `Translate` — задержки этапов перевода (`recognition=`, `translate=`, `tts_start=`, `end_of_speech→sound=`).
+Логи: `adb logcat -s LLM:D Translate:D Audio:D Glasses:D`. `LLM` — строка на каждую попытку запроса к ИИ для сравнения моделей (`role= provider= model= status= latency= in= out= cache_read= cache_write= reasoning= photo=sent|placeholder|none fallback=no|yes(причина)`), `Translate` — задержки этапов перевода (`recognition=`, `translate=`, `tts_start=`, `end_of_speech→sound=`), `Audio` — маршрут звука, `Glasses` — ошибки ассистента.
 
 ### Debug-запуск сценариев без голоса
 
@@ -34,13 +35,18 @@ $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 adb shell "am start -n ru.vasev.glasses/.MainActivity --es question 'Что написано на вывеске?' --ez with_frame true"
 adb shell "am start -n ru.vasev.glasses/.MainActivity --es language TURKISH --es translate_partner 'Merhaba'"
 adb shell "am start -n ru.vasev.glasses/.MainActivity --es translate_me 'Добрый день'"
+# модель для роли (сохраняется в настройках) и имитация сбоя Claude на следующий запрос:
+adb shell "am start -n ru.vasev.glasses/.MainActivity --es model_assistant deepseek-v4-pro --es model_translation deepseek-flash"
+adb shell "am start -n ru.vasev.glasses/.MainActivity --es fail_claude server --es question 'Привет'"   # server|network|forbidden|ratelimit
 ```
+
+«Нет интернета» проверяется авиарежимом: `adb shell cmd connectivity airplane-mode enable|disable` (USB-отладка при этом работает). После проверок верните модели по умолчанию — debug-параметры их сохраняют.
 
 Перед этим выдать разрешения: `adb shell pm grant ru.vasev.glasses android.permission.RECORD_AUDIO` (и `BLUETOOTH_CONNECT`).
 
 ## Секреты и конфигурация
 
-**API-ключ Anthropic в сборку не входит.** Он вводится на вкладке «Настройки» и хранится на телефоне (`security/ApiKeyStore`): AES-256-GCM ключом из Android Keystore (на S25 — StrongBox), в SharedPreferences `secure` лежит только `IV || шифротекст`. Расшифровка — в памяти: перед каждым запросом (`Anthropic.create` подставляет заголовок `x-api-key` в конкретный запрос; клиент SDK собран с заглушкой и ключа не знает) и на экране «Настройки» ради последних 4 символов. Признак «ключ есть» — по наличию шифротекста, без расшифровки. EncryptedSharedPreferences не используем (устарела). Резервное копирование и перенос данных на другое устройство отключены (`allowBackup=false` + `res/xml/data_extraction_rules.xml`). Проверка, что ключа нет в APK: распаковать APK и искать `sk-ant` по всем файлам (в самом .apk строки сжаты). Не вводите ключ через `adb shell input text` — adbd пишет текст команды в logcat. Debug-запуск сценариев работает только после ввода ключа в приложении.
+**API-ключи провайдеров в сборку не входят.** Они вводятся на вкладке «Настройки» и хранятся на телефоне (`security/ApiKeyStore`, слот на `ProviderId`): AES-256-GCM одним ключом из Android Keystore (на S25 — StrongBox), в SharedPreferences `secure` лежит только `IV || шифротекст` на слот (`anthropic_key_ct`, `deepseek_key_ct`, …), в AAD — имя слота. Имена слота Anthropic и alias Keystore (`anthropic_api_key_v1`) остались от версии с одним ключом — не переименовывать, иначе сохранённый ключ перестанет расшифровываться. Расшифровка — в памяти: перед каждым запросом (провайдер подставляет ключ заголовком только в этот запрос: `x-api-key` у Anthropic, где клиент SDK собран с заглушкой, `Authorization: Bearer` у OpenAI-совместимых) и на экране «Настройки» ради последних 4 символов. Признак «ключ есть» — по наличию шифротекста, без расшифровки. EncryptedSharedPreferences не используем (устарела). Резервное копирование и перенос данных на другое устройство отключены (`allowBackup=false` + `res/xml/data_extraction_rules.xml`). Проверка, что ключа нет в APK: распаковать APK и искать `sk-ant` по всем файлам (в самом .apk строки сжаты). Ключи DeepSeek начинаются с `sk-`: в logcat искать шаблон `sk-[A-Za-z0-9_-]{16,}` — голое `sk-` даёт ложные совпадения (`task-display-area`). Не вводите ключ через `adb shell input text` — adbd пишет текст команды в logcat. Debug-запуск сценариев работает только после ввода ключа в приложении.
 
 Остальное — в `local.properties` (в `.gitignore`), в код попадает через `BuildConfig` (`app/build.gradle.kts`):
 - `use_mock_device` → режим по умолчанию при первом запуске (дальше хранится в SharedPreferences);
@@ -63,7 +69,14 @@ DAT SDK берётся из Maven Central, GitHub-токен не нужен.
 - **Ловушка:** после `clearCommunicationDevice()` SCO разрывается асинхронно (на Galaxy S25 + Buds Core ~1,5 с). Пока он жив, телефон «в звонке», и звук уходит в гарнитуру с громкостью звонка, хотя `routedDevice` рапортует динамик. Поэтому `releaseMic()` запускает ожидание (событие разрыва SCO + смена устройства связи, таймаут 3 с), а вывод перед воспроизведением вызывает `awaitRouteSettled()`; ожидание перекрывается временем перевода.
 - Гарнитура отключилась или не включила микрофон за 4 с — молча работаем через телефон.
 
-**Claude** (`claude/`): `Anthropic` — общий клиент официального Java SDK, подстановка ключа из `ApiKeyStore` в каждый запрос и перевод ошибок SDK в русские сообщения (`ClaudeException.needsKey` — нет ключа или 401; кнопки, которым нужен Claude, без ключа неактивны, вместо ошибки — `MissingKeyNotice`). `ClaudeClient` (ассистент): adaptive thinking по умолчанию, effort `low`, автоматический кэш (`cacheControl` на уровне запроса), server-side fallback (`server-side-fallback-2026-07-01`, `fallbacks: "default"`). `Translator` — Haiku 5.5, `max_tokens` 300, без fallback (у Haiku его нет; отказ → `null` → «перевод недоступен»).
+**ИИ-провайдеры** (`llm/`). `AssistantClient` (`claude/`) и `Translator` (`translate/`) задают только промпт, `max_tokens` (2048 / 300) и `Effort` (LOW / NONE), а всё остальное делает `LlmService`:
+- Модель по роли — из `AiSettings` (по умолчанию Sonnet 5.5 / Haiku 5.5). Каталог — `ModelCatalog`: `claude-sonnet-5-5`, `claude-haiku-5-5`, `deepseek-flash` (DeepSeek-V4.1-Flash, видит фото), `deepseek-v4-pro` (только текст, картинка → 400). Старые `deepseek-v4-flash*` у DeepSeek выведены из работы.
+- `ChatProvider` → `AnthropicProvider` (официальный Java SDK: effort `low` — у Claude 5.5 thinking не выключается; авто-кэш только для ассистента; server-side fallback `server-side-fallback-2026-07-01` только у Sonnet) и `OpenAiCompatibleProvider` (OkHttp + org.json, настраивается `ProviderConfig`: URL, слот ключа, `Dialect`). У DeepSeek thinking включён по умолчанию: `reasoning_effort` `none` для перевода, `low` для ассистента; фото — data-URL с `detail: high` (при `low` картинка ужимается до 512×512 и мелкий текст не читается). OpenAI: `ProviderConfigs.OPENAI` и диалект готовы — добавить модели в каталог.
+- Модели без фото получают снимки пометкой «[фото]». «Что я вижу» на модели без фото автоматически уходит в модель того же провайдера с фото (`ModelCatalog.visionFor`, метка «· для фото»).
+- Запасная модель (`FallbackPolicy`, чистая логика под тестами): только если сбой у Claude — 403, 429, 5xx (в т. ч. 529) или обрыв связи — один повтор через DeepSeek Flash с таймаутом 20 с; не при 401/400 и не без ключа DeepSeek. Сети нет совсем (`ConnectivityManager`) — сразу «Нет интернета», ни одной попытки. Фото в запасную модель — только с разрешением в настройках (по умолчанию выключено): иначе «Что я вижу» отвечает «Claude недоступен, фото не отправлено», а снимки из истории уходят пометкой. В ассистенте перед ответом звучит «Отвечает запасная модель», в переводе — только метка. Сообщения `LlmException` («нет интернета» и т. п.) ещё и озвучиваются в канал ME — с очками на экран не смотрят.
+- У каждого ответа — метка модели (`Answer.label`): в чате и в ленте перевода. Без ключа для выбранной модели кнопки неактивны, вместо ошибки — `MissingKeyNotice`.
+- Отказ модели: у Claude `stop_reason: refusal`, у DeepSeek `finish_reason: content_filter` → `Answer.text = null` → «не могу ответить» / «перевод недоступен».
+- Имитация сбоев — `DebugFaults` (только debug).
 
 **Память ассистента** — `Conversation` (чистый Kotlin, покрыт тестами): окно обрезается пачкой (10 обменов → последние 5), чтобы реже сбивать кэш; картинкой отправляется только последний снимок, старые — пометкой «[фото]». **Ответы Claude хранятся только текстом, без thinking-блоков**: у Sonnet 5.5 thinking-блоки привязаны к неизменной истории, и после обрезки окна или замены фото их повторная отправка дала бы 400 на новых аккаунтах. Кэш срабатывает от 512 токенов — короткие текстовые разговоры не кэшируются, это нормально. Сброс: кнопка, голосом «новый разговор» / «забудь всё» (`Conversation.isResetCommand`), автосброс через 5 минут тишины.
 

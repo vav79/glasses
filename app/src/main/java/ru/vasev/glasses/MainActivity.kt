@@ -21,6 +21,10 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import kotlinx.coroutines.CompletableDeferred
 import ru.vasev.glasses.GlassesApp.Companion.TAG
+import ru.vasev.glasses.llm.DebugFaults
+import ru.vasev.glasses.llm.ModelCatalog
+import ru.vasev.glasses.llm.ProviderId
+import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
@@ -132,9 +136,23 @@ class MainActivity : ComponentActivity() {
      * Debug-запуск сценариев без голоса:
      *  - ассистент: --es question "Текст" [--ez with_frame true]
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
+     *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
+     *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
+     * Порядок внутри одного интента: модели и сбой применяются до вопроса.
      */
     private fun handleDebugIntent(intent: Intent) {
         if (!BuildConfig.DEBUG) return
+        val app = application as GlassesApp
+        for ((extra, role) in listOf("model_assistant" to Role.ASSISTANT, "model_translation" to Role.TRANSLATION)) {
+            intent.getStringExtra(extra)?.let { id ->
+                intent.removeExtra(extra)
+                ModelCatalog.byId(id)?.let { app.aiSettings.setModel(role, it) }
+            }
+        }
+        intent.getStringExtra("fail_claude")?.let { kind ->
+            intent.removeExtra("fail_claude")
+            DebugFaults.arm(ProviderId.ANTHROPIC, kind)
+        }
         intent.getStringExtra("question")?.let { question ->
             intent.removeExtra("question")
             selectTab(AppTab.ASSISTANT)

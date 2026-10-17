@@ -12,10 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ru.vasev.glasses.llm.ModelSpec
 
-/** Подсказка вместо ошибки, когда API-ключ ещё не введён. */
+/** Подсказка вместо ошибки, когда для выбранной модели ещё не введён ключ провайдера. */
 @Composable
-fun MissingKeyNotice(onOpenSettings: () -> Unit) {
+fun MissingKeyNotice(model: ModelSpec, onOpenSettings: () -> Unit) {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -25,11 +26,11 @@ fun MissingKeyNotice(onOpenSettings: () -> Unit) {
     ) {
         Column(Modifier.padding(12.dp)) {
             Text(
-                "Чтобы задавать вопросы Claude и переводить, нужен API-ключ Anthropic. " +
+                "Для модели «${model.title}» нужен API-ключ ${model.provider.title}. " +
                     "Он хранится только на этом телефоне в зашифрованном виде.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.End)) { Text("Ввести ключ") }
+            TextButton(onClick = onOpenSettings, modifier = Modifier.align(Alignment.End)) { Text("Открыть настройки") }
         }
     }
 }

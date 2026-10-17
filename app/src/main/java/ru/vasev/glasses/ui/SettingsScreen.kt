@@ -1,11 +1,14 @@
 package ru.vasev.glasses.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,9 +16,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -33,10 +41,18 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.vasev.glasses.llm.ModelCatalog
+import ru.vasev.glasses.llm.ModelSpec
+import ru.vasev.glasses.llm.ProviderId
+import ru.vasev.glasses.llm.Role
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val keys by viewModel.keys.collectAsStateWithLifecycle()
+    val assistantModel by viewModel.assistantModel.collectAsStateWithLifecycle()
+    val translationModel by viewModel.translationModel.collectAsStateWithLifecycle()
+    val fallbackEnabled by viewModel.fallbackEnabled.collectAsStateWithLifecycle()
+    val fallbackPhotos by viewModel.fallbackPhotos.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
@@ -46,56 +62,117 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("API-ключ Anthropic", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        SectionTitle("Модели")
+        ModelPicker("Ассистент", assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
+        ModelPicker("Перевод", translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
+        Hint("Если у модели нет зрения, для «Что я вижу» автоматически берётся DeepSeek Flash.")
 
-        val key = state.key
-        if (key != null && !state.editing) {
-            Text("Ключ сохранён: ••••${key.tail}", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
-            Text(
-                "Зашифрован AES-GCM ключом из Android Keystore" +
-                    (if (key.strongBox) " (StrongBox)" else "") +
-                    ". Расшифровывается только в памяти перед запросом к Claude.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (state.confirmDelete) {
-                Status(
-                    "Удалить ключ? Без него ассистент и перевод работать не будут.",
-                    isError = true,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = viewModel::delete) { Text("Удалить") }
-                    OutlinedButton(onClick = viewModel::cancelDelete) { Text("Отмена") }
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = viewModel::startReplace) { Text("Заменить ключ") }
-                    OutlinedButton(onClick = viewModel::askDelete) { Text("Удалить ключ") }
-                }
-            }
-        } else {
-            KeyEditor(
-                busy = state.busy,
-                canCancel = key != null,
-                onSave = viewModel::save,
-                onCancel = viewModel::cancelReplace,
-            )
+        HorizontalDivider()
+        SectionTitle("Запасная модель")
+        SwitchRow(
+            title = "Повторять через DeepSeek Flash, если Claude недоступен",
+            subtitle = "При ошибках 403, 429, 5xx и обрывах связи — один повтор. Без интернета не пробует.",
+            checked = fallbackEnabled,
+            onChange = viewModel::setFallbackEnabled,
+        )
+        SwitchRow(
+            title = "Отправлять фото в запасную модель",
+            subtitle = "Выключено: «Что я вижу» при сбое Claude не отправит снимок в DeepSeek, " +
+                "а снимки из истории уйдут пометкой «[фото]».",
+            checked = fallbackPhotos,
+            enabled = fallbackEnabled,
+            onChange = viewModel::setFallbackPhotos,
+        )
+
+        for (provider in viewModel.providers) {
+            HorizontalDivider()
+            KeySection(provider, keys.getValue(provider), viewModel)
         }
 
-        state.error?.let { Status(it, isError = true) }
-        state.message?.let { Status(it, isError = false) }
-
-        Text(
-            "Ключ создаётся на console.anthropic.com → API Keys. Он хранится только на этом телефоне, " +
-                "в сборку приложения не входит, а резервное копирование данных приложения отключено.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Hint(
+            "Ключи создаются в консолях провайдеров (console.anthropic.com, platform.deepseek.com). Они хранятся " +
+                "только на этом телефоне в зашифрованном виде, в сборку приложения не входят, а резервное " +
+                "копирование данных приложения отключено.",
         )
     }
 }
 
 @Composable
-private fun KeyEditor(busy: Boolean, canCancel: Boolean, onSave: (String) -> Unit, onCancel: () -> Unit) {
+private fun KeySection(provider: ProviderId, state: KeyState, viewModel: SettingsViewModel) {
+    SectionTitle("API-ключ ${provider.title}")
+    val key = state.key
+    if (key != null && !state.editing) {
+        Text("Ключ сохранён: ••••${key.tail}", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
+        Hint(
+            "Зашифрован AES-GCM ключом из Android Keystore" + (if (key.strongBox) " (StrongBox)" else "") +
+                ". Расшифровывается только в памяти перед запросом.",
+        )
+        if (state.confirmDelete) {
+            Status("Удалить ключ ${provider.title}? Модели ${provider.title} перестанут работать.", isError = true)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { viewModel.delete(provider) }) { Text("Удалить") }
+                OutlinedButton(onClick = { viewModel.cancelDelete(provider) }) { Text("Отмена") }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { viewModel.startReplace(provider) }) { Text("Заменить ключ") }
+                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { Text("Удалить ключ") }
+            }
+        }
+    } else {
+        KeyEditor(
+            provider = provider,
+            busy = state.busy,
+            canCancel = key != null,
+            onSave = { viewModel.save(provider, it) },
+            onCancel = { viewModel.cancelReplace(provider) },
+        )
+    }
+    state.error?.let { Status(it, isError = true) }
+    state.message?.let { Status(it, isError = false) }
+}
+
+@Composable
+private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(role, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Box {
+            OutlinedButton(onClick = { expanded = true }) { Text("${selected.title} ▾", maxLines = 1) }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                ModelCatalog.all.forEach { model ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                model.title + if (model.vision) "" else " (без фото)",
+                                fontWeight = if (model == selected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onSelect(model)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.size(8.dp))
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
+}
+
+@Composable
+private fun KeyEditor(provider: ProviderId, busy: Boolean, canCancel: Boolean, onSave: (String) -> Unit, onCancel: () -> Unit) {
     // Обычный remember, не rememberSaveable: введённый ключ не должен попадать в сохранённое состояние Activity.
     var input by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
@@ -107,7 +184,7 @@ private fun KeyEditor(busy: Boolean, canCancel: Boolean, onSave: (String) -> Uni
     OutlinedTextField(
         value = input,
         onValueChange = { input = it },
-        label = { Text("Вставьте API-ключ") },
+        label = { Text("Вставьте ключ ${provider.title}") },
         singleLine = true,
         enabled = !busy,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -126,6 +203,16 @@ private fun KeyEditor(busy: Boolean, canCancel: Boolean, onSave: (String) -> Uni
         Button(onClick = submit, enabled = !busy && input.isNotBlank()) { Text("Сохранить") }
         if (canCancel) OutlinedButton(onClick = onCancel, enabled = !busy) { Text("Отмена") }
     }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun Hint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable

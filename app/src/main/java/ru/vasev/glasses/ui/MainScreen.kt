@@ -56,6 +56,7 @@ fun MainScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
+    val model by viewModel.model.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -85,7 +86,7 @@ fun MainScreen(
                 onConnectGlasses = onConnectGlasses,
             )
 
-            if (!hasApiKey) MissingKeyNotice(onOpenSettings)
+            if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
             Chat(state, modifier = Modifier.weight(1f).fillMaxWidth())
 
@@ -149,7 +150,7 @@ private fun Chat(state: UiState, modifier: Modifier) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 UserBubble(item.question, item.frame)
-                ClaudeBubble(item.answer)
+                AnswerBubble(item.answer, item.model)
             }
         }
         if (hasPending) {
@@ -203,7 +204,7 @@ private fun UserBubble(text: String, frame: Bitmap?) {
 }
 
 @Composable
-private fun ClaudeBubble(text: String) {
+private fun AnswerBubble(text: String, model: String) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         Column(
             modifier = Modifier
@@ -212,7 +213,7 @@ private fun ClaudeBubble(text: String) {
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(10.dp),
         ) {
-            Text("Claude", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            Text(model.ifEmpty { "Ответ" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
         }
     }

@@ -1,32 +1,25 @@
 package ru.vasev.glasses.translate
 
-import com.anthropic.models.messages.MessageCreateParams
-import com.anthropic.models.messages.OutputConfig
-import com.anthropic.models.messages.StopReason
-import ru.vasev.glasses.claude.Anthropic
-import ru.vasev.glasses.claude.Anthropic.text
-import ru.vasev.glasses.claude.ClaudeException
+import ru.vasev.glasses.claude.Turn
+import ru.vasev.glasses.llm.Answer
+import ru.vasev.glasses.llm.Effort
+import ru.vasev.glasses.llm.LlmService
+import ru.vasev.glasses.llm.Role
 
-/** Перевод одной реплики через Claude Haiku 5.5. */
-class Translator {
+/** Перевод одной реплики моделью, выбранной для «Перевода» (по умолчанию Claude Haiku 5.5). */
+class Translator(private val llm: LlmService) {
 
-    /** Возвращает перевод или null, если модель отказалась переводить. */
-    suspend fun translate(userPrompt: String): String? {
-        val params = MessageCreateParams.builder()
-            .model(MODEL)
-            .maxTokens(MAX_TOKENS)
-            .system(TranslationPrompt.SYSTEM)
-            .addUserMessage(userPrompt)
-            .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
-            .build()
-        val message = Anthropic.create(params)
-        // У Haiku 5.5 нет серверного fallback на другую модель: отказ показываем как «перевод недоступен».
-        if (message.stopReason().orElse(null) == StopReason.REFUSAL) return null
-        return message.text().ifEmpty { throw ClaudeException("Переводчик вернул пустой ответ.") }
-    }
+    /** [Answer.text] = null — модель отказалась переводить. */
+    suspend fun translate(userPrompt: String): Answer = llm.complete(
+        role = Role.TRANSLATION,
+        system = TranslationPrompt.SYSTEM,
+        turns = listOf(Turn.User(userPrompt)),
+        maxTokens = MAX_TOKENS,
+        // Для перевода размышления только добавляют задержку: у DeepSeek выключаются, у Claude — минимальные.
+        effort = Effort.NONE,
+    )
 
     private companion object {
-        const val MODEL = "claude-haiku-5-5"
         const val MAX_TOKENS = 300L
     }
 }

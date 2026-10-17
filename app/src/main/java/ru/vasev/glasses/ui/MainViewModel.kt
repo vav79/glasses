@@ -11,16 +11,20 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp
 import ru.vasev.glasses.GlassesApp.Companion.TAG
-import ru.vasev.glasses.claude.Anthropic
-import ru.vasev.glasses.claude.ClaudeClient
+import ru.vasev.glasses.claude.AssistantClient
 import ru.vasev.glasses.claude.Conversation
 import ru.vasev.glasses.glasses.GlassesStatus
+import ru.vasev.glasses.llm.LlmException
+import ru.vasev.glasses.llm.ModelSpec
+import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Speaker
 
@@ -32,13 +36,14 @@ enum class Phase(val label: String) {
     SPEAKING("Отвечаю…"),
 }
 
-/** Обмен в чате. [remembered] = false — Claude его уже не помнит (показывается бледным). */
+/** Обмен в чате. [remembered] = false — модель его уже не помнит (показывается бледным). [model] — метка модели. */
 data class ChatItem(
     val id: Long,
     val question: String,
     val answer: String,
     val frame: Bitmap?,
     val remembered: Boolean,
+    val model: String,
 )
 
 data class UiState(
@@ -55,18 +60,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val glasses = (app as GlassesApp).glasses
     private val speech = (app as GlassesApp).speechSource
     private val audio = (app as GlassesApp).audioOutput
-    private val claude = ClaudeClient()
+    private val llm = (app as GlassesApp).llm
+    private val assistant = AssistantClient(llm)
 
     // История живёт только в памяти: перезапуск приложения начинает разговор заново.
     private val conversation = Conversation()
     private val frames = mutableMapOf<Long, Bitmap>()
+    private val labels = mutableMapOf<Long, String>()
     private var lastActivity = 0L
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     val glassesStatus: StateFlow<GlassesStatus> = glasses.status
-    val hasApiKey: StateFlow<Boolean> = Anthropic.hasApiKey
+
+    /** Модель «Ассистента» и есть ли для неё ключ. */
+    val model: StateFlow<ModelSpec> = llm.model(Role.ASSISTANT)
+    val hasApiKey: StateFlow<Boolean> = llm.ready(Role.ASSISTANT)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, (app as GlassesApp).apiKeys.has(model.value.provider))
 
     /** Запрос DAT-разрешения на камеру; подставляется из MainActivity. */
     var cameraPermissionRequester: (suspend () -> Boolean)? = null
@@ -129,18 +140,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 setPhase(Phase.THINKING)
-                val answer = claude.ask(conversation.turnsFor(question, jpeg))
+                val result = assistant.ask(conversation.turnsFor(question, jpeg))
+                val answer = result.text ?: "Извините, на это я ответить не могу."
                 val exchange = conversation.add(question, jpeg, answer)
                 _state.value.pendingFrame?.let { frames[exchange.id] = it }
+                labels[exchange.id] = result.label
                 _state.update { it.copy(pendingQuestion = "", pendingFrame = null) }
                 publishChat()
                 touch()
 
                 setPhase(Phase.SPEAKING)
-                audio.speak(answer, Speaker.RUSSIAN, AudioChannel.ME)
+                val spoken = if (result.viaFallback) "Отвечает запасная модель. $answer" else answer
+                audio.speak(spoken, Speaker.RUSSIAN, AudioChannel.ME)
                 setPhase(Phase.IDLE)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: LlmException) {
+                // С очками на экран не смотрят: «нет интернета», «фото не отправлено» и т. п. — ещё и голосом.
+                Log.w(TAG, "LLM: ${e.message}")
+                _state.update { it.copy(phase = Phase.SPEAKING, error = e.message) }
+                runCatching { audio.speak(e.message.orEmpty(), Speaker.RUSSIAN, AudioChannel.ME) }
+                setPhase(Phase.IDLE)
             } catch (e: Exception) {
                 Log.w(TAG, "Request failed", e)
                 val message = e.message ?: "Что-то пошло не так."
@@ -153,6 +173,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         idleJob?.cancel()
         conversation.clear()
         frames.clear()
+        labels.clear()
         lastActivity = 0L
         _state.update { UiState(phase = it.phase) }
     }
@@ -170,7 +191,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun publishChat() {
         val start = conversation.memoryStart
         val chat = conversation.exchanges.mapIndexed { index, exchange ->
-            ChatItem(exchange.id, exchange.question, exchange.answer, frames[exchange.id], remembered = index >= start)
+            ChatItem(
+                exchange.id,
+                exchange.question,
+                exchange.answer,
+                frames[exchange.id],
+                remembered = index >= start,
+                model = labels[exchange.id].orEmpty(),
+            )
         }
         _state.update { it.copy(chat = chat) }
     }

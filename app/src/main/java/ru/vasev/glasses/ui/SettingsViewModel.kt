@@ -11,10 +11,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.vasev.glasses.GlassesApp
+import ru.vasev.glasses.llm.ModelCatalog
+import ru.vasev.glasses.llm.ModelSpec
+import ru.vasev.glasses.llm.ProviderId
+import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.security.ApiKeyException
 import ru.vasev.glasses.security.ApiKeyInfo
 
-data class SettingsUiState(
+/** Состояние ключа одного провайдера на экране. */
+data class KeyState(
     /** Сохранённый ключ: только последние 4 символа. */
     val key: ApiKeyInfo? = null,
     /** Показывать поле ввода (ключа нет или нажато «Заменить ключ»). */
@@ -28,50 +33,69 @@ data class SettingsUiState(
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = (app as GlassesApp).apiKeys
+    private val ai = (app as GlassesApp).aiSettings
 
-    private val _state = MutableStateFlow(SettingsUiState(editing = !store.hasKey.value))
-    val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+    /** Провайдеры, для которых в каталоге есть модели (OpenAI появится, когда добавим его модели). */
+    val providers: List<ProviderId> = ProviderId.entries.filter { p -> ModelCatalog.all.any { it.provider == p } }
 
-    /** Обновить сведения о ключе. Расшифровка — только здесь, при открытом экране, и только ради последних 4 символов. */
+    private val _keys = MutableStateFlow(providers.associateWith { KeyState(editing = !store.has(it)) })
+    val keys: StateFlow<Map<ProviderId, KeyState>> = _keys.asStateFlow()
+
+    val assistantModel: StateFlow<ModelSpec> = ai.model(Role.ASSISTANT)
+    val translationModel: StateFlow<ModelSpec> = ai.model(Role.TRANSLATION)
+    val fallbackEnabled: StateFlow<Boolean> = ai.fallbackEnabled
+    val fallbackPhotos: StateFlow<Boolean> = ai.fallbackPhotos
+
+    fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
+    fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)
+    fun setFallbackPhotos(enabled: Boolean) = ai.setFallbackPhotos(enabled)
+
+    /** Обновить сведения о ключах. Расшифровка — только здесь, при открытом экране, и только ради последних 4 символов. */
     fun refresh() = viewModelScope.launch {
-        if (!store.hasKey.value) {
-            _state.update { it.copy(key = null, editing = true) }
-            return@launch
+        for (provider in providers) {
+            if (!store.has(provider)) {
+                update(provider) { it.copy(key = null, editing = true) }
+                continue
+            }
+            val key = try {
+                withContext(Dispatchers.Default) { store.describe(provider) }
+            } catch (e: ApiKeyException) {
+                update(provider) { it.copy(key = null, editing = true, error = e.message) }
+                continue
+            }
+            update(provider) { it.copy(key = key, editing = key == null) }
         }
-        val key = try {
-            withContext(Dispatchers.Default) { store.describe() }
-        } catch (e: ApiKeyException) {
-            _state.update { it.copy(key = null, editing = true, error = e.message) }
-            return@launch
-        }
-        _state.update { it.copy(key = key, editing = key == null) }
     }
 
-    fun save(input: String) = viewModelScope.launch {
-        _state.update { it.copy(busy = true, error = null, message = null) }
+    fun save(provider: ProviderId, input: String) = viewModelScope.launch {
+        update(provider) { it.copy(busy = true, error = null, message = null) }
         try {
             val key = withContext(Dispatchers.Default) {
-                store.save(input)
-                store.describe()
+                store.save(provider, input)
+                store.describe(provider)
             }
-            _state.update { it.copy(key = key, editing = false, busy = false, message = "Ключ сохранён.") }
+            update(provider) { it.copy(key = key, editing = false, busy = false, message = "Ключ сохранён.") }
         } catch (e: ApiKeyException) {
-            _state.update { it.copy(busy = false, error = e.message) }
+            update(provider) { it.copy(busy = false, error = e.message) }
         } catch (e: Exception) {
-            _state.update { it.copy(busy = false, error = "Не удалось зашифровать ключ (${e.javaClass.simpleName}).") }
+            update(provider) { it.copy(busy = false, error = "Не удалось зашифровать ключ (${e.javaClass.simpleName}).") }
         }
     }
 
-    fun startReplace() = _state.update { it.copy(editing = true, confirmDelete = false, error = null, message = null) }
+    fun startReplace(provider: ProviderId) =
+        update(provider) { it.copy(editing = true, confirmDelete = false, error = null, message = null) }
 
-    fun cancelReplace() = _state.update { it.copy(editing = it.key == null, error = null) }
+    fun cancelReplace(provider: ProviderId) = update(provider) { it.copy(editing = it.key == null, error = null) }
 
-    fun askDelete() = _state.update { it.copy(confirmDelete = true, message = null) }
+    fun askDelete(provider: ProviderId) = update(provider) { it.copy(confirmDelete = true, message = null) }
 
-    fun cancelDelete() = _state.update { it.copy(confirmDelete = false) }
+    fun cancelDelete(provider: ProviderId) = update(provider) { it.copy(confirmDelete = false) }
 
-    fun delete() = viewModelScope.launch {
-        withContext(Dispatchers.Default) { store.delete() }
-        _state.update { SettingsUiState(editing = true, message = "Ключ удалён.") }
+    fun delete(provider: ProviderId) = viewModelScope.launch {
+        withContext(Dispatchers.Default) { store.delete(provider) }
+        update(provider) { KeyState(editing = true, message = "Ключ удалён.") }
     }
+
+    private fun update(provider: ProviderId, change: (KeyState) -> KeyState) =
+        _keys.update { all -> all + (provider to change(all.getValue(provider))) }
 }

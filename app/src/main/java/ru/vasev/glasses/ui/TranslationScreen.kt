@@ -57,6 +57,7 @@ fun TranslationScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
+    val model by viewModel.model.collectAsStateWithLifecycle()
     val busy = state.phase != TranslatePhase.IDLE
 
     Column(
@@ -75,7 +76,7 @@ fun TranslationScreen(
             Switch(checked = state.continuous, onCheckedChange = viewModel::setContinuous)
         }
 
-        if (!hasApiKey) MissingKeyNotice(onOpenSettings)
+        if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
         state.voiceHint?.let { hint ->
             Hint(hint) { TextButton(onClick = onInstallVoice) { Text("Скачать голос") } }
         }
@@ -159,7 +160,7 @@ private fun Feed(state: TranslateUiState, modifier: Modifier) {
 
     LazyColumn(modifier = modifier, state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.feed, key = { it.id }) { item ->
-            Utterance(item.line.who, item.line.original, item.line.translation ?: "перевод недоступен")
+            Utterance(item.line.who, item.line.original, item.line.translation ?: "перевод недоступен", item.model)
         }
         state.pendingWho?.let { who ->
             item(key = "pending") { Utterance(who, state.pending.ifEmpty { "…" }, translation = null) }
@@ -170,7 +171,7 @@ private fun Feed(state: TranslateUiState, modifier: Modifier) {
 
 /** Реплика: оригинал мелко, перевод крупно. Собеседник — слева, я — справа. */
 @Composable
-private fun Utterance(who: Who, original: String, translation: String?) {
+private fun Utterance(who: Who, original: String, translation: String?, model: String = "") {
     val mine = who == Who.ME
     Box(Modifier.fillMaxWidth(), contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(
@@ -191,6 +192,9 @@ private fun Utterance(who: Who, original: String, translation: String?) {
             )
             if (translation != null) {
                 Text(translation, style = MaterialTheme.typography.titleLarge, color = content)
+            }
+            if (model.isNotEmpty()) {
+                Text(model, style = MaterialTheme.typography.labelSmall, color = content.copy(alpha = 0.6f))
             }
         }
     }

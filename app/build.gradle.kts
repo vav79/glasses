@@ -73,6 +73,8 @@ dependencies {
     implementation(libs.mwdat.camera)
     implementation(libs.mwdat.mockdevice)
     implementation(libs.anthropic.java)
+    // OpenAI-совместимые провайдеры (DeepSeek); та же версия, что приходит транзитивно от SDK.
+    implementation(libs.okhttp)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -87,4 +89,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    // org.json есть в Android, но не в JVM-тестах.
+    testImplementation(libs.org.json)
 }
