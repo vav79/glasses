@@ -27,12 +27,8 @@ android {
             abiFilters += "arm64-v8a"
         }
 
-        // API-ключ Anthropic в сборку не входит: он вводится в приложении и хранится зашифрованным (ApiKeyStore).
-        buildConfigField(
-            "boolean",
-            "USE_MOCK_DEVICE_DEFAULT",
-            localProps.getProperty("use_mock_device", "true").trim().toBoolean().toString(),
-        )
+        // API-ключи провайдеров в сборку не входят: они вводятся в приложении и хранятся зашифрованными (ApiKeyStore).
+        // Симулятор очков выбирается в приложении как источник снимков (только в debug-сборке).
 
         // В Developer Mode приложения Meta AI аттестация не используется — достаточно "0".
         manifestPlaceholders["mwdat_application_id"] = localProps.getProperty("mwdat_application_id", "0")
@@ -75,6 +71,10 @@ dependencies {
     implementation(libs.anthropic.java)
     // OpenAI-совместимые провайдеры (DeepSeek); та же версия, что приходит транзитивно от SDK.
     implementation(libs.okhttp)
+    // Камера телефона как источник снимков.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

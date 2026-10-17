@@ -3,11 +3,13 @@ package ru.vasev.glasses.ui
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,10 +19,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ru.vasev.glasses.GlassesApp
 import ru.vasev.glasses.GlassesApp.Companion.TAG
+import ru.vasev.glasses.camera.ImagePrep
+import ru.vasev.glasses.camera.ImageSource
+import ru.vasev.glasses.camera.PhoneCameraException
 import ru.vasev.glasses.claude.AssistantClient
 import ru.vasev.glasses.claude.Conversation
+import ru.vasev.glasses.glasses.GlassesException
 import ru.vasev.glasses.glasses.GlassesStatus
 import ru.vasev.glasses.llm.LlmException
 import ru.vasev.glasses.llm.ModelSpec
@@ -44,6 +51,8 @@ data class ChatItem(
     val frame: Bitmap?,
     val remembered: Boolean,
     val model: String,
+    /** Откуда снимок: «очки», «телефон», «галерея», «симулятор». */
+    val frameSource: String? = null,
 )
 
 data class UiState(
@@ -52,6 +61,7 @@ data class UiState(
     /** Вопрос и кадр текущего, ещё не завершённого обмена. */
     val pendingQuestion: String = "",
     val pendingFrame: Bitmap? = null,
+    val pendingFrameSource: String? = null,
     val error: String? = null,
 )
 
@@ -67,7 +77,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val conversation = Conversation()
     private val frames = mutableMapOf<Long, Bitmap>()
     private val labels = mutableMapOf<Long, String>()
+    private val frameSources = mutableMapOf<Long, String>()
     private var lastActivity = 0L
+
+    private val imageSources = (app as GlassesApp).imageSources
+
+    /** Камера телефона — видоискатель привязывается к ней из MainScreen. */
+    val phoneCamera = (app as GlassesApp).phoneCamera
+    val imageSource: StateFlow<ImageSource> = imageSources.source
+    val availableSources: List<ImageSource> = imageSources.available
+
+    /** Системный выбор фото (без доступа ко всей галерее); подставляется из MainActivity. null — ничего не выбрано. */
+    var galleryPicker: (suspend () -> Uri?)? = null
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -85,12 +106,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var job: Job? = null
     private var idleJob: Job? = null
 
-    fun setMockMode(enabled: Boolean) = glasses.setMockMode(enabled)
+    /** Разрешение на камеру телефона запрашивает MainActivity до вызова. */
+    fun setImageSource(source: ImageSource) = imageSources.set(source)
 
-    /** «Спросить»: голос → Claude → голос. */
+    /** «Спросить»: голос → модель → голос. */
     fun ask() = run(withFrame = false)
 
-    /** «Что я вижу»: кадр с очков + голос → Claude → голос. */
+    /** «Что я вижу»: снимок из выбранного источника + голос → модель → голос. */
     fun whatDoISee() = run(withFrame = true)
 
     /** Только для debug-сборок: прогон сценария с готовым текстом вместо распознавания речи. */
@@ -115,15 +137,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (lastActivity != 0L && SystemClock.elapsedRealtime() - lastActivity >= IDLE_RESET_MS) {
                 resetConversation()
             }
-            _state.update { it.copy(pendingQuestion = "", pendingFrame = null, error = null) }
+            _state.update { it.copy(pendingQuestion = "", pendingFrame = null, pendingFrameSource = null, error = null) }
             try {
                 var jpeg: ByteArray? = null
                 if (withFrame) {
+                    val source = imageSources.source.value
                     setPhase(Phase.CAPTURING)
-                    val requester = cameraPermissionRequester ?: { false }
-                    jpeg = glasses.captureJpeg(requester)
+                    jpeg = when (source) {
+                        ImageSource.GLASSES, ImageSource.SIMULATOR -> {
+                            if (!glasses.status.value.ready) {
+                                // Автоматически на телефон не переключаем: он может лежать в кармане.
+                                failAloud(
+                                    if (source == ImageSource.GLASSES) GLASSES_NOT_CONNECTED else "Симулятор очков не готов.",
+                                )
+                                return@launch
+                            }
+                            glasses.captureJpeg(cameraPermissionRequester ?: { false })
+                        }
+                        ImageSource.PHONE_CAMERA -> phoneCamera.capture()
+                        ImageSource.GALLERY -> {
+                            val uri = galleryPicker?.invoke()
+                            if (uri == null) {
+                                setPhase(Phase.IDLE)
+                                return@launch
+                            }
+                            val resolver = getApplication<Application>().contentResolver
+                            withContext(Dispatchers.Default) { ImagePrep.fromUri(resolver, uri) }
+                        }
+                    }
                     val preview = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
-                    _state.update { it.copy(pendingFrame = preview) }
+                    _state.update { it.copy(pendingFrame = preview, pendingFrameSource = source.chatLabel) }
                 }
 
                 setPhase(Phase.LISTENING)
@@ -144,8 +187,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val answer = result.text ?: "Извините, на это я ответить не могу."
                 val exchange = conversation.add(question, jpeg, answer)
                 _state.value.pendingFrame?.let { frames[exchange.id] = it }
+                _state.value.pendingFrameSource?.let { frameSources[exchange.id] = it }
                 labels[exchange.id] = result.label
-                _state.update { it.copy(pendingQuestion = "", pendingFrame = null) }
+                _state.update { it.copy(pendingQuestion = "", pendingFrame = null, pendingFrameSource = null) }
                 publishChat()
                 touch()
 
@@ -156,11 +200,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: LlmException) {
-                // С очками на экран не смотрят: «нет интернета», «фото не отправлено» и т. п. — ещё и голосом.
                 Log.w(TAG, "LLM: ${e.message}")
-                _state.update { it.copy(phase = Phase.SPEAKING, error = e.message) }
-                runCatching { audio.speak(e.message.orEmpty(), Speaker.RUSSIAN, AudioChannel.ME) }
-                setPhase(Phase.IDLE)
+                failAloud(e.message.orEmpty())
+            } catch (e: GlassesException) {
+                Log.w(TAG, "Glasses: ${e.message}")
+                failAloud(e.message.orEmpty())
+            } catch (e: PhoneCameraException) {
+                Log.w(TAG, "Phone camera: ${e.message}")
+                failAloud(e.message.orEmpty())
             } catch (e: Exception) {
                 Log.w(TAG, "Request failed", e)
                 val message = e.message ?: "Что-то пошло не так."
@@ -169,11 +216,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Ошибка на экран и голосом: с очками на экран не смотрят («нет интернета», «очки не подключены» и т. п.). */
+    private suspend fun failAloud(message: String) {
+        _state.update { it.copy(phase = Phase.SPEAKING, error = message) }
+        runCatching { audio.speak(message, Speaker.RUSSIAN, AudioChannel.ME) }
+        setPhase(Phase.IDLE)
+    }
+
     private fun resetConversation() {
         idleJob?.cancel()
         conversation.clear()
         frames.clear()
         labels.clear()
+        frameSources.clear()
         lastActivity = 0L
         _state.update { UiState(phase = it.phase) }
     }
@@ -198,6 +253,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 frames[exchange.id],
                 remembered = index >= start,
                 model = labels[exchange.id].orEmpty(),
+                frameSource = frameSources[exchange.id],
             )
         }
         _state.update { it.copy(chat = chat) }
@@ -212,5 +268,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         const val IDLE_RESET_MS = 5 * 60 * 1000L
         const val RU_TAG = "ru-RU"
+        const val GLASSES_NOT_CONNECTED =
+            "Очки не подключены. Чтобы снимать телефоном, выберите источник снимков «Камера телефона»."
     }
 }

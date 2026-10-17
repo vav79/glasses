@@ -3,13 +3,16 @@ package ru.vasev.glasses
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
@@ -21,6 +24,7 @@ import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import kotlinx.coroutines.CompletableDeferred
 import ru.vasev.glasses.GlassesApp.Companion.TAG
+import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.llm.DebugFaults
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ProviderId
@@ -45,6 +49,9 @@ class MainActivity : ComponentActivity() {
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
 
+    /** Есть ли доступ к камере телефона; перепроверяется при каждом возврате в приложение (могли отозвать в настройках). */
+    private var cameraGranted by mutableStateOf(false)
+
     private var pendingMicAction: (() -> Unit)? = null
     private var pendingCameraPermission: CompletableDeferred<Boolean>? = null
 
@@ -61,10 +68,30 @@ class MainActivity : ComponentActivity() {
             pendingCameraPermission = null
         }
 
+    /** Разрешение на камеру телефона — запрашивается при выборе источника «Камера телефона». */
+    private val phoneCameraPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            cameraGranted = granted
+            if (granted) {
+                viewModel.setImageSource(ImageSource.PHONE_CAMERA)
+            } else {
+                Toast.makeText(this, "Без доступа к камере источник снимков не изменён.", Toast.LENGTH_LONG).show()
+            }
+        }
+
+    /** Системный выбор фото: приложение получает только выбранный снимок, без доступа ко всей галерее. */
+    private var pendingPhoto: CompletableDeferred<Uri?>? = null
+    private val photoPicker =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            pendingPhoto?.complete(uri)
+            pendingPhoto = null
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
+        viewModel.galleryPicker = ::pickPhoto
         handleRegistrationIntent(intent)
         handleDebugIntent(intent)
         requestRuntimePermissions()
@@ -81,6 +108,8 @@ class MainActivity : ComponentActivity() {
                             onWhatDoISee = { withMic(viewModel::whatDoISee) },
                             onConnectGlasses = { Wearables.startRegistration(this) },
                             onOpenSettings = { selectTab(AppTab.SETTINGS) },
+                            onSelectSource = ::selectImageSource,
+                            cameraGranted = cameraGranted,
                         )
                     },
                     translation = {
@@ -96,6 +125,21 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /** Камера телефона — только после разрешения; остальные источники разрешений Android не требуют. */
+    private fun selectImageSource(source: ImageSource) {
+        val needsCamera = source == ImageSource.PHONE_CAMERA &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+        if (needsCamera) phoneCameraPermission.launch(Manifest.permission.CAMERA) else viewModel.setImageSource(source)
+    }
+
+    private suspend fun pickPhoto(): Uri? {
+        val deferred = CompletableDeferred<Uri?>()
+        pendingPhoto?.complete(null)
+        pendingPhoto = deferred
+        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        return deferred.await()
     }
 
     /** Вкладки независимы: при переключении всё, что звучит или слушает на другой вкладке, останавливается. */
@@ -126,9 +170,16 @@ class MainActivity : ComponentActivity() {
         handleDebugIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    }
+
     override fun onDestroy() {
         viewModel.cameraPermissionRequester = null
+        viewModel.galleryPicker = null
         pendingCameraPermission?.complete(false)
+        pendingPhoto?.complete(null)
         super.onDestroy()
     }
 
@@ -138,11 +189,23 @@ class MainActivity : ComponentActivity() {
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
-     * Порядок внутри одного интента: модели и сбой применяются до вопроса.
+     *  - снимки:    --es image_source glasses|phone|gallery|simulator
+     * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
     private fun handleDebugIntent(intent: Intent) {
         if (!BuildConfig.DEBUG) return
         val app = application as GlassesApp
+        intent.getStringExtra("image_source")?.let { name ->
+            intent.removeExtra("image_source")
+            val source = when (name) {
+                "glasses" -> ImageSource.GLASSES
+                "phone" -> ImageSource.PHONE_CAMERA
+                "gallery" -> ImageSource.GALLERY
+                "simulator" -> ImageSource.SIMULATOR
+                else -> null
+            }
+            source?.let(::selectImageSource)
+        }
         for ((extra, role) in listOf("model_assistant" to Role.ASSISTANT, "model_translation" to Role.TRANSLATION)) {
             intent.getStringExtra(extra)?.let { id ->
                 intent.removeExtra(extra)

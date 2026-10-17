@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Проект
 
-Android-приложение (Kotlin, Jetpack Compose, интерфейс на русском) для очков Ray-Ban Meta Gen 2 на базе Meta Wearables Device Access Toolkit (DAT SDK 1.0.1) и ИИ-провайдеров (Claude API; DeepSeek как альтернатива и запасной вариант). Package `ru.vasev.glasses`, minSdk 29, сборка только под `arm64-v8a`. Очков пока нет: всё проверяется через MockDeviceKit (переключатель «Симулятор / настоящие очки» в приложении).
+Android-приложение (Kotlin, Jetpack Compose, интерфейс на русском) для очков Ray-Ban Meta Gen 2 на базе Meta Wearables Device Access Toolkit (DAT SDK 1.0.1) и ИИ-провайдеров (Claude API; DeepSeek как альтернатива и запасной вариант). Package `ru.vasev.glasses`, minSdk 29, сборка только под `arm64-v8a`. Очков пока нет: снимки для «Что я вижу» можно брать с камеры телефона или из галереи, а в debug-сборке — из симулятора очков (MockDeviceKit).
 
 Три вкладки:
 - **Ассистент** — голосовой вопрос → модель (по умолчанию `claude-sonnet-5-5`) → ответ голосом; «Что я вижу» добавляет снимок с камеры очков. Память разговора и кэш промпта.
@@ -38,6 +38,8 @@ adb shell "am start -n ru.vasev.glasses/.MainActivity --es translate_me 'Доб�
 # модель для роли (сохраняется в настройках) и имитация сбоя Claude на следующий запрос:
 adb shell "am start -n ru.vasev.glasses/.MainActivity --es model_assistant deepseek-v4-pro --es model_translation deepseek-flash"
 adb shell "am start -n ru.vasev.glasses/.MainActivity --es fail_claude server --es question 'Привет'"   # server|network|forbidden|ratelimit
+# источник снимков (камера телефона запросит разрешение, если его нет):
+adb shell "am start -n ru.vasev.glasses/.MainActivity --es image_source simulator"   # glasses|phone|gallery|simulator
 ```
 
 «Нет интернета» проверяется авиарежимом: `adb shell cmd connectivity airplane-mode enable|disable` (USB-отладка при этом работает). После проверок верните модели по умолчанию — debug-параметры их сохраняют.
@@ -49,7 +51,6 @@ adb shell "am start -n ru.vasev.glasses/.MainActivity --es fail_claude server --
 **API-ключи провайдеров в сборку не входят.** Они вводятся на вкладке «Настройки» и хранятся на телефоне (`security/ApiKeyStore`, слот на `ProviderId`): AES-256-GCM одним ключом из Android Keystore (на S25 — StrongBox), в SharedPreferences `secure` лежит только `IV || шифротекст` на слот (`anthropic_key_ct`, `deepseek_key_ct`, …), в AAD — имя слота. Имена слота Anthropic и alias Keystore (`anthropic_api_key_v1`) остались от версии с одним ключом — не переименовывать, иначе сохранённый ключ перестанет расшифровываться. Расшифровка — в памяти: перед каждым запросом (провайдер подставляет ключ заголовком только в этот запрос: `x-api-key` у Anthropic, где клиент SDK собран с заглушкой, `Authorization: Bearer` у OpenAI-совместимых) и на экране «Настройки» ради последних 4 символов. Признак «ключ есть» — по наличию шифротекста, без расшифровки. EncryptedSharedPreferences не используем (устарела). Резервное копирование и перенос данных на другое устройство отключены (`allowBackup=false` + `res/xml/data_extraction_rules.xml`). Проверка, что ключа нет в APK: распаковать APK и искать `sk-ant` по всем файлам (в самом .apk строки сжаты). Ключи DeepSeek начинаются с `sk-`: в logcat искать шаблон `sk-[A-Za-z0-9_-]{16,}` — голое `sk-` даёт ложные совпадения (`task-display-area`). Не вводите ключ через `adb shell input text` — adbd пишет текст команды в logcat. Debug-запуск сценариев работает только после ввода ключа в приложении.
 
 Остальное — в `local.properties` (в `.gitignore`), в код попадает через `BuildConfig` (`app/build.gradle.kts`):
-- `use_mock_device` → режим по умолчанию при первом запуске (дальше хранится в SharedPreferences);
 - `mwdat_application_id`, `mwdat_client_token` — необязательны; в Developer Mode приложения Meta AI достаточно `0` (лог `Failed to read metadata … APPLICATION_ID` при этом ожидаем);
 - `sdk.dir` писать с прямыми слешами (`C:/Users/...`) — экранированные обратные ломают AGP («Invalid file path»).
 
@@ -81,6 +82,13 @@ DAT SDK берётся из Maven Central, GitHub-токен не нужен.
 **Память ассистента** — `Conversation` (чистый Kotlin, покрыт тестами): окно обрезается пачкой (10 обменов → последние 5), чтобы реже сбивать кэш; картинкой отправляется только последний снимок, старые — пометкой «[фото]». **Ответы Claude хранятся только текстом, без thinking-блоков**: у Sonnet 5.5 thinking-блоки привязаны к неизменной истории, и после обрезки окна или замены фото их повторная отправка дала бы 400 на новых аккаунтах. Кэш срабатывает от 512 токенов — короткие текстовые разговоры не кэшируются, это нормально. Сброс: кнопка, голосом «новый разговор» / «забудь всё» (`Conversation.isResetCommand`), автосброс через 5 минут тишины.
 
 **Перевод** (`translate/`): `TranslationPrompt` собирает user-сообщение (3 предыдущие реплики как контекст + направление + фраза), `NoiseFilter` не пускает в API пустые фразы и 1–2 междометия. В `TranslationViewModel.turn` микрофон снова включается только после окончания озвучки + 400 мс (защита от эха). Голос TTS для языка проверяется заранее (`VoiceStatus`); если не скачан — подсказка и кнопка, открывающая установку голосов текущего движка (`Speaker.enginePackage`).
+
+**Источник снимков** (`camera/`) — `ImageSource`, выбирается в карточке вверху «Ассистента» (`ImageSourceSettings`, по умолчанию «Очки»):
+- «Очки» — DAT SDK. Не подключены — «Что я вижу» не блокируется, а говорит «Очки не подключены…» и подсказывает камеру телефона; автоматически не переключает (телефон может лежать в кармане).
+- «Камера телефона» — CameraX (`PhoneCamera`), задняя камера: видоискатель в карточке, `ImageCapture` по «Что я вижу». Камера привязана к жизненному циклу видоискателя — включена только пока он на экране. Разрешение `CAMERA` запрашивается при выборе источника; если его отозвали в настройках Android — вместо чёрного видоискателя «Нет доступа к камере» и «Разрешить» (`MainActivity.cameraGranted` перепроверяется в `onResume`).
+- «Из галереи» — системный `PickVisualMedia`: приложение получает только выбранный снимок, разрешений нет.
+- «Симулятор очков» — только в debug-сборке; он же включает MockDeviceKit (`GlassesManager.setMockMode`, в release всегда выключен).
+- Все снимки проходят `ImagePrep`: поворот (с камеры — `rotationDegrees`, из галереи — EXIF через `ImageDecoder`), длинная сторона ≤ 1024 px и перекодирование `Bitmap.compress` — EXIF (в т. ч. GPS) не уходит. Debug-лог `Image`: `exif_в_исходнике=… exif_в_отправляемом=false`. У снимка в чате — метка источника.
 
 **Очки** (`glasses/`): `GlassesManager.captureJpeg` на каждый снимок открывает короткую DAT-сессию: `createSession` → ждать `STARTED` → `addCamera` → `stream.start()` → ждать `STREAMING` (критическая ошибка стрима ловится сразу) → `stream.capturePhoto()` → стоп. Стабильный `stream.capturePhoto()` выбран намеренно: отдельная съёмка `camera.photo` экспериментальная. `MockGlassesController` поднимает MockDeviceKit: **без `setCameraFeed` симулятор не запускает стрим**, поэтому `MockVideoEncoder` при первом включении кодирует `res/raw/mock_view.jpg` в 2-секундное HEVC-видео (ffmpeg не нужен) и кэширует его.
 

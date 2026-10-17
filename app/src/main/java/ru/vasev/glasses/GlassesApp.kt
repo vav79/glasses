@@ -3,6 +3,8 @@ package ru.vasev.glasses
 import android.app.Application
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
+import ru.vasev.glasses.camera.ImageSourceSettings
+import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
@@ -16,6 +18,12 @@ import ru.vasev.glasses.speech.Speaker
 import ru.vasev.glasses.speech.SpeechSource
 
 class GlassesApp : Application() {
+
+    /** Источник снимков для «Что я вижу» и камера телефона. */
+    lateinit var imageSources: ImageSourceSettings
+        private set
+    lateinit var phoneCamera: PhoneCamera
+        private set
 
     lateinit var glasses: GlassesManager
         private set
@@ -48,6 +56,8 @@ class GlassesApp : Application() {
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)
+        imageSources = ImageSourceSettings(this, glasses)
+        phoneCamera = PhoneCamera(this)
         val router = AudioRouter(this)
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), router)
         speaker = Speaker(this)

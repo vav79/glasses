@@ -1,7 +1,6 @@
 package ru.vasev.glasses.glasses
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.util.Log
 import com.meta.wearable.dat.camera.Camera
@@ -35,7 +34,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.vasev.glasses.BuildConfig
 import ru.vasev.glasses.GlassesApp.Companion.TAG
-import java.io.ByteArrayOutputStream
+import ru.vasev.glasses.camera.ImagePrep
 
 /** Ошибка с текстом, который можно сразу показать пользователю. */
 class GlassesException(message: String) : Exception(message)
@@ -67,7 +66,8 @@ class GlassesManager(private val context: Context) {
     private val prefs = context.getSharedPreferences("glasses", Context.MODE_PRIVATE)
     private val mock = MockGlassesController(context)
 
-    private val _mockMode = MutableStateFlow(prefs.getBoolean(KEY_MOCK, BuildConfig.USE_MOCK_DEVICE_DEFAULT))
+    // Режим задаёт источник снимков (ImageSourceSettings); в release-сборке симулятора нет.
+    private val _mockMode = MutableStateFlow(BuildConfig.DEBUG && prefs.getBoolean(KEY_MOCK, false))
     val mockMode: StateFlow<Boolean> = _mockMode.asStateFlow()
 
     val status: StateFlow<GlassesStatus> =
@@ -83,7 +83,8 @@ class GlassesManager(private val context: Context) {
         if (_mockMode.value) scope.launch { mock.enable() }
     }
 
-    fun setMockMode(enabled: Boolean) {
+    fun setMockMode(requested: Boolean) {
+        val enabled = requested && BuildConfig.DEBUG
         if (enabled == _mockMode.value) return
         prefs.edit().putBoolean(KEY_MOCK, enabled).apply()
         _mockMode.value = enabled
@@ -175,21 +176,11 @@ class GlassesManager(private val context: Context) {
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             }
         }
-        val scale = MAX_IMAGE_SIDE.toFloat() / maxOf(bitmap.width, bitmap.height)
-        val scaled = if (scale < 1f) {
-            Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
-        } else {
-            bitmap
-        }
-        return ByteArrayOutputStream().use { out ->
-            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
-            out.toByteArray()
-        }
+        return ImagePrep.fromBitmap(bitmap, source = if (_mockMode.value) "симулятор" else "очки")
     }
 
     private companion object {
         const val KEY_MOCK = "mock_mode"
-        const val MAX_IMAGE_SIDE = 1024
         const val SESSION_TIMEOUT_MS = 15_000L
         const val STREAM_TIMEOUT_MS = 10_000L
     }

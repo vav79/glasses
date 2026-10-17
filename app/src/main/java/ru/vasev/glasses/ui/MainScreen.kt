@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -27,22 +29,31 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.camera.view.PreviewView
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.vasev.glasses.camera.ImageSource
+import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesStatus
 
 @Composable
@@ -52,9 +63,12 @@ fun MainScreen(
     onWhatDoISee: () -> Unit,
     onConnectGlasses: () -> Unit,
     onOpenSettings: () -> Unit,
+    onSelectSource: (ImageSource) -> Unit,
+    cameraGranted: Boolean,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
+    val source by viewModel.imageSource.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val model by viewModel.model.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
@@ -79,10 +93,14 @@ fun MainScreen(
                 ) { Text("Новый разговор") }
             }
 
-            GlassesCard(
+            SourceCard(
+                source = source,
+                sources = viewModel.availableSources,
                 status = status,
+                camera = viewModel.phoneCamera,
+                cameraGranted = cameraGranted,
                 enabled = !busy,
-                onMockModeChange = viewModel::setMockMode,
+                onSelect = onSelectSource,
                 onConnectGlasses = onConnectGlasses,
             )
 
@@ -109,7 +127,8 @@ fun MainScreen(
 
             FilledTonalButton(
                 onClick = onWhatDoISee,
-                enabled = !busy && status.ready && hasApiKey,
+                // Не блокируем, когда очки не подключены: кнопка сама скажет «Очки не подключены» и что делать.
+                enabled = !busy && hasApiKey,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),
@@ -129,7 +148,7 @@ private fun Chat(state: UiState, modifier: Modifier) {
 
     if (rowCount == 0) {
         Text(
-            "Нажмите «Спросить» и задайте вопрос голосом. «Что я вижу» сначала снимет кадр с очков. " +
+            "Нажмите «Спросить» и задайте вопрос голосом. «Что я вижу» сначала возьмёт снимок из выбранного источника. " +
                 "Уточняющие вопросы Claude поймёт с учётом разговора. Сказать «новый разговор» или " +
                 "«забудь всё» — начать заново.",
             modifier = modifier,
@@ -149,12 +168,14 @@ private fun Chat(state: UiState, modifier: Modifier) {
                 modifier = Modifier.alpha(if (item.remembered) 1f else 0.4f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                UserBubble(item.question, item.frame)
+                UserBubble(item.question, item.frame, item.frameSource)
                 AnswerBubble(item.answer, item.model)
             }
         }
         if (hasPending) {
-            item(key = "pending") { UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame) }
+            item(key = "pending") {
+                UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource)
+            }
         }
         state.error?.let { error -> item(key = "error") { Notice(error) } }
     }
@@ -178,7 +199,7 @@ private fun ForgottenDivider() {
 }
 
 @Composable
-private fun UserBubble(text: String, frame: Bitmap?) {
+private fun UserBubble(text: String, frame: Bitmap?, frameSource: String? = null) {
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Column(
             modifier = Modifier
@@ -191,12 +212,19 @@ private fun UserBubble(text: String, frame: Bitmap?) {
             frame?.let {
                 Image(
                     bitmap = it.asImageBitmap(),
-                    contentDescription = "Кадр с очков",
+                    contentDescription = "Снимок: ${frameSource ?: "очки"}",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp)),
                 )
+                frameSource?.let { label ->
+                    Text(
+                        "снимок: $label",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    )
+                }
             }
             Text(text, color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.bodyLarge)
         }
@@ -219,30 +247,88 @@ private fun AnswerBubble(text: String, model: String) {
     }
 }
 
+/** Источник снимков: выбор, состояние очков и видоискатель камеры телефона. */
 @Composable
-private fun GlassesCard(
+private fun SourceCard(
+    source: ImageSource,
+    sources: List<ImageSource>,
     status: GlassesStatus,
+    camera: PhoneCamera,
+    cameraGranted: Boolean,
     enabled: Boolean,
-    onMockModeChange: (Boolean) -> Unit,
+    onSelect: (ImageSource) -> Unit,
     onConnectGlasses: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (status.mockMode) "Режим: симулятор" else "Режим: настоящие очки",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(status.text, style = MaterialTheme.typography.bodyMedium)
-                }
-                Switch(checked = status.mockMode, onCheckedChange = onMockModeChange, enabled = enabled)
+                Text("Снимки:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                SourcePicker(source, sources, enabled, onSelect)
             }
-            if (!status.mockMode && !status.ready) {
-                FilledTonalButton(onClick = onConnectGlasses, enabled = enabled) { Text("Подключить очки через Meta AI") }
+            when (source) {
+                ImageSource.GLASSES, ImageSource.SIMULATOR -> {
+                    Text(status.text, style = MaterialTheme.typography.bodyMedium)
+                    if (source == ImageSource.GLASSES && !status.ready) {
+                        FilledTonalButton(onClick = onConnectGlasses, enabled = enabled) { Text("Подключить очки через Meta AI") }
+                    }
+                }
+                ImageSource.PHONE_CAMERA -> if (cameraGranted) {
+                    PhoneViewfinder(camera)
+                } else {
+                    // Доступ отозвали в настройках Android — объясняем вместо чёрного видоискателя.
+                    Text("Нет доступа к камере телефона.", style = MaterialTheme.typography.bodyMedium)
+                    FilledTonalButton(onClick = { onSelect(ImageSource.PHONE_CAMERA) }, enabled = enabled) { Text("Разрешить") }
+                }
+                ImageSource.GALLERY -> Text(
+                    "«Что я вижу» откроет системный выбор фото — приложение видит только выбранный снимок.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun SourcePicker(selected: ImageSource, sources: List<ImageSource>, enabled: Boolean, onSelect: (ImageSource) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, enabled = enabled) { Text("${selected.title} ▾", maxLines = 1) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            sources.forEach { source ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            source.title + if (source.debugOnly) " (debug)" else "",
+                            fontWeight = if (source == selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelect(source)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Небольшой видоискатель: камера работает, только пока он на экране. */
+@Composable
+private fun PhoneViewfinder(camera: PhoneCamera) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    DisposableEffect(lifecycleOwner) {
+        camera.bind(lifecycleOwner, previewView)
+        onDispose { camera.unbind() }
+    }
+    AndroidView(
+        factory = { previewView },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .clip(RoundedCornerShape(10.dp)),
+    )
 }
 
 @Composable
