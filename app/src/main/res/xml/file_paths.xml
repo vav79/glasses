@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider отдаёт наружу только копию журнала для «Поделиться» (cache/export). -->
+<paths>
+    <cache-path name="export" path="export/" />
+</paths>

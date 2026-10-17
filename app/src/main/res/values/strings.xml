@@ -186,4 +186,39 @@
     <string name="key_err_whitespace">The key must not contain spaces or line breaks.</string>
     <string name="key_err_short">The key is too short — copy it in full.</string>
     <string name="key_err_no_master">Encryption key not found.</string>
+
+    <!-- Роли и первый запуск -->
+    <string name="tab_dev">Development</string>
+    <string name="onboarding_language_title">Choose a language</string>
+    <string name="onboarding_language_hint">The assistant will listen and answer in this language. You can change it later in Settings.</string>
+    <string name="language_system_current">System (%1$s)</string>
+    <string name="next">Next</string>
+    <string name="start">Start</string>
+    <string name="back">Back</string>
+    <string name="onboarding_role_title">How will you use the app?</string>
+    <string name="onboarding_role_hint">A role only sets which tabs come first and what is shown. You can change it any time in Settings — nothing is lost.</string>
+    <string name="role_traveler">Traveler</string>
+    <string name="role_traveler_desc">Live conversation translation first, the assistant at hand.</string>
+    <string name="role_researcher">Researcher</string>
+    <string name="role_researcher_desc">Assistant with the camera: ask about what you see.</string>
+    <string name="role_developer">Developer</string>
+    <string name="role_developer_desc">Everything above plus the Development tab: request journal, models and logs.</string>
+    <string name="role_selected">selected</string>
+    <string name="settings_role">Role</string>
+    <string name="settings_role_hint">Changes the tab order and which settings are shown. Switching loses nothing.</string>
+    <string name="settings_advanced">Advanced settings</string>
+    <string name="show_advanced">Show advanced</string>
+    <string name="hide_advanced">Hide advanced</string>
+    <string name="settings_journal">Request journal</string>
+    <string name="settings_journal_texts_title">Save question and answer texts</string>
+    <string name="settings_journal_texts_subtitle">Off: the journal keeps only metadata — time, mode, model, latency, tokens, cost. It is stored only on this phone.</string>
+    <string name="dev_journal_title">Model request journal</string>
+    <string name="dev_journal_summary">Requests: %1$d · total ≈ %2$s</string>
+    <string name="dev_journal_empty">No requests yet. Ask the assistant or translate a phrase — every request to a model shows up here.</string>
+    <string name="dev_journal_hint">Last %1$d requests, stored only on this phone. Cost is an estimate from the price table in the app.</string>
+    <string name="dev_export">Share JSONL</string>
+    <string name="dev_clear">Clear</string>
+    <string name="dev_clear_confirm">Clear the request journal?</string>
+    <string name="dev_fallback">fallback</string>
+    <string name="dev_no_entries_to_share">The journal is empty.</string>
 </resources>

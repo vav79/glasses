@@ -182,4 +182,39 @@
     <string name="key_err_whitespace">В ключе не должно быть пробелов и переносов строк.</string>
     <string name="key_err_short">Ключ слишком короткий — скопируйте его целиком.</string>
     <string name="key_err_no_master">Ключ шифрования не найден.</string>
+
+    <!-- Роли и первый запуск -->
+    <string name="tab_dev">Разработка</string>
+    <string name="onboarding_language_title">Выберите язык</string>
+    <string name="onboarding_language_hint">На этом языке ассистент будет слушать и отвечать. Потом его можно сменить в настройках.</string>
+    <string name="language_system_current">Системный (%1$s)</string>
+    <string name="next">Далее</string>
+    <string name="start">Начать</string>
+    <string name="back">Назад</string>
+    <string name="onboarding_role_title">Как вы будете пользоваться приложением?</string>
+    <string name="onboarding_role_hint">Роль только задаёт, какие вкладки идут первыми и что показывать. Её можно сменить в настройках в любой момент — ничего не теряется.</string>
+    <string name="role_traveler">Путешественник</string>
+    <string name="role_traveler_desc">Сначала живой перевод разговора, ассистент под рукой.</string>
+    <string name="role_researcher">Исследователь</string>
+    <string name="role_researcher_desc">Ассистент с камерой: спрашивайте о том, что видите.</string>
+    <string name="role_developer">Разработчик</string>
+    <string name="role_developer_desc">Всё то же + вкладка «Разработка»: журнал запросов, модели и логи.</string>
+    <string name="role_selected">выбрано</string>
+    <string name="settings_role">Роль</string>
+    <string name="settings_role_hint">Меняет порядок вкладок и набор настроек. При смене ничего не теряется.</string>
+    <string name="settings_advanced">Расширенные настройки</string>
+    <string name="show_advanced">Показать расширенные</string>
+    <string name="hide_advanced">Скрыть расширенные</string>
+    <string name="settings_journal">Журнал запросов</string>
+    <string name="settings_journal_texts_title">Сохранять тексты вопросов и ответов</string>
+    <string name="settings_journal_texts_subtitle">Выключено: в журнале только метаданные — время, режим, модель, задержка, токены, стоимость. Журнал хранится только на этом телефоне.</string>
+    <string name="dev_journal_title">Журнал запросов к моделям</string>
+    <string name="dev_journal_summary">Запросов: %1$d · всего ≈ %2$s</string>
+    <string name="dev_journal_empty">Запросов пока нет. Спросите ассистента или переведите фразу — каждый запрос к модели появится здесь.</string>
+    <string name="dev_journal_hint">Последние %1$d запросов, только на этом телефоне. Стоимость — оценка по таблице цен в приложении.</string>
+    <string name="dev_export">Поделиться JSONL</string>
+    <string name="dev_clear">Очистить</string>
+    <string name="dev_clear_confirm">Очистить журнал запросов?</string>
+    <string name="dev_fallback">запасная</string>
+    <string name="dev_no_entries_to_share">Журнал пуст.</string>
 </resources>

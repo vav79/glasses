@@ -66,6 +66,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val fallbackEnabled by viewModel.fallbackEnabled.collectAsStateWithLifecycle()
     val fallbackPhotos by viewModel.fallbackPhotos.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val role by viewModel.role.collectAsStateWithLifecycle()
+    val showAdvanced by viewModel.showAdvanced.collectAsStateWithLifecycle()
+    val journalTexts by viewModel.journalTexts.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
@@ -80,13 +83,32 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         Hint(stringResource(R.string.settings_app_language_hint))
 
         HorizontalDivider()
-        SectionTitle(stringResource(R.string.settings_models))
+        SectionTitle(stringResource(R.string.settings_role))
+        RolePicker(role, viewModel::setRole)
+        Hint(stringResource(R.string.settings_role_hint))
+
+        for (provider in viewModel.providers) {
+            HorizontalDivider()
+            KeySection(provider, keys.getValue(provider), viewModel)
+        }
+        Hint(stringResource(R.string.settings_keys_hint))
+
+        // Расширенные: разработчику — сразу, остальным — по кнопке. Значения действуют независимо от видимости.
+        HorizontalDivider()
+        if (!role.advancedAlwaysVisible) {
+            OutlinedButton(onClick = { viewModel.setShowAdvanced(!showAdvanced) }, modifier = Modifier.fillMaxWidth()) {
+                IconLabel(R.drawable.ic_sym_tune, stringResource(if (showAdvanced) R.string.hide_advanced else R.string.show_advanced))
+            }
+        }
+        if (!role.advancedAlwaysVisible && !showAdvanced) return@Column
+
+        SectionTitle(stringResource(R.string.settings_advanced))
+        SubsectionTitle(stringResource(R.string.settings_models))
         ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
         ModelPicker(stringResource(R.string.settings_model_translation), translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
         Hint(stringResource(R.string.settings_vision_hint))
 
-        HorizontalDivider()
-        SectionTitle(stringResource(R.string.settings_fallback))
+        SubsectionTitle(stringResource(R.string.settings_fallback))
         SwitchRow(
             title = stringResource(R.string.settings_fallback_title),
             subtitle = stringResource(R.string.settings_fallback_subtitle),
@@ -101,13 +123,19 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             onChange = viewModel::setFallbackPhotos,
         )
 
-        for (provider in viewModel.providers) {
-            HorizontalDivider()
-            KeySection(provider, keys.getValue(provider), viewModel)
-        }
-
-        Hint(stringResource(R.string.settings_keys_hint))
+        SubsectionTitle(stringResource(R.string.settings_journal))
+        SwitchRow(
+            title = stringResource(R.string.settings_journal_texts_title),
+            subtitle = stringResource(R.string.settings_journal_texts_subtitle),
+            checked = journalTexts,
+            onChange = viewModel::setJournalTexts,
+        )
     }
+}
+
+@Composable
+private fun SubsectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
 }
 
 @Composable

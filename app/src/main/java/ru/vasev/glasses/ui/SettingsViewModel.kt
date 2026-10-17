@@ -19,6 +19,7 @@ import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
+import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.security.ApiKeyException
 import ru.vasev.glasses.security.ApiKeyInfo
 
@@ -57,6 +58,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         _language.value = choice
         LanguageSettings.set(choice)
     }
+
+    private val profile = (app as GlassesApp).profile
+    val role: StateFlow<UserRole> = profile.role
+    val showAdvanced: StateFlow<Boolean> = profile.showAdvanced
+    val journalTexts: StateFlow<Boolean> = profile.journalTexts
+
+    fun setRole(role: UserRole) = profile.setRole(role)
+    fun setShowAdvanced(show: Boolean) = profile.setShowAdvanced(show)
+    fun setJournalTexts(enabled: Boolean) = profile.setJournalTexts(enabled)
 
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)

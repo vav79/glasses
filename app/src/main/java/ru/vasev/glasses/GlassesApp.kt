@@ -9,6 +9,8 @@ import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
+import ru.vasev.glasses.llm.RequestJournal
+import ru.vasev.glasses.profile.ProfileSettings
 import ru.vasev.glasses.security.ApiKeyStore
 import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
@@ -45,6 +47,14 @@ class GlassesApp : Application() {
     lateinit var aiSettings: AiSettings
         private set
 
+    /** Роль, первый запуск и видимость расширенных настроек. */
+    lateinit var profile: ProfileSettings
+        private set
+
+    /** Журнал запросов к моделям (вкладка «Разработка»). */
+    lateinit var journal: RequestJournal
+        private set
+
     /** Запросы к ИИ для ассистента и перевода. */
     lateinit var llm: LlmService
         private set
@@ -55,7 +65,9 @@ class GlassesApp : Application() {
         L.init(this)
         apiKeys = ApiKeyStore(this)
         aiSettings = AiSettings(this)
-        llm = LlmService(this, apiKeys, aiSettings)
+        profile = ProfileSettings(this)
+        journal = RequestJournal(this)
+        llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)

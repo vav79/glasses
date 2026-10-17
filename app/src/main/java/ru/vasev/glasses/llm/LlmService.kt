@@ -12,6 +12,7 @@ import ru.vasev.glasses.R
 import ru.vasev.glasses.claude.Turn
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.security.ApiKeyStore
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 /** Ошибка для пользователя. [needsKey] — проблема с ключом: показать путь в «Настройки». */
@@ -29,7 +30,14 @@ data class Answer(val text: String?, val model: ModelSpec, val viaFallback: Bool
  * Единая точка запросов к ИИ: модель по роли из [AiSettings], автоматическая модель с фото для «Что я вижу»,
  * запасная модель при сбое Claude ([FallbackPolicy]) и строка лога `LLM` на каждую попытку.
  */
-class LlmService(context: Context, private val keys: ApiKeyStore, private val settings: AiSettings) {
+class LlmService(
+    context: Context,
+    private val keys: ApiKeyStore,
+    private val settings: AiSettings,
+    private val journal: RequestJournal,
+    /** Сохранять ли в журнале тексты вопроса и ответа (настройка, по умолчанию выключена). */
+    private val journalTexts: () -> Boolean,
+) {
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
@@ -106,6 +114,7 @@ class LlmService(context: Context, private val keys: ApiKeyStore, private val se
         return try {
             provider.complete(request).also { r ->
                 val u = r.usage
+                record(request, fallback, if (r.text == null) "refused" else "ok", SystemClock.elapsedRealtime() - started, u, r.text)
                 Log.d(
                     TAG,
                     "$prefix status=${if (r.text == null) "refused" else "ok"} latency=${SystemClock.elapsedRealtime() - started}ms " +
@@ -119,8 +128,30 @@ class LlmService(context: Context, private val keys: ApiKeyStore, private val se
                 "$prefix status=error(${e.kind}${e.status?.let { " $it" } ?: ""}) " +
                     "latency=${SystemClock.elapsedRealtime() - started}ms photo=${photoNote(request)} fallback=$fallbackNote",
             )
+            record(request, fallback, "error(${e.kind}${e.status?.let { " $it" } ?: ""})", SystemClock.elapsedRealtime() - started, Usage(), null)
             throw e
         }
+    }
+
+    private fun record(request: ChatRequest, fallback: Boolean, status: String, latencyMs: Long, usage: Usage, answer: String?) {
+        val now = Instant.now()
+        val texts = journalTexts()
+        journal.add(
+            JournalEntry(
+                time = now,
+                role = request.role,
+                provider = request.model.provider,
+                model = request.model.id,
+                status = status,
+                latencyMs = latencyMs,
+                usage = usage,
+                photo = photoNote(request),
+                fallback = fallback,
+                costUsd = ModelPrices.estimate(request.model.id, usage, now),
+                question = if (texts) (request.turns.lastOrNull() as? Turn.User)?.text else null,
+                answer = if (texts) answer else null,
+            ),
+        )
     }
 
     private fun photoNote(request: ChatRequest): String = when {

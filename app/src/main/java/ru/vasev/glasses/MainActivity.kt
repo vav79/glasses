@@ -18,7 +18,10 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
@@ -36,6 +39,8 @@ import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
 import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
+import ru.vasev.glasses.ui.DevScreen
+import ru.vasev.glasses.ui.OnboardingScreen
 import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.MainViewModel
 import ru.vasev.glasses.ui.SettingsScreen
@@ -95,7 +100,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         // Activity пересоздаётся при смене языка приложения или системы; ViewModel и история разговора остаются.
         LanguageSettings.refresh()
-        savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name }?.let { tab = it } }
+        val profile = (application as GlassesApp).profile
+        // Первый показ — стартовая вкладка роли; после пересоздания — та, что была открыта.
+        tab = savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name } }
+            ?: profile.role.value.startTab
         enableEdgeToEdge()
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
@@ -108,8 +116,27 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             GlassesTheme {
+                val onboarded by profile.onboarded.collectAsStateWithLifecycle()
+                val role by profile.role.collectAsStateWithLifecycle()
+                if (!onboarded) {
+                    val language by settings.language.collectAsStateWithLifecycle()
+                    OnboardingScreen(
+                        language = language,
+                        systemLanguage = LanguageSettings.system(),
+                        onLanguage = settings::setLanguage,
+                        initialRole = role,
+                        onFinish = { chosen ->
+                            profile.completeOnboarding(chosen)
+                            selectTab(chosen.startTab)
+                        },
+                    )
+                    return@GlassesTheme
+                }
+                // Роль сменили в настройках, а открытой вкладки у новой роли нет — на стартовую.
+                LaunchedEffect(role) { if (tab !in role.tabs) selectTab(role.startTab) }
                 AppRoot(
-                    tab = tab,
+                    tabs = role.tabs,
+                    tab = role.keep(tab),
                     onTabChange = ::selectTab,
                     assistant = {
                         MainScreen(
@@ -130,6 +157,10 @@ class MainActivity : AppCompatActivity() {
                             onInstallVoice = ::openVoiceInstaller,
                             onOpenSettings = { selectTab(AppTab.SETTINGS) },
                         )
+                    },
+                    development = {
+                        val journal = (application as GlassesApp).journal
+                        DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear)
                     },
                     settings = { SettingsScreen(settings) },
                 )
@@ -158,9 +189,21 @@ class MainActivity : AppCompatActivity() {
         when (tab) {
             AppTab.ASSISTANT -> viewModel.stop()
             AppTab.TRANSLATE -> translation.stop()
-            AppTab.SETTINGS -> Unit
+            AppTab.DEVELOPMENT, AppTab.SETTINGS -> Unit
         }
         tab = newTab
+    }
+
+    /** Журнал запросов — копией в JSONL через системное «Поделиться» (FileProvider, только папка экспорта). */
+    private fun shareJournal() {
+        val file = (application as GlassesApp).journal.exportCopy()
+        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, file.name)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(send, getString(R.string.dev_journal_title)))
     }
 
     private fun openVoiceInstaller() {
@@ -205,11 +248,17 @@ class MainActivity : AppCompatActivity() {
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
      *  - снимки:    --es image_source glasses|phone|gallery|simulator
+     *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
      * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
     private fun handleDebugIntent(intent: Intent) {
         if (!BuildConfig.DEBUG) return
         val app = application as GlassesApp
+        if (intent.getBooleanExtra("reset_onboarding", false)) {
+            intent.removeExtra("reset_onboarding")
+            // Только флаг первого запуска: роль, ключи и история остаются.
+            app.profile.resetOnboarding()
+        }
         intent.getStringExtra("image_source")?.let { name ->
             intent.removeExtra("image_source")
             val source = when (name) {
