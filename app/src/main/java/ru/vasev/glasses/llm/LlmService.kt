@@ -8,21 +8,21 @@ import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import okhttp3.OkHttpClient
+import ru.vasev.glasses.R
 import ru.vasev.glasses.claude.Turn
+import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.security.ApiKeyStore
 import java.util.concurrent.TimeUnit
 
 /** Ошибка для пользователя. [needsKey] — проблема с ключом: показать путь в «Настройки». */
 class LlmException(message: String, val needsKey: Boolean = false) : Exception(message)
 
-/** Ответ с меткой модели. [text] = null — модель отказалась отвечать. */
+/** Метка модели у ответа; подпись («· запасная», «· для фото») собирает экран на текущем языке. */
+data class ModelTag(val title: String, val viaFallback: Boolean, val autoVision: Boolean)
+
+/** Ответ модели. [text] = null — модель отказалась отвечать. */
 data class Answer(val text: String?, val model: ModelSpec, val viaFallback: Boolean, val autoVision: Boolean) {
-    val label: String
-        get() = model.title + when {
-            viaFallback -> " · запасная"
-            autoVision -> " · для фото"
-            else -> ""
-        }
+    val tag: ModelTag get() = ModelTag(model.title, viaFallback, autoVision)
 }
 
 /**
@@ -51,7 +51,7 @@ class LlmService(context: Context, private val keys: ApiKeyStore, private val se
     fun model(role: Role) = settings.model(role)
 
     suspend fun complete(role: Role, system: String, turns: List<Turn>, maxTokens: Long, effort: Effort): Answer {
-        if (!isOnline()) throw LlmException(FallbackPolicy.NO_INTERNET)
+        if (!isOnline()) throw LlmException(L.s(R.string.no_internet))
 
         var request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort)
         var autoVision = false
@@ -75,14 +75,21 @@ class LlmService(context: Context, private val keys: ApiKeyStore, private val se
                 photosAllowed = settings.fallbackPhotos.value,
             )
             when (decision) {
-                is FallbackDecision.Fail -> throw LlmException(decision.message, needsKey = e.needsKey)
+                is FallbackDecision.Fail -> throw LlmException(
+                    when (decision.reason) {
+                        FailReason.NO_INTERNET -> L.s(R.string.no_internet)
+                        FailReason.PHOTO_NOT_SENT -> L.s(R.string.photo_not_sent)
+                        FailReason.ORIGINAL_ERROR -> e.userMessage
+                    },
+                    needsKey = e.needsKey,
+                )
                 is FallbackDecision.Retry -> {
                     val retry = (if (decision.stripPhotos) request.withoutPhotos() else request)
                         .copy(model = ModelCatalog.FALLBACK, timeoutMs = FALLBACK_TIMEOUT_MS)
                     val result = try {
                         attempt(retry, fallback = true, cause = e)
                     } catch (e2: ProviderException) {
-                        throw LlmException("${e.userMessage} Запасная модель тоже не ответила.")
+                        throw LlmException(L.s(R.string.fallback_also_failed, e.userMessage))
                     }
                     return Answer(result.text, result.model, viaFallback = true, autoVision = false)
                 }

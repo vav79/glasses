@@ -11,6 +11,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.vasev.glasses.GlassesApp
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
+import ru.vasev.glasses.i18n.LanguageChoice
+import ru.vasev.glasses.i18n.LanguageSettings
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
@@ -46,6 +50,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val fallbackEnabled: StateFlow<Boolean> = ai.fallbackEnabled
     val fallbackPhotos: StateFlow<Boolean> = ai.fallbackPhotos
 
+    private val _language = MutableStateFlow(LanguageSettings.choice())
+    val language: StateFlow<LanguageChoice> = _language.asStateFlow()
+
+    fun setLanguage(choice: LanguageChoice) {
+        _language.value = choice
+        LanguageSettings.set(choice)
+    }
+
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)
     fun setFallbackPhotos(enabled: Boolean) = ai.setFallbackPhotos(enabled)
@@ -74,11 +86,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 store.save(provider, input)
                 store.describe(provider)
             }
-            update(provider) { it.copy(key = key, editing = false, busy = false, message = "Ключ сохранён.") }
+            update(provider) { it.copy(key = key, editing = false, busy = false, message = L.s(R.string.key_saved_message)) }
         } catch (e: ApiKeyException) {
             update(provider) { it.copy(busy = false, error = e.message) }
         } catch (e: Exception) {
-            update(provider) { it.copy(busy = false, error = "Не удалось зашифровать ключ (${e.javaClass.simpleName}).") }
+            update(provider) { it.copy(busy = false, error = L.s(R.string.key_encrypt_failed, e.javaClass.simpleName)) }
         }
     }
 
@@ -93,7 +105,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(provider: ProviderId) = viewModelScope.launch {
         withContext(Dispatchers.Default) { store.delete(provider) }
-        update(provider) { KeyState(editing = true, message = "Ключ удалён.") }
+        update(provider) { KeyState(editing = true, message = L.s(R.string.key_deleted_message)) }
     }
 
     private fun update(provider: ProviderId, change: (KeyState) -> KeyState) =

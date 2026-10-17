@@ -23,7 +23,7 @@ object DebugFaults {
             else -> return
         }
         pending = provider to parsed
-        Log.d("LLM", "debug: следующий запрос к ${provider.title} завершится ошибкой $parsed")
+        Log.d("LLM", "debug: the next ${provider.title} request will fail with $parsed")
     }
 
     fun consume(provider: ProviderId): ProviderException? {
@@ -36,6 +36,6 @@ object DebugFaults {
             ProviderException.Kind.RATE_LIMIT -> 429
             else -> null
         }
-        return ProviderException(provider, fault.second, status, detail = "имитация (debug)")
+        return ProviderException(provider, fault.second, status, detail = "simulated (debug)")
     }
 }

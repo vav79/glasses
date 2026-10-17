@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Основная тема окна; цвета интерфейса задаёт Compose (GlassesTheme, Material You). -->
-    <style name="Theme.Glasses" parent="android:Theme.Material.NoActionBar" />
+    <!--
+      Основная тема окна. MainActivity — AppCompatActivity (нужна для per-app language на Android 10–12),
+      поэтому тема — потомок Theme.AppCompat. Цвета интерфейса задаёт Compose (GlassesTheme, Material You).
+    -->
+    <style name="Theme.Glasses" parent="Theme.AppCompat.DayNight.NoActionBar" />
 
-    <!-- Заставка при запуске (SplashScreen API): иконка приложения на её фоне. -->
+    <!--
+      Заставка при запуске (SplashScreen API). installSplashScreen() вызывается до super.onCreate и сразу
+      ставит postSplashScreenTheme — проверка темы AppCompatActivity видит уже Theme.Glasses.
+    -->
     <style name="Theme.Glasses.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>

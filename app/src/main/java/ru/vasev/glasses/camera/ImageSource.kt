@@ -4,15 +4,22 @@ import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.annotation.StringRes
 import ru.vasev.glasses.BuildConfig
+import ru.vasev.glasses.R
 import ru.vasev.glasses.glasses.GlassesManager
 
-/** Откуда берётся снимок для «Что я вижу». [chatLabel] — метка у снимка в чате. */
-enum class ImageSource(val title: String, val chatLabel: String, val debugOnly: Boolean = false) {
-    GLASSES("Очки", "очки"),
-    PHONE_CAMERA("Камера телефона", "телефон"),
-    GALLERY("Из галереи", "галерея"),
-    SIMULATOR("Симулятор очков", "симулятор", debugOnly = true),
+/** Откуда берётся снимок для «Что я вижу». [chatLabelRes] — метка у снимка в чате, [logName] — имя в логах. */
+enum class ImageSource(
+    @StringRes val titleRes: Int,
+    @StringRes val chatLabelRes: Int,
+    val logName: String,
+    val debugOnly: Boolean = false,
+) {
+    GLASSES(R.string.source_glasses, R.string.source_label_glasses, "glasses"),
+    PHONE_CAMERA(R.string.source_phone_camera, R.string.source_label_phone, "phone"),
+    GALLERY(R.string.source_gallery, R.string.source_label_gallery, "gallery"),
+    SIMULATOR(R.string.source_simulator, R.string.source_label_simulator, "simulator", debugOnly = true),
     ;
 
     /** Снимок даёт DAT SDK (настоящие очки или MockDeviceKit). */

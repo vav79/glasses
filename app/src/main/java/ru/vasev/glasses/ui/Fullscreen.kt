@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,11 +38,11 @@ fun FullscreenPhoto(bitmap: Bitmap, label: String?, onClose: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .clickable(onClickLabel = "Закрыть снимок", onClick = onClose),
+                .clickable(onClickLabel = stringResource(R.string.close_photo), onClick = onClose),
         ) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Снимок на весь экран" + (label?.let { ", источник: $it" } ?: ""),
+                contentDescription = label?.let { stringResource(R.string.photo_full_screen_with_source, it) } ?: stringResource(R.string.photo_full_screen),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -67,7 +68,7 @@ fun FullscreenText(text: String, caption: String, onClose: () -> Unit) {
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(onClickLabel = "Закрыть", onClick = onClose),
+                .clickable(onClickLabel = stringResource(R.string.close), onClick = onClose),
         ) {
             Column(
                 Modifier.align(Alignment.Center).padding(24.dp),
@@ -93,6 +94,6 @@ fun FullscreenText(text: String, caption: String, onClose: () -> Unit) {
 private fun CloseButton(onClose: () -> Unit, modifier: Modifier) {
     // IconButton — зона нажатия 48 dp.
     IconButton(onClick = onClose, modifier = modifier) {
-        Icon(painterResource(R.drawable.ic_sym_close), contentDescription = "Закрыть", tint = Color.Gray, modifier = Modifier.size(28.dp))
+        Icon(painterResource(R.drawable.ic_sym_close), contentDescription = stringResource(R.string.close), tint = Color.Gray, modifier = Modifier.size(28.dp))
     }
 }

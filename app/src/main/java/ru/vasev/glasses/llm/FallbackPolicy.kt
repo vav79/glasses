@@ -2,11 +2,22 @@ package ru.vasev.glasses.llm
 
 /** Что делать после сбоя основной модели. Чистая логика — покрыта unit-тестами. */
 sealed interface FallbackDecision {
-    /** Повторить через запасную модель; [stripPhotos] — снимки из истории заменить на «[фото]». */
+    /** Повторить через запасную модель; [stripPhotos] — снимки из истории заменить на «[photo]». */
     data class Retry(val stripPhotos: Boolean) : FallbackDecision
 
-    /** Не повторять, показать [message]. */
-    data class Fail(val message: String) : FallbackDecision
+    /** Не повторять. Текст для пользователя по [reason] собирает [LlmService] на языке приложения. */
+    data class Fail(val reason: FailReason) : FallbackDecision
+}
+
+enum class FailReason {
+    /** Сети нет совсем — «Нет интернета». */
+    NO_INTERNET,
+
+    /** «Что я вижу» при сбое Claude, а фото в запасную модель отправлять нельзя. */
+    PHOTO_NOT_SENT,
+
+    /** Показать исходную ошибку провайдера. */
+    ORIGINAL_ERROR,
 }
 
 object FallbackPolicy {
@@ -19,9 +30,6 @@ object FallbackPolicy {
         ProviderException.Kind.NETWORK,
     )
 
-    const val NO_INTERNET = "Нет интернета."
-    const val PHOTO_NOT_SENT = "Claude недоступен, фото не отправлено."
-
     fun decide(
         error: ProviderException,
         online: Boolean,
@@ -30,11 +38,11 @@ object FallbackPolicy {
         photoInCurrentTurn: Boolean,
         photosAllowed: Boolean,
     ): FallbackDecision {
-        if (error.kind == ProviderException.Kind.NETWORK && !online) return FallbackDecision.Fail(NO_INTERNET)
+        if (error.kind == ProviderException.Kind.NETWORK && !online) return FallbackDecision.Fail(FailReason.NO_INTERNET)
         val eligible = error.provider == ProviderId.ANTHROPIC && error.kind in TRIGGERS
-        if (!eligible || !fallbackEnabled || !hasFallbackKey) return FallbackDecision.Fail(error.userMessage)
+        if (!eligible || !fallbackEnabled || !hasFallbackKey) return FallbackDecision.Fail(FailReason.ORIGINAL_ERROR)
         // Автоматическая подмена: без разрешения снимок с камеры не уходит в другую модель.
-        if (photoInCurrentTurn && !photosAllowed) return FallbackDecision.Fail(PHOTO_NOT_SENT)
+        if (photoInCurrentTurn && !photosAllowed) return FallbackDecision.Fail(FailReason.PHOTO_NOT_SENT)
         return FallbackDecision.Retry(stripPhotos = !photosAllowed)
     }
 }

@@ -54,7 +54,7 @@ class OpenAiCompatibleFormatTest {
             Dialect.DEEPSEEK,
         )
         val first = body.getJSONArray("messages").getJSONObject(1).get("content")
-        assertEquals("[фото]\nЧто это?", first)
+        assertEquals("[photo]\nЧто это?", first)
         assertFalse(body.toString().contains("image_url"))
     }
 
@@ -64,7 +64,7 @@ class OpenAiCompatibleFormatTest {
             request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("старый вопрос", photoPlaceholder = true), Turn.Assistant("a"), Turn.User("новый"))),
             Dialect.DEEPSEEK,
         )
-        assertEquals("[фото]\nстарый вопрос", body.getJSONArray("messages").getJSONObject(1).get("content"))
+        assertEquals("[photo]\nстарый вопрос", body.getJSONArray("messages").getJSONObject(1).get("content"))
     }
 
     @Test

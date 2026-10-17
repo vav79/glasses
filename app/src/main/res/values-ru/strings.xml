@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Очки</string>
+
+    <!-- Вкладки -->
+    <string name="tab_assistant">Ассистент</string>
+    <string name="tab_translate">Перевод</string>
+    <string name="tab_settings">Настройки</string>
+
+    <!-- Ассистент -->
+    <string name="assistant_title">Очки + ИИ</string>
+    <string name="assistant_hint_idle">Нажмите и задайте вопрос</string>
+    <string name="assistant_hint_busy">%1$s Нажмите, чтобы остановить.</string>
+    <string name="assistant_empty">Нажмите на микрофон и задайте вопрос голосом. «Что я вижу» сначала возьмёт снимок из выбранного источника. Уточняющие вопросы модель поймёт с учётом разговора. Сказать «новый разговор» или «забудь всё» — начать заново.</string>
+    <string name="what_do_i_see">Что я вижу</string>
+    <string name="new_conversation">Новый разговор</string>
+    <string name="forgotten_divider">Выше — модель уже не помнит</string>
+    <string name="photo_with_source">Снимок, источник: %1$s. Нажмите, чтобы открыть на весь экран</string>
+    <string name="open_photo_full_screen">Открыть снимок на весь экран</string>
+    <string name="photo_caption">снимок: %1$s</string>
+    <string name="photo_full_screen">Снимок на весь экран</string>
+    <string name="photo_full_screen_with_source">Снимок на весь экран, источник: %1$s</string>
+    <string name="close_photo">Закрыть снимок</string>
+    <string name="close">Закрыть</string>
+    <string name="model_fallback_suffix">%1$s · запасная</string>
+    <string name="model_for_photo_suffix">%1$s · для фото</string>
+
+    <!-- Состояния ассистента -->
+    <string name="phase_capturing">Снимаю…</string>
+    <string name="phase_listening">Слушаю…</string>
+    <string name="phase_thinking">Думаю…</string>
+    <string name="phase_speaking">Говорю…</string>
+    <string name="mic_ask">Спросить голосом</string>
+    <string name="mic_stop">Остановить</string>
+    <string name="mic_state_ready">готов</string>
+    <string name="mic_state_capturing">снимаю кадр</string>
+    <string name="mic_state_listening">слушаю</string>
+    <string name="mic_state_thinking">думаю</string>
+    <string name="mic_state_speaking">говорю</string>
+
+    <!-- Озвучивается ассистентом -->
+    <string name="say_new_conversation">Начинаем новый разговор.</string>
+    <string name="say_cannot_answer">Извините, на это я ответить не могу.</string>
+    <string name="say_fallback_answers">Отвечает запасная модель. %1$s</string>
+    <string name="glasses_not_connected">Очки не подключены. Чтобы снимать телефоном, выберите источник снимков «Камера телефона».</string>
+    <string name="simulator_not_ready">Симулятор очков не готов.</string>
+    <string name="something_went_wrong">Что-то пошло не так.</string>
+
+    <!-- Голосовые команды сброса разговора (сравниваются без учёта регистра, ё/е и знаков препинания) -->
+    <string-array name="reset_commands">
+        <item>новый разговор</item>
+        <item>забудь всё</item>
+    </string-array>
+
+    <!-- Источники снимков -->
+    <string name="photos_label">Снимки:</string>
+    <string name="source_glasses">Очки</string>
+    <string name="source_phone_camera">Камера телефона</string>
+    <string name="source_gallery">Из галереи</string>
+    <string name="source_simulator">Симулятор очков</string>
+    <string name="source_label_glasses">очки</string>
+    <string name="source_label_phone">телефон</string>
+    <string name="source_label_gallery">галерея</string>
+    <string name="source_label_simulator">симулятор</string>
+    <string name="source_debug_suffix">%1$s (debug)</string>
+    <string name="connect_glasses">Подключить очки через Meta AI</string>
+    <string name="no_camera_access">Нет доступа к камере телефона.</string>
+    <string name="allow">Разрешить</string>
+    <string name="gallery_hint">«Что я вижу» откроет системный выбор фото — приложение видит только выбранный снимок.</string>
+    <string name="camera_permission_denied">Без доступа к камере источник снимков не изменён.</string>
+    <string name="phone_camera_not_ready">Камера телефона не готова. Откройте вкладку «Ассистент» и разрешите доступ к камере.</string>
+    <string name="phone_camera_failed">Не удалось сделать снимок камерой телефона.</string>
+
+    <!-- Состояние очков и ошибки -->
+    <string name="glasses_registering">Регистрация в Meta AI…</string>
+    <string name="glasses_not_registered">Приложение не подключено к Meta AI</string>
+    <string name="glasses_not_found">Очки не найдены</string>
+    <string name="glasses_simulator_ready">Симулятор очков готов</string>
+    <string name="glasses_connected">Очки подключены</string>
+    <string name="glasses_err_not_registered">Приложение не подключено к Meta AI. Нажмите «Подключить очки».</string>
+    <string name="glasses_err_not_found">Очки не найдены. Наденьте их и проверьте Bluetooth.</string>
+    <string name="glasses_err_session">Не удалось открыть сессию с очками.</string>
+    <string name="glasses_err_camera_unavailable">Камера недоступна: %1$s</string>
+    <string name="glasses_err_unknown">неизвестная ошибка</string>
+    <string name="glasses_err_stream_start">Стрим не запустился: %1$s</string>
+    <string name="glasses_err_camera_start">Камера очков не запустилась. Попробуйте ещё раз.</string>
+    <string name="glasses_err_capture">Не удалось сделать снимок: %1$s</string>
+    <string name="glasses_err_camera_permission">Нет доступа к камере очков. Разрешите его в Meta AI.</string>
+    <string name="glasses_err_not_responding">Очки не отвечают. Проверьте, что они включены и надеты.</string>
+
+    <!-- Речь -->
+    <string name="speech_not_heard">Не расслышал. Попробуйте ещё раз.</string>
+    <string name="speech_phrase_not_heard">Не расслышал фразу. Попробуйте ещё раз.</string>
+    <string name="speech_no_service">На телефоне нет службы распознавания речи (нужно приложение Google).</string>
+    <string name="speech_interrupted">Распознавание прервалось. Попробуйте ещё раз.</string>
+    <string name="speech_no_mic_permission">Нет разрешения на микрофон.</string>
+    <string name="speech_no_network">Нет сети для распознавания речи.</string>
+    <string name="speech_language_unavailable">Этот язык недоступен для распознавания на телефоне.</string>
+    <string name="speech_error_code">Ошибка распознавания речи (код %1$d).</string>
+    <string name="tts_unavailable">Синтез речи недоступен на телефоне.</string>
+    <string name="tts_no_voice">Нет голоса для языка «%1$s».</string>
+
+    <!-- ИИ-провайдеры -->
+    <string name="no_internet">Нет интернета.</string>
+    <string name="photo_not_sent">Claude недоступен, фото не отправлено.</string>
+    <string name="fallback_also_failed">%1$s Запасная модель тоже не ответила.</string>
+    <string name="llm_no_key">Нет API-ключа %1$s. Откройте «Настройки» и введите ключ.</string>
+    <string name="llm_auth">API-ключ %1$s не подходит. Замените его в «Настройках».</string>
+    <string name="llm_no_balance">На счёте %1$s закончились средства.</string>
+    <string name="llm_forbidden">%1$s: нет доступа к модели.</string>
+    <string name="llm_rate_limit">Слишком много запросов к %1$s, подождите немного.</string>
+    <string name="llm_server">%1$s временно недоступен%2$s.</string>
+    <string name="llm_network">Нет связи с %1$s.</string>
+    <string name="llm_bad_request">Ошибка запроса к %1$s%2$s.</string>
+    <string name="llm_empty">%1$s вернул пустой ответ.</string>
+    <string name="missing_key_notice">Для модели «%1$s» нужен API-ключ %2$s. Он хранится только на этом телефоне в зашифрованном виде.</string>
+    <string name="open_settings">Открыть настройки</string>
+
+    <!-- Перевод -->
+    <string name="continuous">Непрерывно</string>
+    <string name="download_voice">Скачать голос</string>
+    <string name="stop">Стоп</string>
+    <string name="clear_feed">Очистить ленту</string>
+    <string name="partner_speaks">Собеседник говорит %1$s</string>
+    <string name="i_reply">Я отвечаю</string>
+    <string name="partner_language_cd">Язык собеседника: %1$s. Изменить</string>
+    <string name="translate_empty">Выберите язык собеседника. «Собеседник говорит» — перевод его речи для вас (%1$s). «Я отвечаю» — перевод вашей речи, его услышит собеседник из динамика телефона. В непрерывном режиме приложение снова слушает собеседника, пока вы не нажмёте «Стоп».</string>
+    <string name="translation_unavailable">перевод недоступен</string>
+    <string name="show_translation_full_screen">Показать перевод на весь экран</string>
+    <string name="tphase_listening_partner">Слушаю собеседника…</string>
+    <string name="tphase_listening_me">Слушаю вас…</string>
+    <string name="tphase_translating">Перевожу…</string>
+    <string name="tphase_speaking">Озвучиваю перевод…</string>
+    <string name="voice_not_downloaded">Голос «%1$s» не скачан — ответы собеседнику не будут озвучены. Скачайте его кнопкой ниже (или: Настройки → Общие настройки → Синтез речи).</string>
+    <string name="voice_unsupported">Движок синтеза речи не поддерживает язык «%1$s». Выберите Google в Настройки → Общие настройки → Синтез речи и скачайте голос.</string>
+
+    <!-- Языки (названия в интерфейсе) -->
+    <string name="lang_english">Английский</string>
+    <string name="lang_russian">Русский</string>
+    <string name="lang_chinese">Китайский</string>
+    <string name="lang_turkish">Турецкий</string>
+    <string name="lang_german">Немецкий</string>
+    <string name="lang_french">Французский</string>
+    <string name="lang_spanish">Испанский</string>
+    <string name="lang_italian">Итальянский</string>
+    <string name="lang_arabic">Арабский</string>
+    <string name="lang_thai">Тайский</string>
+
+    <!-- Настройки -->
+    <string name="settings_app_language">Язык приложения</string>
+    <string name="settings_app_language_hint">Это и язык общения с ассистентом: распознавание речи, голос, ответы и голосовые команды.</string>
+    <string name="language_system">Системный</string>
+    <string name="settings_models">Модели</string>
+    <string name="settings_model_assistant">Ассистент</string>
+    <string name="settings_model_translation">Перевод</string>
+    <string name="settings_vision_hint">Если у модели нет зрения, для «Что я вижу» автоматически берётся DeepSeek Flash.</string>
+    <string name="model_no_photo">%1$s (без фото)</string>
+    <string name="settings_fallback">Запасная модель</string>
+    <string name="settings_fallback_title">Повторять через DeepSeek Flash, если Claude недоступен</string>
+    <string name="settings_fallback_subtitle">При ошибках 403, 429, 5xx и обрывах связи — один повтор. Без интернета не пробует.</string>
+    <string name="settings_fallback_photos_title">Отправлять фото в запасную модель</string>
+    <string name="settings_fallback_photos_subtitle">Выключено: «Что я вижу» при сбое Claude не отправит снимок в DeepSeek, а снимки из истории уйдут пометкой «[photo]».</string>
+    <string name="settings_keys_hint">Ключи создаются в консолях провайдеров (console.anthropic.com, platform.deepseek.com). Они хранятся только на этом телефоне в зашифрованном виде, в сборку приложения не входят, а резервное копирование данных приложения отключено.</string>
+    <string name="key_section_title">API-ключ %1$s</string>
+    <string name="key_saved">Ключ сохранён: ••••%1$s</string>
+    <string name="key_encrypted">Зашифрован AES-GCM ключом из Android Keystore%1$s. Расшифровывается только в памяти перед запросом.</string>
+    <string name="key_strongbox_suffix">" (StrongBox)"</string>
+    <string name="key_delete_confirm">Удалить ключ %1$s? Модели %1$s перестанут работать.</string>
+    <string name="delete">Удалить</string>
+    <string name="cancel">Отмена</string>
+    <string name="key_replace">Заменить ключ</string>
+    <string name="key_delete">Удалить ключ</string>
+    <string name="key_paste">Вставьте ключ %1$s</string>
+    <string name="key_show">Показать ключ</string>
+    <string name="key_hide">Скрыть ключ</string>
+    <string name="save">Сохранить</string>
+    <string name="key_saved_message">Ключ сохранён.</string>
+    <string name="key_deleted_message">Ключ удалён.</string>
+    <string name="key_encrypt_failed">Не удалось зашифровать ключ (%1$s).</string>
+    <string name="key_err_unreadable">Сохранённый ключ %1$s не читается. Введите его заново в «Настройках».</string>
+    <string name="key_err_empty">Введите ключ.</string>
+    <string name="key_err_whitespace">В ключе не должно быть пробелов и переносов строк.</string>
+    <string name="key_err_short">Ключ слишком короткий — скопируйте его целиком.</string>
+    <string name="key_err_no_master">Ключ шифрования не найден.</string>
+</resources>

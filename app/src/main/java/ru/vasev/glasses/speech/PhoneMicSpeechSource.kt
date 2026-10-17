@@ -1,6 +1,8 @@
 package ru.vasev.glasses.speech
 
 import android.content.Context
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
@@ -23,7 +25,7 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
 
     override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit, onLevel: (Float) -> Unit): Heard {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            throw SpeechException("На телефоне нет службы распознавания речи (нужно приложение Google).")
+            throw SpeechException(L.s(R.string.speech_no_service))
         }
         val recognizer = recognizer ?: SpeechRecognizer.createSpeechRecognizer(context).also { recognizer = it }
         return suspendCancellableCoroutine { cont ->
@@ -35,7 +37,7 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
                         ?.firstOrNull()?.trim().orEmpty()
                     if (!cont.isActive) return
                     if (text.isEmpty()) {
-                        cont.resumeWithException(SpeechException(NOT_HEARD, noSpeech = true))
+                        cont.resumeWithException(SpeechException(L.s(R.string.speech_not_heard), noSpeech = true))
                     } else {
                         val end = if (endOfSpeechAt != 0L) endOfSpeechAt else SystemClock.elapsedRealtime()
                         cont.resume(Heard(text, end))
@@ -75,19 +77,16 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
 
     private fun errorFor(error: Int): SpeechException = when (error) {
         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-            SpeechException(NOT_HEARD, noSpeech = true)
+            SpeechException(L.s(R.string.speech_not_heard), noSpeech = true)
         // Сбои связи со службой распознавания — повторяемые.
         SpeechRecognizer.ERROR_SERVER_DISCONNECTED, SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_CLIENT ->
-            SpeechException("Распознавание прервалось. Попробуйте ещё раз.", transient = true)
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> SpeechException("Нет разрешения на микрофон.")
+            SpeechException(L.s(R.string.speech_interrupted), transient = true)
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> SpeechException(L.s(R.string.speech_no_mic_permission))
         SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-            SpeechException("Нет сети для распознавания речи.")
+            SpeechException(L.s(R.string.speech_no_network))
         SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
-            SpeechException("Этот язык недоступен для распознавания на телефоне.")
-        else -> SpeechException("Ошибка распознавания речи (код $error).")
+            SpeechException(L.s(R.string.speech_language_unavailable))
+        else -> SpeechException(L.s(R.string.speech_error_code, error))
     }
 
-    private companion object {
-        const val NOT_HEARD = "Не расслышал. Попробуйте ещё раз."
-    }
 }

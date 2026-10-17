@@ -32,9 +32,8 @@ class ImageSourceTest {
     }
 
     @Test
-    fun `chat labels`() {
-        assertEquals("очки", ImageSource.GLASSES.chatLabel)
-        assertEquals("телефон", ImageSource.PHONE_CAMERA.chatLabel)
+    fun `log names and glasses flag`() {
+        assertEquals(listOf("glasses", "phone", "gallery", "simulator"), ImageSource.entries.map { it.logName })
         assertTrue(ImageSource.GLASSES.usesGlasses && ImageSource.SIMULATOR.usesGlasses)
         assertFalse(ImageSource.PHONE_CAMERA.usesGlasses || ImageSource.GALLERY.usesGlasses)
     }

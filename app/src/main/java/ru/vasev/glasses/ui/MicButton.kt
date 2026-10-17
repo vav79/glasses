@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -85,14 +86,14 @@ fun MicButton(phase: Phase, level: Float, enabled: Boolean, onClick: () -> Unit,
     }
     val haloVisible = phase == Phase.LISTENING || phase == Phase.SPEAKING
 
-    val description = if (phase == Phase.IDLE) "Спросить голосом" else "Остановить"
+    val description = stringResource(if (phase == Phase.IDLE) R.string.mic_ask else R.string.mic_stop)
     val state = when (phase) {
-        Phase.IDLE -> "готов"
-        Phase.CAPTURING -> "снимаю кадр"
-        Phase.LISTENING -> "слушаю"
-        Phase.THINKING -> "думаю"
-        Phase.SPEAKING -> "говорю"
-    }
+        Phase.IDLE -> R.string.mic_state_ready
+        Phase.CAPTURING -> R.string.mic_state_capturing
+        Phase.LISTENING -> R.string.mic_state_listening
+        Phase.THINKING -> R.string.mic_state_thinking
+        Phase.SPEAKING -> R.string.mic_state_speaking
+    }.let { stringResource(it) }
 
     Box(Modifier.size(size * 1.4f), contentAlignment = Alignment.Center) {
         if (haloVisible) {

@@ -1,5 +1,7 @@
 package ru.vasev.glasses.claude
 
+import java.text.Normalizer
+
 /** Один завершённый обмен «вопрос — ответ». [jpeg] — снимок с очков, если вопрос был с ним. */
 class Exchange(
     val id: Long,
@@ -76,15 +78,18 @@ class Conversation(
     }
 
     companion object {
-        private val RESET_COMMANDS = setOf("новый разговор", "забудь все")
+        /**
+         * «Новый разговор», «Забудь всё!», «New conversation.» и т. п. — команды языка приложения
+         * (`R.array.reset_commands`). Сравнение без учёта регистра, знаков препинания и диакритики
+         * (NFD + удаление диакритических знаков: «ё» → «е»; команды нормализуются так же, как фраза).
+         */
+        fun isResetCommand(text: String, commands: Collection<String>): Boolean =
+            normalize(text) in commands.map(::normalize)
 
-        /** «Новый разговор», «Забудь всё!» и т. п. — без учёта регистра, ё/е и знаков препинания. */
-        fun isResetCommand(text: String): Boolean {
-            val normalized = text.lowercase()
-                .replace('ё', 'е')
+        private fun normalize(text: String): String =
+            Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
+                .replace(Regex("\\p{M}+"), "")
                 .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
                 .trim()
-            return normalized in RESET_COMMANDS
-        }
     }
 }

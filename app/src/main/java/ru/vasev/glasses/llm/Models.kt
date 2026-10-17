@@ -10,7 +10,7 @@ enum class ProviderId(val title: String) {
 }
 
 /** Кто спрашивает: от роли зависят модель по умолчанию, лимит токенов и глубина размышлений. */
-enum class Role(val title: String) { ASSISTANT("Ассистент"), TRANSLATION("Перевод") }
+enum class Role { ASSISTANT, TRANSLATION }
 
 /** Глубина размышлений: [NONE] — выключить, где модель это позволяет; [LOW] — минимальная. */
 enum class Effort { NONE, LOW }

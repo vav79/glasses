@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +55,8 @@ import ru.vasev.glasses.translate.TranslatePhase
 import ru.vasev.glasses.translate.TranslateUiState
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
+import ru.vasev.glasses.llm.ModelTag
+import ru.vasev.glasses.speech.VoiceStatus
 
 @Composable
 fun TranslationScreen(
@@ -78,7 +81,7 @@ fun TranslationScreen(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {
-                LanguagePicker(state.language, enabled = !busy, onSelect = viewModel::setLanguage)
+                LanguagePicker(state.language, PartnerLanguage.partnersFor(state.my), enabled = !busy, onSelect = viewModel::setLanguage)
             }
             Spacer(Modifier.size(8.dp))
             // Подпись и переключатель — один элемент: TalkBack читает «Непрерывно, переключатель, вкл/выкл».
@@ -89,19 +92,20 @@ fun TranslationScreen(
                     .toggleable(value = state.continuous, role = Role.Switch, onValueChange = viewModel::setContinuous)
                     .padding(start = 8.dp),
             ) {
-                Text("Непрерывно", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                Text(stringResource(R.string.continuous), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                 Spacer(Modifier.size(8.dp))
                 Switch(checked = state.continuous, onCheckedChange = null)
             }
         }
 
         if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
-        state.voiceHint?.let { hint ->
-            Hint(hint) {
+        state.voiceHint?.let { (language, status) ->
+            val title = stringResource(language.titleRes)
+            Hint(stringResource(if (status == VoiceStatus.UNSUPPORTED) R.string.voice_unsupported else R.string.voice_not_downloaded, title)) {
                 TextButton(onClick = onInstallVoice) {
                     Icon(painterResource(R.drawable.ic_sym_download), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Скачать голос")
+                    Text(stringResource(R.string.download_voice))
                 }
             }
         }
@@ -116,18 +120,18 @@ fun TranslationScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
                 Spacer(Modifier.size(12.dp))
-                Text(state.phase.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Text(state.phase.labelRes?.let { stringResource(it) }.orEmpty(), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(onClick = viewModel::stop) {
                     Icon(painterResource(R.drawable.ic_sym_stop), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Стоп")
+                    Text(stringResource(R.string.stop))
                 }
             }
         } else if (state.feed.isNotEmpty()) {
             TextButton(onClick = viewModel::clearFeed, modifier = Modifier.align(Alignment.End)) {
                 Icon(painterResource(R.drawable.ic_sym_clear_all), contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("Очистить ленту")
+                Text(stringResource(R.string.clear_feed))
             }
         }
 
@@ -145,7 +149,7 @@ fun TranslationScreen(
         ) {
             Icon(painterResource(R.drawable.ic_sym_hearing), contentDescription = null, modifier = Modifier.size(28.dp))
             Spacer(Modifier.size(12.dp))
-            Text("Собеседник говорит ${state.language.flag}", fontSize = 20.sp)
+            Text(stringResource(R.string.partner_speaks, state.language.flag), fontSize = 20.sp)
         }
 
         Button(
@@ -157,7 +161,7 @@ fun TranslationScreen(
         ) {
             Icon(painterResource(R.drawable.ic_sym_campaign), contentDescription = null, modifier = Modifier.size(28.dp))
             Spacer(Modifier.size(12.dp))
-            Text("Я отвечаю", fontSize = 20.sp)
+            Text(stringResource(R.string.i_reply) + " " + state.my.flag, fontSize = 20.sp)
         }
     }
 
@@ -165,23 +169,25 @@ fun TranslationScreen(
 }
 
 @Composable
-private fun LanguagePicker(selected: PartnerLanguage, enabled: Boolean, onSelect: (PartnerLanguage) -> Unit) {
+private fun LanguagePicker(selected: PartnerLanguage, languages: List<PartnerLanguage>, enabled: Boolean, onSelect: (PartnerLanguage) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val selectedTitle = stringResource(selected.titleRes)
+    val description = stringResource(R.string.partner_language_cd, selectedTitle)
     Box {
         OutlinedButton(
             onClick = { expanded = true },
             enabled = enabled,
-            modifier = Modifier.semantics { contentDescription = "Язык собеседника: ${selected.title}. Изменить" },
+            modifier = Modifier.semantics { contentDescription = description },
         ) {
-            Text("${selected.flag}  ${selected.title} ▾", maxLines = 1)
+            Text(selected.flag + "  " + selectedTitle + " ▾", maxLines = 1)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            PartnerLanguage.entries.forEach { language ->
+            languages.forEach { language ->
                 DropdownMenuItem(
                     leadingIcon = { Text(language.flag, fontSize = 22.sp) },
                     text = {
                         Text(
-                            language.title,
+                            stringResource(language.titleRes),
                             fontWeight = if (language == selected) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     },
@@ -205,9 +211,7 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
 
     if (rows == 0) {
         Text(
-            "Выберите язык собеседника. «Собеседник говорит» — перевод его речи на русский для вас. " +
-                "«Я отвечаю» — перевод вашей речи, его услышит собеседник из динамика телефона. " +
-                "В непрерывном режиме приложение снова слушает собеседника, пока вы не нажмёте «Стоп».",
+            stringResource(R.string.translate_empty, stringResource(state.my.titleRes)),
             modifier = modifier,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -215,19 +219,22 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
         return
     }
 
+    val partnerCaption = state.language.flag + "  " + stringResource(state.language.titleRes)
+    val myCaption = state.my.flag + "  " + stringResource(state.my.titleRes)
+    val unavailable = stringResource(R.string.translation_unavailable)
     LazyColumn(modifier = modifier, state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.feed, key = { it.id }) { item ->
-            val flag = if (item.line.who == Who.PARTNER) state.language.flag else "🇷🇺"
+            val flag = if (item.line.who == Who.PARTNER) state.language.flag else state.my.flag
             Utterance(
                 who = item.line.who,
                 flag = flag,
                 original = item.line.original,
-                translation = item.line.translation ?: "перевод недоступен",
+                translation = item.line.translation ?: unavailable,
                 model = item.model,
                 // Мой ответ — на языке собеседника: его и показываем ему крупно.
                 onShowLarge = item.line.translation?.let { text ->
                     {
-                        val caption = if (item.line.who == Who.ME) "${state.language.flag}  ${state.language.title}" else "🇷🇺  Русский"
+                        val caption = if (item.line.who == Who.ME) partnerCaption else myCaption
                         onShowLarge(text, caption)
                     }
                 },
@@ -235,7 +242,7 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
         }
         state.pendingWho?.let { who ->
             item(key = "pending") {
-                Utterance(who, if (who == Who.PARTNER) state.language.flag else "🇷🇺", state.pending.ifEmpty { "…" }, null)
+                Utterance(who, if (who == Who.PARTNER) state.language.flag else state.my.flag, state.pending.ifEmpty { "…" }, null)
             }
         }
         state.error?.let { error -> item(key = "error") { Hint(error) } }
@@ -252,7 +259,7 @@ private fun Utterance(
     flag: String,
     original: String,
     translation: String?,
-    model: String = "",
+    model: ModelTag? = null,
     onShowLarge: (() -> Unit)? = null,
 ) {
     val mine = who == Who.ME
@@ -267,7 +274,7 @@ private fun Utterance(
                 .background(container)
                 .then(
                     if (onShowLarge != null) {
-                        Modifier.clickable(onClickLabel = "Показать перевод на весь экран", onClick = onShowLarge)
+                        Modifier.clickable(onClickLabel = stringResource(R.string.show_translation_full_screen), onClick = onShowLarge)
                     } else {
                         Modifier
                     },
@@ -291,9 +298,9 @@ private fun Utterance(
                 }
             }
         }
-        if (model.isNotEmpty()) {
+        if (model != null) {
             Text(
-                model,
+                modelLabel(model),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),

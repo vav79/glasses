@@ -31,15 +31,15 @@ class PhoneSpeakerOutput(private val speaker: Speaker, private val router: Audio
         if (channel == AudioChannel.PARTNER && headset?.output != null) {
             val builtin = router.builtinSpeaker()
             if (builtin != null) {
-                router.log("out PARTNER", "запрошен динамик телефона (гарнитура подключена); ${router.state()}")
+                router.log("out PARTNER", "phone speaker requested (headset connected); ${router.state()}")
                 speaker.speakTo(text, locale, builtin, onStart) { routed ->
-                    router.log("out PARTNER", "звук идёт на: ${router.describe(routed)}")
+                    router.log("out PARTNER", "playing on: ${router.describe(routed)}")
                 }
                 return
             }
         }
-        val expected = if (headset?.output != null) "гарнитура «${headset.name}»" else "динамик телефона"
-        router.log("out $channel", "$expected, по маршруту системы: ${currentRoute()}; ${router.state()}")
+        val expected = if (headset?.output != null) "headset \"${headset.name}\"" else "phone speaker"
+        router.log("out $channel", "$expected, system route: ${currentRoute()}; ${router.state()}")
         speaker.speak(text, locale, onStart)
     }
 
@@ -49,8 +49,8 @@ class PhoneSpeakerOutput(private val speaker: Speaker, private val router: Audio
 
     private fun currentRoute(): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            router.devicesFor(Speaker.ATTRIBUTES).joinToString { router.describe(it) }.ifEmpty { "неизвестно" }
+            router.devicesFor(Speaker.ATTRIBUTES).joinToString { router.describe(it) }.ifEmpty { "unknown" }
         } else {
-            "неизвестно (Android < 13)"
+            "unknown (Android < 13)"
         }
 }

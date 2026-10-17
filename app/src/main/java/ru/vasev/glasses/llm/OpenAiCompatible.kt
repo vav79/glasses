@@ -25,7 +25,7 @@ import kotlin.coroutines.resumeWithException
 /** Сборка запроса и разбор ответа Chat Completions — чистые функции, покрыты unit-тестами. */
 object OpenAiCompatibleFormat {
 
-    const val PHOTO_PLACEHOLDER = "[фото]"
+    const val PHOTO_PLACEHOLDER = "[photo]"
 
     fun buildBody(request: ChatRequest, dialect: Dialect): JSONObject {
         val messages = JSONArray()
@@ -142,7 +142,7 @@ class OpenAiCompatibleProvider(
             val (answer, usage) = try {
                 OpenAiCompatibleFormat.parse(text)
             } catch (e: Exception) {
-                throw ProviderException(id, ProviderException.Kind.EMPTY, detail = "не разобран ответ")
+                throw ProviderException(id, ProviderException.Kind.EMPTY, detail = "unparsable response")
             }
             if (answer != null && answer.isEmpty()) throw ProviderException(id, ProviderException.Kind.EMPTY)
             ChatResult(answer, request.model, usage, latency)

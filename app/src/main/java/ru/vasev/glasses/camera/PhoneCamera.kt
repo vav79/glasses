@@ -2,6 +2,8 @@ package ru.vasev.glasses.camera
 
 import android.content.Context
 import ru.vasev.glasses.BuildConfig
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
@@ -58,23 +60,23 @@ class PhoneCamera(private val context: Context) {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
                 bound = true
-                Log.d(TAG, "камера телефона включена")
+                Log.d(TAG, "phone camera on")
             } catch (e: Exception) {
                 bound = false
-                Log.w(TAG, "не удалось включить камеру телефона: ${e.javaClass.simpleName}")
+                Log.w(TAG, "phone camera failed to start: ${e.javaClass.simpleName}")
             }
         }, mainExecutor)
     }
 
     fun unbind() {
         provider?.unbindAll()
-        if (bound) Log.d(TAG, "камера телефона выключена")
+        if (bound) Log.d(TAG, "phone camera off")
         bound = false
     }
 
     /** Снимок с учётом поворота, уменьшенный и без метаданных. */
     suspend fun capture(): ByteArray {
-        if (!bound) throw PhoneCameraException("Камера телефона не готова. Откройте вкладку «Ассистент» и разрешите доступ к камере.")
+        if (!bound) throw PhoneCameraException(L.s(R.string.phone_camera_not_ready))
         val (bitmap, rotation, jpeg) = suspendCancellableCoroutine { cont ->
             imageCapture.takePicture(
                 mainExecutor,
@@ -89,12 +91,12 @@ class PhoneCamera(private val context: Context) {
                     }
 
                     override fun onError(exception: ImageCaptureException) {
-                        if (cont.isActive) cont.resumeWithException(PhoneCameraException("Не удалось сделать снимок камерой телефона."))
+                        if (cont.isActive) cont.resumeWithException(PhoneCameraException(L.s(R.string.phone_camera_failed)))
                     }
                 },
             )
         }
-        return withContext(Dispatchers.Default) { ImagePrep.fromBitmap(bitmap, rotation, "телефон", jpeg) }
+        return withContext(Dispatchers.Default) { ImagePrep.fromBitmap(bitmap, rotation, ImageSource.PHONE_CAMERA.logName, jpeg) }
     }
 
     private fun ByteBuffer.toByteArray(): ByteArray {

@@ -18,6 +18,8 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.ProviderId
 
 /** Состояние ключа для интерфейса: только последние 4 символа, сам ключ сюда не попадает. */
@@ -64,7 +66,7 @@ class ApiKeyStore(context: Context) {
         } finally {
             plain.fill(0)
         }
-        Log.d(TAG, "Ключ ${provider.title} сохранён (зашифрован${if (isStrongBoxKey()) ", StrongBox" else ""})")
+        Log.d(TAG, "${provider.title} key saved (encrypted${if (isStrongBoxKey()) ", StrongBox" else ""})")
         _saved.value = savedSlots()
     }
 
@@ -86,8 +88,8 @@ class ApiKeyStore(context: Context) {
             cipher.doFinal(sealed, GCM_IV_BYTES, sealed.size - GCM_IV_BYTES)
         } catch (e: Exception) {
             // Ключ Keystore удалён или сменился (например, после сброса блокировки экрана) — ключ API не восстановить.
-            Log.w(TAG, "Не удалось расшифровать ключ ${provider.title}: ${e.javaClass.simpleName}")
-            throw ApiKeyException("Сохранённый ключ ${provider.title} не читается. Введите его заново в «Настройках».")
+            Log.w(TAG, "Failed to decrypt the ${provider.title} key: ${e.javaClass.simpleName}")
+            throw ApiKeyException(L.s(R.string.key_err_unreadable, provider.title))
         } finally {
             sealed.fill(0)
         }
@@ -103,21 +105,21 @@ class ApiKeyStore(context: Context) {
         _saved.value = savedSlots()
         // Ключ шифрования общий: удаляем его, только когда не осталось ни одного сохранённого ключа.
         if (_saved.value.isEmpty()) runCatching { keyStore().deleteEntry(KEY_ALIAS) }
-        Log.d(TAG, "Ключ ${provider.title} удалён")
+        Log.d(TAG, "${provider.title} key deleted")
     }
 
     private fun savedSlots(): Set<ProviderId> = ProviderId.entries.filter { prefs.contains(prefName(it)) }.toSet()
 
     private fun validate(key: String) {
-        if (key.isEmpty()) throw ApiKeyException("Введите ключ.")
-        if (key.any { it.isWhitespace() }) throw ApiKeyException("В ключе не должно быть пробелов и переносов строк.")
-        if (key.length < MIN_KEY_LENGTH) throw ApiKeyException("Ключ слишком короткий — скопируйте его целиком.")
+        if (key.isEmpty()) throw ApiKeyException(L.s(R.string.key_err_empty))
+        if (key.any { it.isWhitespace() }) throw ApiKeyException(L.s(R.string.key_err_whitespace))
+        if (key.length < MIN_KEY_LENGTH) throw ApiKeyException(L.s(R.string.key_err_short))
     }
 
     private fun keyStore(): KeyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
 
     private fun existingKey(): SecretKey =
-        keyStore().getKey(KEY_ALIAS, null) as? SecretKey ?: throw ApiKeyException("Ключ шифрования не найден.")
+        keyStore().getKey(KEY_ALIAS, null) as? SecretKey ?: throw ApiKeyException(L.s(R.string.key_err_no_master))
 
     /** Ключ шифрования из Keystore; создаётся при первом сохранении (в StrongBox, если он есть). */
     private fun secretKey(): SecretKey {
@@ -126,7 +128,7 @@ class ApiKeyStore(context: Context) {
             try {
                 return generateKey(strongBox = true)
             } catch (e: StrongBoxUnavailableException) {
-                Log.w(TAG, "StrongBox недоступен, ключ шифрования будет в обычном Keystore")
+                Log.w(TAG, "StrongBox unavailable, the encryption key will be in the regular Keystore")
             }
         }
         return generateKey(strongBox = false)

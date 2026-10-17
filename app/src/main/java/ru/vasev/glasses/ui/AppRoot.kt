@@ -1,6 +1,7 @@
 package ru.vasev.glasses.ui
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,12 +16,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import ru.vasev.glasses.R
 
-enum class AppTab(val title: String, @DrawableRes val icon: Int) {
-    ASSISTANT("Ассистент", R.drawable.ic_sym_assistant),
-    TRANSLATE("Перевод", R.drawable.ic_sym_g_translate),
-    SETTINGS("Настройки", R.drawable.ic_sym_settings),
+enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
+    ASSISTANT(R.string.tab_assistant, R.drawable.ic_sym_assistant),
+    TRANSLATE(R.string.tab_translate, R.drawable.ic_sym_g_translate),
+    SETTINGS(R.string.tab_settings, R.drawable.ic_sym_settings),
 }
 
 @Composable
@@ -40,7 +42,7 @@ fun AppRoot(
                         onClick = { onTabChange(item) },
                         // Подпись вкладки озвучивает TalkBack, иконка — декоративная.
                         icon = { Icon(painterResource(item.icon), contentDescription = null) },
-                        text = { Text(item.title) },
+                        text = { Text(stringResource(item.titleRes)) },
                     )
                 }
             }

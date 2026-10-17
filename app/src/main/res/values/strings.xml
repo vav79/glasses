@@ -1,4 +1,189 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- English is the default language; Russian is in values-ru/. -->
 <resources>
-    <string name="app_name">Очки</string>
+    <string name="app_name">Glasses</string>
+
+    <!-- Tabs -->
+    <string name="tab_assistant">Assistant</string>
+    <string name="tab_translate">Translate</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Assistant -->
+    <string name="assistant_title">Glasses + AI</string>
+    <string name="assistant_hint_idle">Tap and ask a question</string>
+    <string name="assistant_hint_busy">%1$s Tap to stop.</string>
+    <string name="assistant_empty">Tap the microphone and ask a question out loud. “What do I see” first takes a photo from the selected source. Follow-up questions are understood in the context of the conversation. Say “new conversation” or “forget everything” to start over.</string>
+    <string name="what_do_i_see">What do I see</string>
+    <string name="new_conversation">New conversation</string>
+    <string name="forgotten_divider">Above — the model no longer remembers</string>
+    <string name="photo_with_source">Photo, source: %1$s. Tap to open full screen</string>
+    <string name="open_photo_full_screen">Open photo full screen</string>
+    <string name="photo_caption">photo: %1$s</string>
+    <string name="photo_full_screen">Photo full screen</string>
+    <string name="photo_full_screen_with_source">Photo full screen, source: %1$s</string>
+    <string name="close_photo">Close photo</string>
+    <string name="close">Close</string>
+    <string name="model_fallback_suffix">%1$s · fallback</string>
+    <string name="model_for_photo_suffix">%1$s · for photo</string>
+
+    <!-- Assistant phases -->
+    <string name="phase_capturing">Taking a photo…</string>
+    <string name="phase_listening">Listening…</string>
+    <string name="phase_thinking">Thinking…</string>
+    <string name="phase_speaking">Speaking…</string>
+    <string name="mic_ask">Ask by voice</string>
+    <string name="mic_stop">Stop</string>
+    <string name="mic_state_ready">ready</string>
+    <string name="mic_state_capturing">taking a photo</string>
+    <string name="mic_state_listening">listening</string>
+    <string name="mic_state_thinking">thinking</string>
+    <string name="mic_state_speaking">speaking</string>
+
+    <!-- Spoken by the assistant -->
+    <string name="say_new_conversation">Starting a new conversation.</string>
+    <string name="say_cannot_answer">Sorry, I can\'t answer that.</string>
+    <string name="say_fallback_answers">The fallback model is answering. %1$s</string>
+    <string name="glasses_not_connected">The glasses are not connected. To take photos with the phone, choose the “Phone camera” photo source.</string>
+    <string name="simulator_not_ready">The glasses simulator is not ready.</string>
+    <string name="something_went_wrong">Something went wrong.</string>
+
+    <!-- Voice commands that reset the conversation (compared ignoring case and punctuation) -->
+    <string-array name="reset_commands">
+        <item>new conversation</item>
+        <item>forget everything</item>
+    </string-array>
+
+    <!-- Photo sources -->
+    <string name="photos_label">Photos:</string>
+    <string name="source_glasses">Glasses</string>
+    <string name="source_phone_camera">Phone camera</string>
+    <string name="source_gallery">From gallery</string>
+    <string name="source_simulator">Glasses simulator</string>
+    <string name="source_label_glasses">glasses</string>
+    <string name="source_label_phone">phone</string>
+    <string name="source_label_gallery">gallery</string>
+    <string name="source_label_simulator">simulator</string>
+    <string name="source_debug_suffix">%1$s (debug)</string>
+    <string name="connect_glasses">Connect glasses via Meta AI</string>
+    <string name="no_camera_access">No access to the phone camera.</string>
+    <string name="allow">Allow</string>
+    <string name="gallery_hint">“What do I see” opens the system photo picker — the app only sees the photo you choose.</string>
+    <string name="camera_permission_denied">Without camera access the photo source was not changed.</string>
+    <string name="phone_camera_not_ready">The phone camera is not ready. Open the Assistant tab and allow camera access.</string>
+    <string name="phone_camera_failed">Could not take a photo with the phone camera.</string>
+
+    <!-- Glasses status and errors -->
+    <string name="glasses_registering">Registering with Meta AI…</string>
+    <string name="glasses_not_registered">The app is not connected to Meta AI</string>
+    <string name="glasses_not_found">Glasses not found</string>
+    <string name="glasses_simulator_ready">Glasses simulator is ready</string>
+    <string name="glasses_connected">Glasses connected</string>
+    <string name="glasses_err_not_registered">The app is not connected to Meta AI. Tap “Connect glasses”.</string>
+    <string name="glasses_err_not_found">Glasses not found. Put them on and check Bluetooth.</string>
+    <string name="glasses_err_session">Could not open a session with the glasses.</string>
+    <string name="glasses_err_camera_unavailable">Camera unavailable: %1$s</string>
+    <string name="glasses_err_unknown">unknown error</string>
+    <string name="glasses_err_stream_start">The stream did not start: %1$s</string>
+    <string name="glasses_err_camera_start">The glasses camera did not start. Try again.</string>
+    <string name="glasses_err_capture">Could not take a photo: %1$s</string>
+    <string name="glasses_err_camera_permission">No access to the glasses camera. Allow it in Meta AI.</string>
+    <string name="glasses_err_not_responding">The glasses are not responding. Check that they are on and being worn.</string>
+
+    <!-- Speech -->
+    <string name="speech_not_heard">I didn\'t catch that. Please try again.</string>
+    <string name="speech_phrase_not_heard">I didn\'t catch the phrase. Please try again.</string>
+    <string name="speech_no_service">There is no speech recognition service on the phone (the Google app is required).</string>
+    <string name="speech_interrupted">Recognition was interrupted. Please try again.</string>
+    <string name="speech_no_mic_permission">No microphone permission.</string>
+    <string name="speech_no_network">No network for speech recognition.</string>
+    <string name="speech_language_unavailable">This language is not available for recognition on the phone.</string>
+    <string name="speech_error_code">Speech recognition error (code %1$d).</string>
+    <string name="tts_unavailable">Text-to-speech is not available on the phone.</string>
+    <string name="tts_no_voice">No voice for “%1$s”.</string>
+
+    <!-- AI providers -->
+    <string name="no_internet">No internet connection.</string>
+    <string name="photo_not_sent">Claude is unavailable, the photo was not sent.</string>
+    <string name="fallback_also_failed">%1$s The fallback model did not answer either.</string>
+    <string name="llm_no_key">No %1$s API key. Open Settings and enter the key.</string>
+    <string name="llm_auth">The %1$s API key is not valid. Replace it in Settings.</string>
+    <string name="llm_no_balance">The %1$s account is out of funds.</string>
+    <string name="llm_forbidden">%1$s: no access to the model.</string>
+    <string name="llm_rate_limit">Too many requests to %1$s, please wait a moment.</string>
+    <string name="llm_server">%1$s is temporarily unavailable%2$s.</string>
+    <string name="llm_network">No connection to %1$s.</string>
+    <string name="llm_bad_request">Request to %1$s failed%2$s.</string>
+    <string name="llm_empty">%1$s returned an empty answer.</string>
+    <string name="missing_key_notice">The “%1$s” model needs a %2$s API key. It is stored only on this phone, encrypted.</string>
+    <string name="open_settings">Open settings</string>
+
+    <!-- Translation -->
+    <string name="continuous">Continuous</string>
+    <string name="download_voice">Download voice</string>
+    <string name="stop">Stop</string>
+    <string name="clear_feed">Clear feed</string>
+    <string name="partner_speaks">Partner speaks %1$s</string>
+    <string name="i_reply">I reply</string>
+    <string name="partner_language_cd">Partner\'s language: %1$s. Change</string>
+    <string name="translate_empty">Choose your partner\'s language. “Partner speaks” translates their speech into %1$s for you. “I reply” translates your speech — your partner hears it from the phone speaker. In continuous mode the app keeps listening to your partner until you tap “Stop”.</string>
+    <string name="translation_unavailable">translation unavailable</string>
+    <string name="show_translation_full_screen">Show the translation full screen</string>
+    <string name="tphase_listening_partner">Listening to your partner…</string>
+    <string name="tphase_listening_me">Listening to you…</string>
+    <string name="tphase_translating">Translating…</string>
+    <string name="tphase_speaking">Speaking the translation…</string>
+    <string name="voice_not_downloaded">The “%1$s” voice is not downloaded — replies to your partner won\'t be spoken. Download it with the button below (or: Settings → General management → Text-to-speech).</string>
+    <string name="voice_unsupported">The text-to-speech engine doesn\'t support “%1$s”. Choose Google in Settings → General management → Text-to-speech and download the voice.</string>
+
+    <!-- Languages (UI names) -->
+    <string name="lang_english">English</string>
+    <string name="lang_russian">Russian</string>
+    <string name="lang_chinese">Chinese</string>
+    <string name="lang_turkish">Turkish</string>
+    <string name="lang_german">German</string>
+    <string name="lang_french">French</string>
+    <string name="lang_spanish">Spanish</string>
+    <string name="lang_italian">Italian</string>
+    <string name="lang_arabic">Arabic</string>
+    <string name="lang_thai">Thai</string>
+
+    <!-- Settings -->
+    <string name="settings_app_language">App language</string>
+    <string name="settings_app_language_hint">Also the language for talking to the assistant: speech recognition, voice, answers and voice commands.</string>
+    <string name="language_system">System</string>
+    <!-- Названия языков на самих языках — одинаковы в любом языке интерфейса. -->
+    <string name="language_native_russian" translatable="false">Русский</string>
+    <string name="language_native_english" translatable="false">English</string>
+    <string name="settings_models">Models</string>
+    <string name="settings_model_assistant">Assistant</string>
+    <string name="settings_model_translation">Translation</string>
+    <string name="settings_vision_hint">If the model has no vision, DeepSeek Flash is used automatically for “What do I see”.</string>
+    <string name="model_no_photo">%1$s (no photos)</string>
+    <string name="settings_fallback">Fallback model</string>
+    <string name="settings_fallback_title">Retry with DeepSeek Flash if Claude is unavailable</string>
+    <string name="settings_fallback_subtitle">On 403, 429, 5xx errors and connection drops — one retry. Doesn\'t try without internet.</string>
+    <string name="settings_fallback_photos_title">Send photos to the fallback model</string>
+    <string name="settings_fallback_photos_subtitle">Off: on a Claude failure “What do I see” won\'t send the photo to DeepSeek, and photos from the history go as a “[photo]” marker.</string>
+    <string name="settings_keys_hint">Keys are created in the provider consoles (console.anthropic.com, platform.deepseek.com). They are stored only on this phone, encrypted, are not part of the app build, and app data backup is disabled.</string>
+    <string name="key_section_title">%1$s API key</string>
+    <string name="key_saved">Key saved: ••••%1$s</string>
+    <string name="key_encrypted">Encrypted with AES-GCM using a key from Android Keystore%1$s. Decrypted only in memory before a request.</string>
+    <string name="key_strongbox_suffix">" (StrongBox)"</string>
+    <string name="key_delete_confirm">Delete the %1$s key? %1$s models will stop working.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="key_replace">Replace key</string>
+    <string name="key_delete">Delete key</string>
+    <string name="key_paste">Paste the %1$s key</string>
+    <string name="key_show">Show key</string>
+    <string name="key_hide">Hide key</string>
+    <string name="save">Save</string>
+    <string name="key_saved_message">Key saved.</string>
+    <string name="key_deleted_message">Key deleted.</string>
+    <string name="key_encrypt_failed">Could not encrypt the key (%1$s).</string>
+    <string name="key_err_unreadable">The saved %1$s key can\'t be read. Enter it again in Settings.</string>
+    <string name="key_err_empty">Enter the key.</string>
+    <string name="key_err_whitespace">The key must not contain spaces or line breaks.</string>
+    <string name="key_err_short">The key is too short — copy it in full.</string>
+    <string name="key_err_no_master">Encryption key not found.</string>
 </resources>

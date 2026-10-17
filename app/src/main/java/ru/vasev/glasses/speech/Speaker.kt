@@ -1,6 +1,9 @@
 package ru.vasev.glasses.speech
 
 import android.content.Context
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
+import ru.vasev.glasses.i18n.LanguageSettings
 import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.MediaPlayer
@@ -68,10 +71,10 @@ class Speaker(context: Context) {
      * [onStart] вызывается в момент начала звука.
      */
     suspend fun speak(text: String, locale: Locale, onStart: () -> Unit = {}) {
-        if (!ready.await()) throw SpeechException("Синтез речи недоступен на телефоне.")
+        if (!ready.await()) throw SpeechException(L.s(R.string.tts_unavailable))
         val lang = tts.setLanguage(locale)
         if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
-            throw SpeechException("Нет голоса для языка «${locale.getDisplayLanguage(RUSSIAN)}».")
+            throw SpeechException(L.s(R.string.tts_no_voice, locale.getDisplayLanguage(LanguageSettings.current.value.locale)))
         }
         suspendCancellableCoroutine { cont ->
             pendingStart = onStart
@@ -94,10 +97,10 @@ class Speaker(context: Context) {
         onStart: () -> Unit = {},
         onRouted: (AudioDeviceInfo?) -> Unit = {},
     ) {
-        if (!ready.await()) throw SpeechException("Синтез речи недоступен на телефоне.")
+        if (!ready.await()) throw SpeechException(L.s(R.string.tts_unavailable))
         val lang = tts.setLanguage(locale)
         if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
-            throw SpeechException("Нет голоса для языка «${locale.getDisplayLanguage(RUSSIAN)}».")
+            throw SpeechException(L.s(R.string.tts_no_voice, locale.getDisplayLanguage(LanguageSettings.current.value.locale)))
         }
         val file = File(cacheDir, "tts_out.wav")
         // 1. Синтез в файл.

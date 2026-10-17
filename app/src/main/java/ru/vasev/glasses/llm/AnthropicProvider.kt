@@ -134,6 +134,6 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
     private companion object {
         const val API_KEY_HEADER = "x-api-key"
         const val NO_KEY_PLACEHOLDER = "not-set"
-        const val PHOTO_PLACEHOLDER = "[фото]"
+        const val PHOTO_PLACEHOLDER = "[photo]"
     }
 }

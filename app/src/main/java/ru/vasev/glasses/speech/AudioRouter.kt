@@ -63,13 +63,13 @@ class AudioRouter(context: Context) {
         val mic = _headset.value?.mic
         if (talker != Talker.USER || mic == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             releaseMic()
-            return log("in", "микрофон телефона" + if (talker == Talker.PARTNER) " (говорит собеседник)" else "")
+            return log("in", "phone mic" + if (talker == Talker.PARTNER) " (partner speaking)" else "")
         }
         return if (switchToHeadsetMic(mic)) {
-            log("in", "микрофон гарнитуры «${_headset.value?.name}» (${typeName(mic)})")
+            log("in", "headset mic \"${_headset.value?.name}\" (${typeName(mic)})")
         } else {
             releaseMic()
-            log("in", "микрофон телефона (гарнитура не включила микрофон за ${SCO_TIMEOUT_MS} мс)")
+            log("in", "phone mic (headset mic did not turn on within ${SCO_TIMEOUT_MS} ms)")
         }
     }
 
@@ -91,7 +91,7 @@ class AudioRouter(context: Context) {
         var commLeftHeadset = false
         fun check(reason: String) {
             if (done.isCompleted || !(scoDisconnected && commLeftHeadset)) return
-            Log.d(TAG, "микрофон гарнитуры отключён за ${SystemClock.elapsedRealtime() - startedAt} мс ($reason); ${state()}")
+            Log.d(TAG, "headset mic released in ${SystemClock.elapsedRealtime() - startedAt} ms ($reason); ${state()}")
             done.complete(Unit)
         }
 
@@ -101,7 +101,7 @@ class AudioRouter(context: Context) {
                 val sco = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.SCO_AUDIO_STATE_ERROR)
                 if (sco == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) {
                     scoDisconnected = true
-                    check("SCO разорван")
+                    check("SCO disconnected")
                 }
             }
         }
@@ -115,7 +115,7 @@ class AudioRouter(context: Context) {
             AudioManager.OnCommunicationDeviceChangedListener { device ->
                 if (device?.type !in HEADSET_MIC_TYPES) {
                     commLeftHeadset = true
-                    check("устройство связи: ${describe(device)}")
+                    check("communication device: ${describe(device)}")
                 }
             }.also { audio.addOnCommunicationDeviceChangedListener(mainExecutor, it) }
         } else {
@@ -140,10 +140,10 @@ class AudioRouter(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || audio.communicationDevice?.type !in HEADSET_MIC_TYPES) {
             commLeftHeadset = true
         }
-        check("сразу")
+        check("immediately")
         main.postDelayed({
             if (!done.isCompleted) {
-                Log.w(TAG, "маршрут не переключился за ${RELEASE_TIMEOUT_MS} мс, играю как есть; ${state()}")
+                Log.w(TAG, "route did not switch within ${RELEASE_TIMEOUT_MS} ms, playing anyway; ${state()}")
                 done.complete(Unit)
             }
         }, RELEASE_TIMEOUT_MS)
@@ -167,9 +167,9 @@ class AudioRouter(context: Context) {
             AudioManager.MODE_IN_CALL -> "IN_CALL"
             else -> audio.mode.toString()
         }
-        val comm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) describe(audio.communicationDevice) else "—"
+        val comm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) describe(audio.communicationDevice) else "-"
         val volume = "${audio.getStreamVolume(AudioManager.STREAM_MUSIC)}/${audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)}"
-        return "mode=$mode, связь=$comm, медиа-громкость=$volume"
+        return "mode=$mode, comm=$comm, media_volume=$volume"
     }
 
     @Suppress("DEPRECATION")
@@ -188,7 +188,7 @@ class AudioRouter(context: Context) {
         }
 
     fun describe(device: AudioDeviceInfo?): String =
-        if (device == null) "по умолчанию" else "${device.productName} (${typeName(device)})"
+        if (device == null) "default" else "${device.productName} (${typeName(device)})"
 
     fun log(direction: String, what: String): String {
         Log.d(TAG, "$direction: $what")
@@ -231,10 +231,10 @@ class AudioRouter(context: Context) {
             Log.d(
                 TAG,
                 if (headset == null) {
-                    "гарнитура отключена — звук через телефон"
+                    "headset disconnected, audio via phone"
                 } else {
-                    "гарнитура «${headset.name}»: микрофон ${headset.mic?.let(::typeName) ?: "нет"}, " +
-                        "вывод ${headset.output?.let(::typeName) ?: "нет"}"
+                    "headset \"${headset.name}\": mic ${headset.mic?.let(::typeName) ?: "none"}, " +
+                        "output ${headset.output?.let(::typeName) ?: "none"}"
                 },
             )
         }
@@ -246,10 +246,10 @@ class AudioRouter(context: Context) {
         AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth HFP/SCO"
         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth A2DP"
         AudioDeviceInfo.TYPE_BLE_HEADSET -> "Bluetooth LE Audio"
-        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "динамик телефона"
-        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "разговорный динамик телефона"
-        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "микрофон телефона"
-        else -> "тип ${device.type}"
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "phone speaker"
+        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "phone earpiece"
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "phone mic"
+        else -> "type ${device.type}"
     }
 
     private companion object {

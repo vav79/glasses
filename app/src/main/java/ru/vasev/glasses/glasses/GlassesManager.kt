@@ -3,6 +3,7 @@ package ru.vasev.glasses.glasses
 import android.content.Context
 import android.graphics.ImageDecoder
 import android.util.Log
+import androidx.annotation.StringRes
 import com.meta.wearable.dat.camera.Camera
 import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.types.PhotoData
@@ -34,7 +35,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import ru.vasev.glasses.BuildConfig
 import ru.vasev.glasses.GlassesApp.Companion.TAG
+import ru.vasev.glasses.R
 import ru.vasev.glasses.camera.ImagePrep
+import ru.vasev.glasses.camera.ImageSource
+import ru.vasev.glasses.i18n.L
 
 /** Ошибка с текстом, который можно сразу показать пользователю. */
 class GlassesException(message: String) : Exception(message)
@@ -46,13 +50,14 @@ data class GlassesStatus(
 ) {
     val ready: Boolean get() = registration == RegistrationState.REGISTERED && deviceCount > 0
 
-    val text: String
+    @get:StringRes
+    val textRes: Int
         get() = when {
-            registration == RegistrationState.REGISTERING -> "Регистрация в Meta AI…"
-            registration != RegistrationState.REGISTERED -> "Приложение не подключено к Meta AI"
-            deviceCount == 0 -> "Очки не найдены"
-            mockMode -> "Симулятор очков готов"
-            else -> "Очки подключены"
+            registration == RegistrationState.REGISTERING -> R.string.glasses_registering
+            registration != RegistrationState.REGISTERED -> R.string.glasses_not_registered
+            deviceCount == 0 -> R.string.glasses_not_found
+            mockMode -> R.string.glasses_simulator_ready
+            else -> R.string.glasses_connected
         }
 }
 
@@ -98,14 +103,14 @@ class GlassesManager(private val context: Context) {
     suspend fun captureJpeg(requestCameraPermission: suspend () -> Boolean): ByteArray {
         val current = status.value
         if (current.registration != RegistrationState.REGISTERED) {
-            throw GlassesException("Приложение не подключено к Meta AI. Нажмите «Подключить очки».")
+            throw GlassesException(L.s(R.string.glasses_err_not_registered))
         }
-        if (current.deviceCount == 0) throw GlassesException("Очки не найдены. Наденьте их и проверьте Bluetooth.")
+        if (current.deviceCount == 0) throw GlassesException(L.s(R.string.glasses_err_not_found))
 
         ensureCameraPermission(requestCameraPermission)
 
         val session = Wearables.createSession(AutoDeviceSelector()).getOrNull()
-            ?: throw GlassesException("Не удалось открыть сессию с очками.")
+            ?: throw GlassesException(L.s(R.string.glasses_err_session))
         var camera: Camera? = null
         try {
             session.start()
@@ -115,7 +120,7 @@ class GlassesManager(private val context: Context) {
                 StreamConfiguration(videoQuality = VideoQuality.MEDIUM, frameRate = 15),
             ).let { result ->
                 result.getOrNull() ?: throw GlassesException(
-                    "Камера недоступна: ${result.errorOrNull()?.description ?: "неизвестная ошибка"}",
+                    L.s(R.string.glasses_err_camera_unavailable, result.errorOrNull()?.description ?: L.s(R.string.glasses_err_unknown)),
                 )
             }
 
@@ -127,14 +132,14 @@ class GlassesManager(private val context: Context) {
                     stream.errorStream.collect { if (it == StreamError.CRITICAL_STREAM_ERROR) critical.value = it }
                 }
                 try {
-                    stream.start().errorOrNull()?.let { throw GlassesException("Стрим не запустился: ${it.description}") }
+                    stream.start().errorOrNull()?.let { throw GlassesException(L.s(R.string.glasses_err_stream_start, it.description)) }
                     val outcome = withTimeoutOrNull(STREAM_TIMEOUT_MS) {
                         combine(stream.state, critical) { state, error -> error ?: state }
                             .first { it == StreamState.STREAMING || it == StreamState.CLOSED || it is StreamError }
                     }
                     when (outcome) {
                         is StreamError, StreamState.CLOSED ->
-                            throw GlassesException("Камера очков не запустилась. Попробуйте ещё раз.")
+                            throw GlassesException(L.s(R.string.glasses_err_camera_start))
                         null -> Log.w(TAG, "Stream state is ${stream.state.value}, trying capture anyway")
                     }
                 } finally {
@@ -144,7 +149,7 @@ class GlassesManager(private val context: Context) {
 
             val photo = stream.capturePhoto()
             val data = photo.getOrNull()
-                ?: throw GlassesException("Не удалось сделать снимок: ${photo.errorOrNull()?.description}")
+                ?: throw GlassesException(L.s(R.string.glasses_err_capture, photo.errorOrNull()?.description.orEmpty()))
             return withContext(Dispatchers.Default) { toJpeg(data) }
         } finally {
             runCatching { camera?.stop() }
@@ -155,7 +160,7 @@ class GlassesManager(private val context: Context) {
     private suspend fun ensureCameraPermission(request: suspend () -> Boolean) {
         val status = Wearables.checkPermissionStatus(Permission.CAMERA)
         if (status.getOrNull() is PermissionStatus.Granted) return
-        if (!request()) throw GlassesException("Нет доступа к камере очков. Разрешите его в Meta AI.")
+        if (!request()) throw GlassesException(L.s(R.string.glasses_err_camera_permission))
     }
 
     private suspend fun awaitSessionStarted(session: DeviceSession) {
@@ -165,7 +170,7 @@ class GlassesManager(private val context: Context) {
             }
         }
         if (state != DeviceSessionState.STARTED) {
-            throw GlassesException("Очки не отвечают. Проверьте, что они включены и надеты.")
+            throw GlassesException(L.s(R.string.glasses_err_not_responding))
         }
     }
 
@@ -176,7 +181,7 @@ class GlassesManager(private val context: Context) {
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             }
         }
-        return ImagePrep.fromBitmap(bitmap, source = if (_mockMode.value) "симулятор" else "очки")
+        return ImagePrep.fromBitmap(bitmap, source = (if (_mockMode.value) ImageSource.SIMULATOR else ImageSource.GLASSES).logName)
     }
 
     private companion object {

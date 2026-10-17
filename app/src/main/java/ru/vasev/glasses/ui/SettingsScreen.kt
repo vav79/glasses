@@ -26,6 +26,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role as SemanticsRole
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -48,6 +52,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.LanguageChoice
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
@@ -60,6 +65,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val translationModel by viewModel.translationModel.collectAsStateWithLifecycle()
     val fallbackEnabled by viewModel.fallbackEnabled.collectAsStateWithLifecycle()
     val fallbackPhotos by viewModel.fallbackPhotos.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
@@ -69,23 +75,27 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionTitle("Модели")
-        ModelPicker("Ассистент", assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
-        ModelPicker("Перевод", translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
-        Hint("Если у модели нет зрения, для «Что я вижу» автоматически берётся DeepSeek Flash.")
+        SectionTitle(stringResource(R.string.settings_app_language))
+        LanguagePicker(language, viewModel::setLanguage)
+        Hint(stringResource(R.string.settings_app_language_hint))
 
         HorizontalDivider()
-        SectionTitle("Запасная модель")
+        SectionTitle(stringResource(R.string.settings_models))
+        ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
+        ModelPicker(stringResource(R.string.settings_model_translation), translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
+        Hint(stringResource(R.string.settings_vision_hint))
+
+        HorizontalDivider()
+        SectionTitle(stringResource(R.string.settings_fallback))
         SwitchRow(
-            title = "Повторять через DeepSeek Flash, если Claude недоступен",
-            subtitle = "При ошибках 403, 429, 5xx и обрывах связи — один повтор. Без интернета не пробует.",
+            title = stringResource(R.string.settings_fallback_title),
+            subtitle = stringResource(R.string.settings_fallback_subtitle),
             checked = fallbackEnabled,
             onChange = viewModel::setFallbackEnabled,
         )
         SwitchRow(
-            title = "Отправлять фото в запасную модель",
-            subtitle = "Выключено: «Что я вижу» при сбое Claude не отправит снимок в DeepSeek, " +
-                "а снимки из истории уйдут пометкой «[фото]».",
+            title = stringResource(R.string.settings_fallback_photos_title),
+            subtitle = stringResource(R.string.settings_fallback_photos_subtitle),
             checked = fallbackPhotos,
             enabled = fallbackEnabled,
             onChange = viewModel::setFallbackPhotos,
@@ -96,34 +106,27 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             KeySection(provider, keys.getValue(provider), viewModel)
         }
 
-        Hint(
-            "Ключи создаются в консолях провайдеров (console.anthropic.com, platform.deepseek.com). Они хранятся " +
-                "только на этом телефоне в зашифрованном виде, в сборку приложения не входят, а резервное " +
-                "копирование данных приложения отключено.",
-        )
+        Hint(stringResource(R.string.settings_keys_hint))
     }
 }
 
 @Composable
 private fun KeySection(provider: ProviderId, state: KeyState, viewModel: SettingsViewModel) {
-    SectionTitle("API-ключ ${provider.title}")
+    SectionTitle(stringResource(R.string.key_section_title, provider.title))
     val key = state.key
     if (key != null && !state.editing) {
-        Text("Ключ сохранён: ••••${key.tail}", style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
-        Hint(
-            "Зашифрован AES-GCM ключом из Android Keystore" + (if (key.strongBox) " (StrongBox)" else "") +
-                ". Расшифровывается только в памяти перед запросом.",
-        )
+        Text(stringResource(R.string.key_saved, key.tail), style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
+        Hint(stringResource(R.string.key_encrypted, if (key.strongBox) stringResource(R.string.key_strongbox_suffix) else ""))
         if (state.confirmDelete) {
-            Status("Удалить ключ ${provider.title}? Модели ${provider.title} перестанут работать.", isError = true)
+            Status(stringResource(R.string.key_delete_confirm, provider.title), isError = true)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.delete(provider) }) { IconLabel(R.drawable.ic_sym_delete, "Удалить") }
-                OutlinedButton(onClick = { viewModel.cancelDelete(provider) }) { Text("Отмена") }
+                Button(onClick = { viewModel.delete(provider) }) { IconLabel(R.drawable.ic_sym_delete, stringResource(R.string.delete)) }
+                OutlinedButton(onClick = { viewModel.cancelDelete(provider) }) { Text(stringResource(R.string.cancel)) }
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.startReplace(provider) }) { IconLabel(R.drawable.ic_sym_key, "Заменить ключ") }
-                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { IconLabel(R.drawable.ic_sym_delete, "Удалить ключ") }
+                Button(onClick = { viewModel.startReplace(provider) }) { IconLabel(R.drawable.ic_sym_key, stringResource(R.string.key_replace)) }
+                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { IconLabel(R.drawable.ic_sym_delete, stringResource(R.string.key_delete)) }
             }
         }
     } else {
@@ -151,7 +154,7 @@ private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec)
                     DropdownMenuItem(
                         text = {
                             Text(
-                                model.title + if (model.vision) "" else " (без фото)",
+                                if (model.vision) model.title else stringResource(R.string.model_no_photo, model.title),
                                 fontWeight = if (model == selected) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         },
@@ -195,7 +198,7 @@ private fun KeyEditor(provider: ProviderId, busy: Boolean, canCancel: Boolean, o
     OutlinedTextField(
         value = input,
         onValueChange = { input = it },
-        label = { Text("Вставьте ключ ${provider.title}") },
+        label = { Text(stringResource(R.string.key_paste, provider.title)) },
         singleLine = true,
         enabled = !busy,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -210,15 +213,15 @@ private fun KeyEditor(provider: ProviderId, busy: Boolean, canCancel: Boolean, o
             IconButton(onClick = { visible = !visible }) {
                 Icon(
                     painterResource(if (visible) R.drawable.ic_sym_visibility_off else R.drawable.ic_sym_visibility),
-                    contentDescription = if (visible) "Скрыть ключ" else "Показать ключ",
+                    contentDescription = stringResource(if (visible) R.string.key_hide else R.string.key_show),
                 )
             }
         },
         modifier = Modifier.fillMaxWidth(),
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = submit, enabled = !busy && input.isNotBlank()) { Text("Сохранить") }
-        if (canCancel) OutlinedButton(onClick = onCancel, enabled = !busy) { Text("Отмена") }
+        Button(onClick = submit, enabled = !busy && input.isNotBlank()) { Text(stringResource(R.string.save)) }
+        if (canCancel) OutlinedButton(onClick = onCancel, enabled = !busy) { Text(stringResource(R.string.cancel)) }
     }
 }
 
@@ -251,4 +254,32 @@ private fun IconLabel(@DrawableRes icon: Int, label: String) {
     Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
     Spacer(Modifier.size(8.dp))
     Text(label)
+}
+
+/** Системный / Русский / English. Смена языка пересоздаёт экран; история разговора и перевода сохраняются. */
+@Composable
+private fun LanguagePicker(selected: LanguageChoice, onSelect: (LanguageChoice) -> Unit) {
+    val choices = LanguageChoice.entries
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == selected,
+                onClick = { if (choice != selected) onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
+                // Без галочки: «Системный» иначе не помещается; выбранный сегмент и так выделен цветом.
+                icon = {},
+            ) {
+                Text(
+                    stringResource(
+                        when (choice) {
+                            LanguageChoice.SYSTEM -> R.string.language_system
+                            LanguageChoice.RUSSIAN -> R.string.language_native_russian
+                            LanguageChoice.ENGLISH -> R.string.language_native_english
+                        },
+                    ),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }

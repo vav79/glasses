@@ -6,6 +6,7 @@ import com.meta.wearable.dat.core.Wearables
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesManager
+import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.security.ApiKeyStore
@@ -50,6 +51,8 @@ class GlassesApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Строки на языке приложения нужны уже при создании остальных объектов (сообщения об ошибках).
+        L.init(this)
         apiKeys = ApiKeyStore(this)
         aiSettings = AiSettings(this)
         llm = LlmService(this, apiKeys, aiSettings)

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -17,30 +18,36 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp
+import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
+import ru.vasev.glasses.i18n.LanguageSettings
 import ru.vasev.glasses.llm.LlmException
 import ru.vasev.glasses.llm.ModelSpec
+import ru.vasev.glasses.llm.ModelTag
 import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Heard
-import ru.vasev.glasses.speech.Speaker
 import ru.vasev.glasses.speech.SpeechException
 import ru.vasev.glasses.speech.Talker
 import ru.vasev.glasses.speech.VoiceStatus
 import java.util.Locale
 
-enum class TranslatePhase(val label: String) {
-    IDLE(""),
-    LISTENING_PARTNER("Слушаю собеседника…"),
-    LISTENING_ME("Слушаю вас…"),
-    TRANSLATING("Перевожу…"),
-    SPEAKING("Озвучиваю перевод…"),
+enum class TranslatePhase(@StringRes val labelRes: Int?) {
+    IDLE(null),
+    LISTENING_PARTNER(R.string.tphase_listening_partner),
+    LISTENING_ME(R.string.tphase_listening_me),
+    TRANSLATING(R.string.tphase_translating),
+    SPEAKING(R.string.tphase_speaking),
 }
 
 /** Реплика в ленте; [model] — метка модели, которая перевела. */
-data class FeedLine(val id: Long, val line: Line, val model: String = "")
+data class FeedLine(val id: Long, val line: Line, val model: ModelTag? = null)
 
 data class TranslateUiState(
+    /** Язык собеседника. */
     val language: PartnerLanguage = PartnerLanguage.ENGLISH,
+    /** Мой язык = язык приложения. */
+    val my: PartnerLanguage = PartnerLanguage.RUSSIAN,
     val continuous: Boolean = false,
     val phase: TranslatePhase = TranslatePhase.IDLE,
     val feed: List<FeedLine> = emptyList(),
@@ -48,8 +55,8 @@ data class TranslateUiState(
     val pending: String = "",
     val pendingWho: Who? = null,
     val error: String? = null,
-    /** Подсказка, что голос TTS для языка не скачан. */
-    val voiceHint: String? = null,
+    /** Голос TTS для языка не скачан или не поддерживается — подсказку собирает экран. */
+    val voiceHint: Pair<PartnerLanguage, VoiceStatus>? = null,
 )
 
 /** Режим перевода живого разговора. Отдельно от истории ассистента, живёт только в памяти. */
@@ -60,14 +67,19 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     private val llm = (app as GlassesApp).llm
     private val translator = Translator(llm)
     private val prefs = app.getSharedPreferences("translate", Context.MODE_PRIVATE)
+    private val noiseFilter = NoiseFilter.load(app)
+
+    private fun savedPartner(): PartnerLanguage? =
+        prefs.getString(KEY_LANGUAGE, null)?.let { name -> PartnerLanguage.entries.firstOrNull { it.name == name } }
 
     private val _state = MutableStateFlow(
-        TranslateUiState(
-            language = prefs.getString(KEY_LANGUAGE, null)
-                ?.let { name -> PartnerLanguage.entries.firstOrNull { it.name == name } }
-                ?: PartnerLanguage.ENGLISH,
-            continuous = prefs.getBoolean(KEY_CONTINUOUS, false),
-        ),
+        PartnerLanguage.forApp(LanguageSettings.current.value).let { my ->
+            TranslateUiState(
+                language = PartnerLanguage.resolvePartner(savedPartner(), my),
+                my = my,
+                continuous = prefs.getBoolean(KEY_CONTINUOUS, false),
+            )
+        },
     )
     val state: StateFlow<TranslateUiState> = _state.asStateFlow()
 
@@ -82,6 +94,16 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         checkVoice(_state.value.language)
+        // Сменили язык приложения — меняется «мой язык»; лента и контекст сохраняются.
+        viewModelScope.launch {
+            LanguageSettings.current.collect { appLanguage ->
+                val my = PartnerLanguage.forApp(appLanguage)
+                if (my == _state.value.my) return@collect
+                val partner = PartnerLanguage.resolvePartner(savedPartner(), my)
+                _state.update { it.copy(my = my, language = partner) }
+                checkVoice(partner)
+            }
+        }
     }
 
     fun setLanguage(language: PartnerLanguage) {
@@ -97,7 +119,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(continuous = enabled) }
     }
 
-    /** «Собеседник говорит»: его речь → русский → озвучка мне. В непрерывном режиме — по кругу. */
+    /** «Собеседник говорит»: его речь → мой язык → озвучка мне. В непрерывном режиме — по кругу. */
     fun partnerSpeaks() = launch { turn(Who.PARTNER, preset = null, quietNoSpeech = false) }
 
     /** «Я отвечаю»: моя речь → язык собеседника → озвучка ему. В непрерывном режиме затем слушаю собеседника. */
@@ -139,10 +161,10 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
                 // «Нет интернета» и т. п. — ещё и голосом, но только мне (канал ME), не собеседнику.
                 Log.w(LOG_TAG, "LLM: ${e.message}")
                 _state.update { it.copy(error = e.message, phase = TranslatePhase.SPEAKING) }
-                runCatching { audio.speak(e.message.orEmpty(), Speaker.RUSSIAN, AudioChannel.ME) }
+                runCatching { audio.speak(e.message.orEmpty(), _state.value.my.locale, AudioChannel.ME) }
             } catch (e: Exception) {
                 Log.w(LOG_TAG, "Translation failed", e)
-                _state.update { it.copy(error = e.message ?: "Что-то пошло не так.") }
+                _state.update { it.copy(error = e.message ?: L.s(R.string.something_went_wrong)) }
             } finally {
                 _state.update { it.copy(phase = TranslatePhase.IDLE, pending = "", pendingWho = null) }
             }
@@ -155,7 +177,8 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun turn(who: Who, preset: String?, quietNoSpeech: Boolean) {
         val language = _state.value.language
-        val sourceTag = if (who == Who.PARTNER) language.tag else RU_TAG
+        val my = _state.value.my
+        val sourceTag = if (who == Who.PARTNER) language.tag else my.tag
 
         val t0 = SystemClock.elapsedRealtime()
         if (preset == null) Log.d(LOG_TAG, "[$who] mic on ($sourceTag)")
@@ -187,15 +210,15 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
         val tRecognized = SystemClock.elapsedRealtime()
         Log.d(LOG_TAG, "[$who] recognition=${tRecognized - t0}ms text=\"${heard.text}\"")
 
-        if (NoiseFilter.isNoise(heard.text)) {
+        if (noiseFilter.isNoise(heard.text)) {
             Log.d(LOG_TAG, "[$who] skipped as noise")
             _state.update { it.copy(pending = "", pendingWho = null) }
-            if (!quietNoSpeech) throw SpeechException("Не расслышал фразу. Попробуйте ещё раз.", noSpeech = true)
+            if (!quietNoSpeech) throw SpeechException(L.s(R.string.speech_phrase_not_heard), noSpeech = true)
             return
         }
 
         _state.update { it.copy(phase = TranslatePhase.TRANSLATING, pending = heard.text) }
-        val prompt = TranslationPrompt.build(language, who, heard.text, lines)
+        val prompt = TranslationPrompt.build(language, my, who, heard.text, lines)
         val answer = translator.translate(prompt)
         val translation = answer.text
         val tTranslated = SystemClock.elapsedRealtime()
@@ -204,10 +227,10 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
         val line = Line(who, heard.text, translation)
         lines += line
         // Запасная модель в переводе — только меткой: лишняя фраза вслух сломала бы разговор.
-        _state.update { it.copy(feed = it.feed + FeedLine(nextId++, line, answer.label), pending = "", pendingWho = null) }
+        _state.update { it.copy(feed = it.feed + FeedLine(nextId++, line, answer.tag), pending = "", pendingWho = null) }
         if (translation == null) return
 
-        val targetLocale: Locale = if (who == Who.PARTNER) Speaker.RUSSIAN else language.locale
+        val targetLocale: Locale = if (who == Who.PARTNER) my.locale else language.locale
         if (who == Who.ME && audio.voiceStatus(targetLocale) != VoiceStatus.READY) {
             showVoiceHint(language, audio.voiceStatus(targetLocale))
             return
@@ -237,16 +260,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun showVoiceHint(language: PartnerLanguage, status: VoiceStatus) {
-        val hint = when (status) {
-            VoiceStatus.NOT_DOWNLOADED ->
-                "Голос «${language.title}» не скачан — ответы собеседнику не будут озвучены. " +
-                    "Скачайте его кнопкой ниже (или: Настройки → Общие настройки → Синтез речи)."
-            VoiceStatus.UNSUPPORTED ->
-                "Движок синтеза речи не поддерживает язык «${language.title}». Выберите Google в " +
-                    "Настройки → Общие настройки → Синтез речи и скачайте голос."
-            VoiceStatus.READY -> null
-        }
-        _state.update { it.copy(voiceHint = hint) }
+        _state.update { it.copy(voiceHint = if (status == VoiceStatus.READY) null else language to status) }
     }
 
     override fun onCleared() {
@@ -255,7 +269,6 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val LOG_TAG = "Translate"
-        const val RU_TAG = "ru-RU"
         const val ECHO_GAP_MS = 400L
         const val RETRY_DELAY_MS = 300L
         const val KEY_LANGUAGE = "language"

@@ -53,27 +53,27 @@ class ShowcaseActivity : ComponentActivity() {
     private data class AppIcon(val id: String, val title: String, @DrawableRes val fg: Int, @DrawableRes val mono: Int, val bg: Color)
 
     private val slots = listOf(
-        Slot("tab_assistant", "Вкладка «Ассистент»", listOf(o("assistant", R.drawable.ic_sym_assistant), o("smart_toy", R.drawable.ic_sym_smart_toy), o("forum", R.drawable.ic_sym_forum))),
-        Slot("tab_translate", "Вкладка «Перевод»", listOf(o("translate", R.drawable.ic_sym_translate), o("g_translate", R.drawable.ic_sym_g_translate), o("language", R.drawable.ic_sym_language))),
-        Slot("tab_settings", "Вкладка «Настройки» (задано)", listOf(o("settings", R.drawable.ic_sym_settings))),
-        Slot("ask", "«Спросить» (кнопка микрофона)", listOf(o("mic", R.drawable.ic_sym_mic), o("keyboard_voice", R.drawable.ic_sym_keyboard_voice), o("record_voice_over", R.drawable.ic_sym_record_voice_over))),
-        Slot("what_i_see", "«Что я вижу»", listOf(o("visibility", R.drawable.ic_sym_visibility), o("eyeglasses", R.drawable.ic_sym_eyeglasses), o("photo_camera", R.drawable.ic_sym_photo_camera))),
-        Slot("new_conversation", "«Новый разговор»", listOf(o("add_comment", R.drawable.ic_sym_add_comment), o("restart_alt", R.drawable.ic_sym_restart_alt), o("edit_square", R.drawable.ic_sym_edit_square))),
-        Slot("partner_speaks", "«Собеседник говорит»", listOf(o("hearing", R.drawable.ic_sym_hearing), o("record_voice_over", R.drawable.ic_sym_record_voice_over), o("person", R.drawable.ic_sym_person))),
-        Slot("me_reply", "«Я отвечаю»", listOf(o("mic", R.drawable.ic_sym_mic), o("reply", R.drawable.ic_sym_reply), o("campaign", R.drawable.ic_sym_campaign))),
-        Slot("stop", "«Стоп»", listOf(o("stop", R.drawable.ic_sym_stop), o("stop_circle", R.drawable.ic_sym_stop_circle), o("close", R.drawable.ic_sym_close))),
-        Slot("download_voice", "«Скачать голос»", listOf(o("download", R.drawable.ic_sym_download), o("download_for_offline", R.drawable.ic_sym_download_for_offline), o("cloud_download", R.drawable.ic_sym_cloud_download))),
-        Slot("clear_feed", "«Очистить ленту»", listOf(o("delete_sweep", R.drawable.ic_sym_delete_sweep), o("clear_all", R.drawable.ic_sym_clear_all), o("delete", R.drawable.ic_sym_delete))),
-        Slot("connect_glasses", "«Подключить очки»", listOf(o("bluetooth_connected", R.drawable.ic_sym_bluetooth_connected), o("link", R.drawable.ic_sym_link), o("eyeglasses", R.drawable.ic_sym_eyeglasses))),
-        Slot("show_partner", "«Показать собеседнику» (перевод крупно)", listOf(o("fullscreen", R.drawable.ic_sym_fullscreen), o("visibility", R.drawable.ic_sym_visibility), o("volume_up", R.drawable.ic_sym_volume_up))),
-        Slot("replace_key", "«Заменить ключ»", listOf(o("key", R.drawable.ic_sym_key), o("edit", R.drawable.ic_sym_edit))),
-        Slot("delete_key", "«Удалить ключ»", listOf(o("delete", R.drawable.ic_sym_delete), o("close", R.drawable.ic_sym_close))),
+        Slot("tab_assistant", "Assistant tab", listOf(o("assistant", R.drawable.ic_sym_assistant), o("smart_toy", R.drawable.ic_sym_smart_toy), o("forum", R.drawable.ic_sym_forum))),
+        Slot("tab_translate", "Translate tab", listOf(o("translate", R.drawable.ic_sym_translate), o("g_translate", R.drawable.ic_sym_g_translate), o("language", R.drawable.ic_sym_language))),
+        Slot("tab_settings", "Settings tab (fixed)", listOf(o("settings", R.drawable.ic_sym_settings))),
+        Slot("ask", "Ask (mic button)", listOf(o("mic", R.drawable.ic_sym_mic), o("keyboard_voice", R.drawable.ic_sym_keyboard_voice), o("record_voice_over", R.drawable.ic_sym_record_voice_over))),
+        Slot("what_i_see", "What do I see", listOf(o("visibility", R.drawable.ic_sym_visibility), o("eyeglasses", R.drawable.ic_sym_eyeglasses), o("photo_camera", R.drawable.ic_sym_photo_camera))),
+        Slot("new_conversation", "New conversation", listOf(o("add_comment", R.drawable.ic_sym_add_comment), o("restart_alt", R.drawable.ic_sym_restart_alt), o("edit_square", R.drawable.ic_sym_edit_square))),
+        Slot("partner_speaks", "Partner speaks", listOf(o("hearing", R.drawable.ic_sym_hearing), o("record_voice_over", R.drawable.ic_sym_record_voice_over), o("person", R.drawable.ic_sym_person))),
+        Slot("me_reply", "I reply", listOf(o("mic", R.drawable.ic_sym_mic), o("reply", R.drawable.ic_sym_reply), o("campaign", R.drawable.ic_sym_campaign))),
+        Slot("stop", "Stop", listOf(o("stop", R.drawable.ic_sym_stop), o("stop_circle", R.drawable.ic_sym_stop_circle), o("close", R.drawable.ic_sym_close))),
+        Slot("download_voice", "Download voice", listOf(o("download", R.drawable.ic_sym_download), o("download_for_offline", R.drawable.ic_sym_download_for_offline), o("cloud_download", R.drawable.ic_sym_cloud_download))),
+        Slot("clear_feed", "Clear feed", listOf(o("delete_sweep", R.drawable.ic_sym_delete_sweep), o("clear_all", R.drawable.ic_sym_clear_all), o("delete", R.drawable.ic_sym_delete))),
+        Slot("connect_glasses", "Connect glasses", listOf(o("bluetooth_connected", R.drawable.ic_sym_bluetooth_connected), o("link", R.drawable.ic_sym_link), o("eyeglasses", R.drawable.ic_sym_eyeglasses))),
+        Slot("show_partner", "Show to partner (large translation)", listOf(o("fullscreen", R.drawable.ic_sym_fullscreen), o("visibility", R.drawable.ic_sym_visibility), o("volume_up", R.drawable.ic_sym_volume_up))),
+        Slot("replace_key", "Replace key", listOf(o("key", R.drawable.ic_sym_key), o("edit", R.drawable.ic_sym_edit))),
+        Slot("delete_key", "Delete key", listOf(o("delete", R.drawable.ic_sym_delete), o("close", R.drawable.ic_sym_close))),
     )
 
     private val appIcons = listOf(
-        AppIcon("A", "A — очки + искра", R.drawable.showcase_icon_a_fg, R.drawable.showcase_icon_a_mono, Color(0xFF0B57D0)),
-        AppIcon("B", "B — облачко речи с очками", R.drawable.showcase_icon_b_fg, R.drawable.showcase_icon_b_mono, Color(0xFF00696B)),
-        AppIcon("C", "C — круглые очки, искра-блик", R.drawable.showcase_icon_c_fg, R.drawable.showcase_icon_c_mono, Color(0xFF6750A4)),
+        AppIcon("A", "A - glasses + spark", R.drawable.showcase_icon_a_fg, R.drawable.showcase_icon_a_mono, Color(0xFF0B57D0)),
+        AppIcon("B", "B - speech bubble with glasses", R.drawable.showcase_icon_b_fg, R.drawable.showcase_icon_b_mono, Color(0xFF00696B)),
+        AppIcon("C", "C - round glasses, spark glint", R.drawable.showcase_icon_c_fg, R.drawable.showcase_icon_c_mono, Color(0xFF6750A4)),
     )
 
     private fun o(id: String, @DrawableRes icon: Int) = Option(id, icon)
@@ -92,8 +92,8 @@ class ShowcaseActivity : ComponentActivity() {
                 fun choose(slot: String, option: String) {
                     chosen[slot] = option
                     prefs.edit().putString(slot, option).apply()
-                    Log.d(TAG, "выбор $slot=$option")
-                    Log.d(TAG, "итог ${chosen.toSortedMap()}")
+                    Log.d(TAG, "choice $slot=$option")
+                    Log.d(TAG, "result ${chosen.toSortedMap()}")
                 }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     LazyColumn(
@@ -101,18 +101,18 @@ class ShowcaseActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         item {
-                            Text("Витрина иконок (debug)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                            Text("Icon showcase (debug)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                             Text(
-                                "Нажмите на понравившийся вариант — выбор сохраняется и попадает в лог.",
+                                "Tap the option you like - the choice is saved and logged.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        item { SectionTitle("Иконка приложения: круг · скруглённая · тематическая (монохром)") }
+                        item { SectionTitle("App icon: circle · rounded · themed (monochrome)") }
                         items(appIcons) { icon ->
                             AppIconRow(icon, selected = chosen["app_icon"] == icon.id) { choose("app_icon", icon.id) }
                         }
-                        item { SectionTitle("Иконки вкладок и кнопок") }
+                        item { SectionTitle("Tab and button icons") }
                         items(slots) { slot ->
                             SlotRow(slot, chosen[slot.id]) { choose(slot.id, it) }
                         }
@@ -134,11 +134,11 @@ class ShowcaseActivity : ComponentActivity() {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
-                .clickable(onClickLabel = "Выбрать вариант ${icon.id}", onClick = onClick)
+                .clickable(onClickLabel = "Choose option ${icon.id}", onClick = onClick)
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(icon.title + if (selected) "  ✓ выбрано" else "", style = MaterialTheme.typography.bodyLarge)
+            Text(icon.title + if (selected) "  ✓ chosen" else "", style = MaterialTheme.typography.bodyLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(72.dp).clip(CircleShape).background(icon.bg)) {
                     Image(painterResource(icon.fg), contentDescription = null, modifier = Modifier.fillMaxSize())
@@ -171,7 +171,7 @@ class ShowcaseActivity : ComponentActivity() {
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
                             .border(if (isSelected) 2.dp else 0.dp, MaterialTheme.colorScheme.primary.copy(alpha = if (isSelected) 1f else 0f), RoundedCornerShape(12.dp))
-                            .clickable(onClickLabel = "Выбрать ${option.id}") { onChoose(option.id) }
+                            .clickable(onClickLabel = "Choose ${option.id}") { onChoose(option.id) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {

@@ -26,34 +26,34 @@ class FallbackPolicyTest {
 
     @Test
     fun `no internet at all - no fallback, say so`() {
-        assertEquals(FallbackDecision.Fail(FallbackPolicy.NO_INTERNET), decide(claude(Kind.NETWORK), online = false))
+        assertEquals(FallbackDecision.Fail(FailReason.NO_INTERNET), decide(claude(Kind.NETWORK), online = false))
     }
 
     @Test
     fun `bad key and bad request do not trigger fallback`() {
         for (kind in listOf(Kind.AUTH, Kind.BAD_REQUEST, Kind.NO_KEY, Kind.EMPTY)) {
             val error = claude(kind)
-            assertEquals(kind.name, FallbackDecision.Fail(error.userMessage), decide(error))
+            assertEquals(kind.name, FallbackDecision.Fail(FailReason.ORIGINAL_ERROR), decide(error))
         }
     }
 
     @Test
     fun `only claude failures fall back`() {
         val error = ProviderException(ProviderId.DEEPSEEK, Kind.SERVER, 503)
-        assertEquals(FallbackDecision.Fail(error.userMessage), decide(error))
+        assertEquals(FallbackDecision.Fail(FailReason.ORIGINAL_ERROR), decide(error))
     }
 
     @Test
     fun `disabled in settings or no deepseek key - original error`() {
         val error = claude(Kind.SERVER, 500)
-        assertEquals(FallbackDecision.Fail(error.userMessage), decide(error, enabled = false))
-        assertEquals(FallbackDecision.Fail(error.userMessage), decide(error, hasKey = false))
+        assertEquals(FallbackDecision.Fail(FailReason.ORIGINAL_ERROR), decide(error, enabled = false))
+        assertEquals(FallbackDecision.Fail(FailReason.ORIGINAL_ERROR), decide(error, hasKey = false))
     }
 
     @Test
     fun `what do I see without photo permission - photo not sent`() {
         assertEquals(
-            FallbackDecision.Fail(FallbackPolicy.PHOTO_NOT_SENT),
+            FallbackDecision.Fail(FailReason.PHOTO_NOT_SENT),
             decide(claude(Kind.SERVER, 529), photoNow = true, photosAllowed = false),
         )
     }

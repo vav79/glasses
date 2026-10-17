@@ -9,7 +9,7 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
@@ -26,6 +26,7 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import kotlinx.coroutines.CompletableDeferred
 import ru.vasev.glasses.GlassesApp.Companion.TAG
 import ru.vasev.glasses.camera.ImageSource
+import ru.vasev.glasses.i18n.LanguageSettings
 import ru.vasev.glasses.llm.DebugFaults
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ProviderId
@@ -42,7 +43,7 @@ import ru.vasev.glasses.ui.SettingsViewModel
 import ru.vasev.glasses.ui.TranslationScreen
 import ru.vasev.glasses.ui.theme.GlassesTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val translation: TranslationViewModel by viewModels()
@@ -76,7 +77,7 @@ class MainActivity : ComponentActivity() {
             if (granted) {
                 viewModel.setImageSource(ImageSource.PHONE_CAMERA)
             } else {
-                Toast.makeText(this, "Без доступа к камере источник снимков не изменён.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, R.string.camera_permission_denied, Toast.LENGTH_LONG).show()
             }
         }
 
@@ -92,11 +93,17 @@ class MainActivity : ComponentActivity() {
         // Заставка при запуске (SplashScreen API) — до super.onCreate.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Activity пересоздаётся при смене языка приложения или системы; ViewModel и история разговора остаются.
+        LanguageSettings.refresh()
+        savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name }?.let { tab = it } }
         enableEdgeToEdge()
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
-        handleRegistrationIntent(intent)
-        handleDebugIntent(intent)
+        // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
+        if (savedInstanceState == null) {
+            handleRegistrationIntent(intent)
+            handleDebugIntent(intent)
+        }
         requestRuntimePermissions()
 
         setContent {
@@ -171,6 +178,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         handleRegistrationIntent(intent)
         handleDebugIntent(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_TAB, tab.name)
     }
 
     override fun onResume() {
@@ -272,4 +284,8 @@ class MainActivity : ComponentActivity() {
 
     private fun hasMic() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private companion object {
+        const val STATE_TAB = "tab"
+    }
 }

@@ -1,6 +1,8 @@
 package ru.vasev.glasses.llm
 
+import ru.vasev.glasses.R
 import ru.vasev.glasses.claude.Turn
+import ru.vasev.glasses.i18n.L
 
 /** Запрос к модели: системный промпт и разговор, который заканчивается новой репликой пользователя. */
 data class ChatRequest(
@@ -47,18 +49,22 @@ class ProviderException(
 
     enum class Kind { NO_KEY, AUTH, NO_BALANCE, FORBIDDEN, RATE_LIMIT, SERVER, NETWORK, BAD_REQUEST, EMPTY }
 
-    /** Текст для пользователя. */
+    /** Текст для пользователя на текущем языке приложения. */
     val userMessage: String
-        get() = when (kind) {
-            Kind.NO_KEY -> "Нет API-ключа ${provider.title}. Откройте «Настройки» и введите ключ."
-            Kind.AUTH -> "API-ключ ${provider.title} не подходит. Замените его в «Настройках»."
-            Kind.NO_BALANCE -> "На счёте ${provider.title} закончились средства."
-            Kind.FORBIDDEN -> "${provider.title}: нет доступа к модели."
-            Kind.RATE_LIMIT -> "Слишком много запросов к ${provider.title}, подождите немного."
-            Kind.SERVER -> "${provider.title} временно недоступен${status?.let { " ($it)" } ?: ""}."
-            Kind.NETWORK -> "Нет связи с ${provider.title}."
-            Kind.BAD_REQUEST -> "Ошибка запроса к ${provider.title}${status?.let { " ($it)" } ?: ""}."
-            Kind.EMPTY -> "${provider.title} вернул пустой ответ."
+        get() {
+            val p = provider.title
+            val code = status?.let { " ($it)" } ?: ""
+            return when (kind) {
+                Kind.NO_KEY -> L.s(R.string.llm_no_key, p)
+                Kind.AUTH -> L.s(R.string.llm_auth, p)
+                Kind.NO_BALANCE -> L.s(R.string.llm_no_balance, p)
+                Kind.FORBIDDEN -> L.s(R.string.llm_forbidden, p)
+                Kind.RATE_LIMIT -> L.s(R.string.llm_rate_limit, p)
+                Kind.SERVER -> L.s(R.string.llm_server, p, code)
+                Kind.NETWORK -> L.s(R.string.llm_network, p)
+                Kind.BAD_REQUEST -> L.s(R.string.llm_bad_request, p, code)
+                Kind.EMPTY -> L.s(R.string.llm_empty, p)
+            }
         }
 
     val needsKey: Boolean get() = kind == Kind.NO_KEY || kind == Kind.AUTH

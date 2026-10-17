@@ -79,7 +79,7 @@ object ImagePrep {
             decoder.setTargetSize(w, h)
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
         }
-        return encode(bitmap, "галерея", null, originalHasExif)
+        return encode(bitmap, ImageSource.GALLERY.logName, null, originalHasExif)
     }
 
     private fun encode(bitmap: Bitmap, source: String, original: ByteArray?, originalHasExifHint: Boolean? = null): ByteArray {
@@ -91,8 +91,8 @@ object ImagePrep {
             val before = originalHasExifHint ?: original?.let(::hasExif)
             Log.d(
                 TAG,
-                "источник=$source размер=${bitmap.width}x${bitmap.height} jpeg=${jpeg.size / 1024}КБ " +
-                    "exif_в_исходнике=${before ?: "—"} exif_в_отправляемом=${hasExif(jpeg)}",
+                "source=$source size=${bitmap.width}x${bitmap.height} jpeg=${jpeg.size / 1024}KB " +
+                    "exif_in_original=${before ?: "-"} exif_in_sent=${hasExif(jpeg)}",
             )
         }
         return jpeg

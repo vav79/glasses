@@ -97,9 +97,17 @@ class ConversationTest {
 
     @Test
     fun `reset commands are recognized`() {
+        // Команды — из R.array.reset_commands (values-ru / values).
+        val ru = listOf("новый разговор", "забудь всё")
         listOf("новый разговор", "Новый разговор.", "НОВЫЙ  РАЗГОВОР!", "забудь всё", "Забудь все", "забудь всё!")
-            .forEach { assertTrue(it, Conversation.isResetCommand(it)) }
-        listOf("расскажи про новый разговор", "забудь", "новый", "что я вижу")
-            .forEach { assertFalse(it, Conversation.isResetCommand(it)) }
+            .forEach { assertTrue(it, Conversation.isResetCommand(it, ru)) }
+        listOf("расскажи про новый разговор", "забудь", "новый", "что я вижу", "new conversation")
+            .forEach { assertFalse(it, Conversation.isResetCommand(it, ru)) }
+
+        val en = listOf("new conversation", "forget everything")
+        listOf("New conversation.", "NEW  CONVERSATION!", "forget everything", "Forget everything!")
+            .forEach { assertTrue(it, Conversation.isResetCommand(it, en)) }
+        listOf("tell me about a new conversation", "forget", "новый разговор")
+            .forEach { assertFalse(it, Conversation.isResetCommand(it, en)) }
     }
 }
