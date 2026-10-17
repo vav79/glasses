@@ -53,8 +53,10 @@ fun TranslationScreen(
     onPartnerSpeaks: () -> Unit,
     onMeReplies: () -> Unit,
     onInstallVoice: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val busy = state.phase != TranslatePhase.IDLE
 
     Column(
@@ -73,9 +75,7 @@ fun TranslationScreen(
             Switch(checked = state.continuous, onCheckedChange = viewModel::setContinuous)
         }
 
-        if (!viewModel.hasApiKey) {
-            Hint("Не задан API-ключ Anthropic. Впишите его в local.properties (anthropic_api_key) и пересоберите приложение.")
-        }
+        if (!hasApiKey) MissingKeyNotice(onOpenSettings)
         state.voiceHint?.let { hint ->
             Hint(hint) { TextButton(onClick = onInstallVoice) { Text("Скачать голос") } }
         }
@@ -95,7 +95,7 @@ fun TranslationScreen(
 
         Button(
             onClick = onPartnerSpeaks,
-            enabled = !busy || state.phase == TranslatePhase.LISTENING_PARTNER,
+            enabled = hasApiKey && (!busy || state.phase == TranslatePhase.LISTENING_PARTNER),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp),
@@ -103,6 +103,7 @@ fun TranslationScreen(
 
         FilledTonalButton(
             onClick = onMeReplies,
+            enabled = hasApiKey,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp),

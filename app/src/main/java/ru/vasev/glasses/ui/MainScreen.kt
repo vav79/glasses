@@ -51,9 +51,11 @@ fun MainScreen(
     onAsk: () -> Unit,
     onWhatDoISee: () -> Unit,
     onConnectGlasses: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
+    val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -83,9 +85,7 @@ fun MainScreen(
                 onConnectGlasses = onConnectGlasses,
             )
 
-            if (!viewModel.hasApiKey) {
-                Notice("Не задан API-ключ Anthropic. Впишите его в local.properties (anthropic_api_key) и пересоберите приложение.")
-            }
+            if (!hasApiKey) MissingKeyNotice(onOpenSettings)
 
             Chat(state, modifier = Modifier.weight(1f).fillMaxWidth())
 
@@ -100,7 +100,7 @@ fun MainScreen(
 
             Button(
                 onClick = onAsk,
-                enabled = !busy,
+                enabled = !busy && hasApiKey,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),
@@ -108,7 +108,7 @@ fun MainScreen(
 
             FilledTonalButton(
                 onClick = onWhatDoISee,
-                enabled = !busy && status.ready,
+                enabled = !busy && status.ready && hasApiKey,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp),

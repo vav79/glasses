@@ -5,13 +5,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Секреты читаются только из local.properties (он в .gitignore).
+// Локальные настройки сборки (режим по умолчанию, ID для Meta) — из local.properties (он в .gitignore).
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-
-fun String.asBuildConfigString() = "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "ru.vasev.glasses"
@@ -29,11 +27,7 @@ android {
             abiFilters += "arm64-v8a"
         }
 
-        buildConfigField(
-            "String",
-            "ANTHROPIC_API_KEY",
-            localProps.getProperty("anthropic_api_key", "").trim().asBuildConfigString(),
-        )
+        // API-ключ Anthropic в сборку не входит: он вводится в приложении и хранится зашифрованным (ApiKeyStore).
         buildConfigField(
             "boolean",
             "USE_MOCK_DEVICE_DEFAULT",

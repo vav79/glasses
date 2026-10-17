@@ -17,8 +17,6 @@ import ru.vasev.glasses.claude.Anthropic.text
 /** Короткие голосовые ответы Claude через официальный Java SDK (Messages API). */
 class ClaudeClient {
 
-    val hasApiKey: Boolean get() = Anthropic.hasApiKey
-
     /**
      * Отправляет разговор ([turns] заканчивается новым вопросом пользователя) и возвращает текст ответа.
      * В историю ответы Claude попадают только текстом — без thinking-блоков, поэтому обрезка истории

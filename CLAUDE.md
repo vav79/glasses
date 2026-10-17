@@ -40,13 +40,14 @@ adb shell "am start -n ru.vasev.glasses/.MainActivity --es translate_me 'Доб�
 
 ## Секреты и конфигурация
 
-Только в `local.properties` (в `.gitignore`), в код попадают через `BuildConfig` (`app/build.gradle.kts`):
-- `anthropic_api_key` → `BuildConfig.ANTHROPIC_API_KEY`;
+**API-ключ Anthropic в сборку не входит.** Он вводится на вкладке «Настройки» и хранится на телефоне (`security/ApiKeyStore`): AES-256-GCM ключом из Android Keystore (на S25 — StrongBox), в SharedPreferences `secure` лежит только `IV || шифротекст`. Расшифровка — в памяти: перед каждым запросом (`Anthropic.create` подставляет заголовок `x-api-key` в конкретный запрос; клиент SDK собран с заглушкой и ключа не знает) и на экране «Настройки» ради последних 4 символов. Признак «ключ есть» — по наличию шифротекста, без расшифровки. EncryptedSharedPreferences не используем (устарела). Резервное копирование и перенос данных на другое устройство отключены (`allowBackup=false` + `res/xml/data_extraction_rules.xml`). Проверка, что ключа нет в APK: распаковать APK и искать `sk-ant` по всем файлам (в самом .apk строки сжаты). Не вводите ключ через `adb shell input text` — adbd пишет текст команды в logcat. Debug-запуск сценариев работает только после ввода ключа в приложении.
+
+Остальное — в `local.properties` (в `.gitignore`), в код попадает через `BuildConfig` (`app/build.gradle.kts`):
 - `use_mock_device` → режим по умолчанию при первом запуске (дальше хранится в SharedPreferences);
 - `mwdat_application_id`, `mwdat_client_token` — необязательны; в Developer Mode приложения Meta AI достаточно `0` (лог `Failed to read metadata … APPLICATION_ID` при этом ожидаем);
 - `sdk.dir` писать с прямыми слешами (`C:/Users/...`) — экранированные обратные ломают AGP («Invalid file path»).
 
-DAT SDK берётся из Maven Central, GitHub-токен не нужен. Ключ Anthropic, переданный через BuildConfig, извлекаем из APK — приложение только для личного использования.
+DAT SDK берётся из Maven Central, GitHub-токен не нужен.
 
 ## Архитектура
 
@@ -62,7 +63,7 @@ DAT SDK берётся из Maven Central, GitHub-токен не нужен. К
 - **Ловушка:** после `clearCommunicationDevice()` SCO разрывается асинхронно (на Galaxy S25 + Buds Core ~1,5 с). Пока он жив, телефон «в звонке», и звук уходит в гарнитуру с громкостью звонка, хотя `routedDevice` рапортует динамик. Поэтому `releaseMic()` запускает ожидание (событие разрыва SCO + смена устройства связи, таймаут 3 с), а вывод перед воспроизведением вызывает `awaitRouteSettled()`; ожидание перекрывается временем перевода.
 - Гарнитура отключилась или не включила микрофон за 4 с — молча работаем через телефон.
 
-**Claude** (`claude/`): `Anthropic` — общий клиент официального Java SDK и перевод ошибок SDK в русские сообщения. `ClaudeClient` (ассистент): adaptive thinking по умолчанию, effort `low`, автоматический кэш (`cacheControl` на уровне запроса), server-side fallback (`server-side-fallback-2026-07-01`, `fallbacks: "default"`). `Translator` — Haiku 5.5, `max_tokens` 300, без fallback (у Haiku его нет; отказ → `null` → «перевод недоступен»).
+**Claude** (`claude/`): `Anthropic` — общий клиент официального Java SDK, подстановка ключа из `ApiKeyStore` в каждый запрос и перевод ошибок SDK в русские сообщения (`ClaudeException.needsKey` — нет ключа или 401; кнопки, которым нужен Claude, без ключа неактивны, вместо ошибки — `MissingKeyNotice`). `ClaudeClient` (ассистент): adaptive thinking по умолчанию, effort `low`, автоматический кэш (`cacheControl` на уровне запроса), server-side fallback (`server-side-fallback-2026-07-01`, `fallbacks: "default"`). `Translator` — Haiku 5.5, `max_tokens` 300, без fallback (у Haiku его нет; отказ → `null` → «перевод недоступен»).
 
 **Память ассистента** — `Conversation` (чистый Kotlin, покрыт тестами): окно обрезается пачкой (10 обменов → последние 5), чтобы реже сбивать кэш; картинкой отправляется только последний снимок, старые — пометкой «[фото]». **Ответы Claude хранятся только текстом, без thinking-блоков**: у Sonnet 5.5 thinking-блоки привязаны к неизменной истории, и после обрезки окна или замены фото их повторная отправка дала бы 400 на новых аккаунтах. Кэш срабатывает от 512 токенов — короткие текстовые разговоры не кэшируются, это нормально. Сброс: кнопка, голосом «новый разговор» / «забудь всё» (`Conversation.isResetCommand`), автосброс через 5 минут тишины.
 

@@ -13,7 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-enum class AppTab(val title: String) { ASSISTANT("Ассистент"), TRANSLATE("Перевод") }
+enum class AppTab(val title: String) { ASSISTANT("Ассистент"), TRANSLATE("Перевод"), SETTINGS("Настройки") }
 
 @Composable
 fun AppRoot(
@@ -21,6 +21,7 @@ fun AppRoot(
     onTabChange: (AppTab) -> Unit,
     assistant: @Composable () -> Unit,
     translation: @Composable () -> Unit,
+    settings: @Composable () -> Unit,
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -33,6 +34,7 @@ fun AppRoot(
                 when (tab) {
                     AppTab.ASSISTANT -> assistant()
                     AppTab.TRANSLATE -> translation()
+                    AppTab.SETTINGS -> settings()
                 }
             }
         }

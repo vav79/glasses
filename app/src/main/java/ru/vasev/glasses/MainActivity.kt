@@ -28,6 +28,8 @@ import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.MainViewModel
+import ru.vasev.glasses.ui.SettingsScreen
+import ru.vasev.glasses.ui.SettingsViewModel
 import ru.vasev.glasses.ui.TranslationScreen
 import ru.vasev.glasses.ui.theme.GlassesTheme
 
@@ -35,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val translation: TranslationViewModel by viewModels()
+    private val settings: SettingsViewModel by viewModels()
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
 
@@ -73,6 +76,7 @@ class MainActivity : ComponentActivity() {
                             onAsk = { withMic(viewModel::ask) },
                             onWhatDoISee = { withMic(viewModel::whatDoISee) },
                             onConnectGlasses = { Wearables.startRegistration(this) },
+                            onOpenSettings = { selectTab(AppTab.SETTINGS) },
                         )
                     },
                     translation = {
@@ -81,8 +85,10 @@ class MainActivity : ComponentActivity() {
                             onPartnerSpeaks = { withMic(translation::partnerSpeaks) },
                             onMeReplies = { withMic(translation::meReplies) },
                             onInstallVoice = ::openVoiceInstaller,
+                            onOpenSettings = { selectTab(AppTab.SETTINGS) },
                         )
                     },
+                    settings = { SettingsScreen(settings) },
                 )
             }
         }
@@ -94,6 +100,7 @@ class MainActivity : ComponentActivity() {
         when (tab) {
             AppTab.ASSISTANT -> viewModel.stop()
             AppTab.TRANSLATE -> translation.stop()
+            AppTab.SETTINGS -> Unit
         }
         tab = newTab
     }

@@ -65,7 +65,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     )
     val state: StateFlow<TranslateUiState> = _state.asStateFlow()
 
-    val hasApiKey: Boolean get() = Anthropic.hasApiKey
+    val hasApiKey: StateFlow<Boolean> get() = Anthropic.hasApiKey
 
     private val lines = mutableListOf<Line>()
     private var nextId = 0L

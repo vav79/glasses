@@ -10,33 +10,51 @@ import com.anthropic.errors.UnauthorizedException
 import com.anthropic.models.messages.Message
 import com.anthropic.models.messages.MessageCreateParams
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import ru.vasev.glasses.BuildConfig
+import ru.vasev.glasses.security.ApiKeyException
+import ru.vasev.glasses.security.ApiKeyStore
 import java.time.Duration
 
-class ClaudeException(message: String) : Exception(message)
+/** Ошибка Claude с текстом для пользователя. [needsKey] — проблема с API-ключом: показать путь в «Настройки». */
+class ClaudeException(message: String, val needsKey: Boolean = false) : Exception(message)
 
-/** Общий клиент Anthropic для ассистента и переводчика: один ключ, одно пулом соединений. */
+/**
+ * Общий клиент Anthropic для ассистента и переводчика: один пул соединений.
+ * Сам клиент не знает ключа — ключ расшифровывается из [ApiKeyStore] в памяти перед каждым запросом
+ * и уходит заголовком `x-api-key` только в этот запрос.
+ */
 object Anthropic {
 
-    private val apiKey: String = BuildConfig.ANTHROPIC_API_KEY
+    private lateinit var keys: ApiKeyStore
 
-    val hasApiKey: Boolean get() = apiKey.isNotBlank()
+    fun init(store: ApiKeyStore) {
+        keys = store
+    }
+
+    /** Сохранён ли ключ (без расшифровки). */
+    val hasApiKey: StateFlow<Boolean> get() = keys.hasKey
 
     private val client: AnthropicClient by lazy {
         AnthropicOkHttpClient.builder()
-            .apiKey(apiKey)
+            // Заглушка вместо ключа: настоящий подставляется в каждый запрос, клиент его не хранит.
+            .apiKey(NO_KEY_PLACEHOLDER)
             .timeout(Duration.ofSeconds(60))
             .build()
     }
 
     /** Выполняет запрос к Messages API, переводя ошибки SDK в понятные пользователю сообщения. */
     suspend fun create(params: MessageCreateParams): Message = withContext(Dispatchers.IO) {
-        if (!hasApiKey) throw ClaudeException("Не задан API-ключ Anthropic (anthropic_api_key в local.properties).")
+        val apiKey = try {
+            keys.decrypt()
+        } catch (e: ApiKeyException) {
+            throw ClaudeException(e.message ?: NO_KEY_MESSAGE, needsKey = true)
+        } ?: throw ClaudeException(NO_KEY_MESSAGE, needsKey = true)
+
         try {
-            client.messages().create(params)
+            client.messages().create(params.toBuilder().putAdditionalHeader(API_KEY_HEADER, apiKey).build())
         } catch (e: UnauthorizedException) {
-            throw ClaudeException("Неверный API-ключ Anthropic.")
+            throw ClaudeException("API-ключ не подходит. Замените его в «Настройках».", needsKey = true)
         } catch (e: PermissionDeniedException) {
             throw ClaudeException("API-ключ не имеет доступа к модели ${params.model()}.")
         } catch (e: RateLimitException) {
@@ -53,4 +71,8 @@ object Anthropic {
         .mapNotNull { block -> block.text().orElse(null)?.text() }
         .joinToString(" ")
         .trim()
+
+    const val NO_KEY_MESSAGE = "Нет API-ключа Anthropic. Откройте вкладку «Настройки» и введите ключ."
+    private const val API_KEY_HEADER = "x-api-key"
+    private const val NO_KEY_PLACEHOLDER = "not-set"
 }

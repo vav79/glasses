@@ -3,7 +3,9 @@ package ru.vasev.glasses
 import android.app.Application
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
+import ru.vasev.glasses.claude.Anthropic
 import ru.vasev.glasses.glasses.GlassesManager
+import ru.vasev.glasses.security.ApiKeyStore
 import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
@@ -25,8 +27,14 @@ class GlassesApp : Application() {
     lateinit var speaker: Speaker
         private set
 
+    /** Зашифрованный API-ключ Anthropic (вводится на экране «Настройки»). */
+    lateinit var apiKeys: ApiKeyStore
+        private set
+
     override fun onCreate() {
         super.onCreate()
+        apiKeys = ApiKeyStore(this)
+        Anthropic.init(apiKeys)
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)

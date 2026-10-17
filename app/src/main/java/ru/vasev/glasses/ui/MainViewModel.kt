@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp
 import ru.vasev.glasses.GlassesApp.Companion.TAG
+import ru.vasev.glasses.claude.Anthropic
 import ru.vasev.glasses.claude.ClaudeClient
 import ru.vasev.glasses.claude.Conversation
 import ru.vasev.glasses.glasses.GlassesStatus
@@ -65,7 +66,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     val glassesStatus: StateFlow<GlassesStatus> = glasses.status
-    val hasApiKey: Boolean = claude.hasApiKey
+    val hasApiKey: StateFlow<Boolean> = Anthropic.hasApiKey
 
     /** Запрос DAT-разрешения на камеру; подставляется из MainActivity. */
     var cameraPermissionRequester: (suspend () -> Boolean)? = null
