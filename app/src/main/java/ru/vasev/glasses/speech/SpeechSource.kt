@@ -23,15 +23,21 @@ enum class Talker { USER, PARTNER }
  */
 interface SpeechSource {
     /** Слушает одну фразу на языке [languageTag] (BCP-47, например "tr-TR"), сказанную [talker]. */
-    suspend fun listen(languageTag: String, talker: Talker = Talker.USER, onPartial: (String) -> Unit = {}): Heard
+    suspend fun listen(
+        languageTag: String,
+        talker: Talker = Talker.USER,
+        onPartial: (String) -> Unit = {},
+        /** Громкость голоса 0..1 — для пульсации кнопки микрофона. */
+        onLevel: (Float) -> Unit = {},
+    ): Heard
 }
 
 /** Перед фразой выбирает микрофон через [router], после — отключает микрофон гарнитуры. */
 class RoutedSpeechSource(private val inner: SpeechSource, private val router: AudioRouter) : SpeechSource {
-    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit): Heard {
+    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit, onLevel: (Float) -> Unit): Heard {
         router.routeMic(talker)
         return try {
-            inner.listen(languageTag, talker, onPartial)
+            inner.listen(languageTag, talker, onPartial, onLevel)
         } finally {
             router.releaseMic()
         }

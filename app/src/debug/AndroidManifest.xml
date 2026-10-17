@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Только debug-сборка: витрина вариантов иконок. exported — чтобы открывать через adb am start. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".debug.ShowcaseActivity"
+            android:exported="true"
+            android:label="Витрина иконок"
+            android:theme="@style/Theme.Glasses" />
+    </application>
+</manifest>

@@ -1,8 +1,10 @@
 package ru.vasev.glasses.ui
 
 import android.graphics.Bitmap
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -25,6 +28,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -44,6 +49,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,6 +62,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.vasev.glasses.R
 import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesStatus
@@ -71,7 +82,9 @@ fun MainScreen(
     val source by viewModel.imageSource.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val model by viewModel.model.collectAsStateWithLifecycle()
+    val micLevel by viewModel.micLevel.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
+    var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -80,18 +93,12 @@ fun MainScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Очки + Claude",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                TextButton(
-                    onClick = viewModel::newConversation,
-                    enabled = state.chat.isNotEmpty() || state.pendingQuestion.isNotEmpty(),
-                ) { Text("Новый разговор") }
-            }
+            Text(
+                "Очки + ИИ",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
 
             SourceCard(
                 source = source,
@@ -106,39 +113,61 @@ fun MainScreen(
 
             if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
-            Chat(state, modifier = Modifier.weight(1f).fillMaxWidth())
+            Chat(state, modifier = Modifier.weight(1f).fillMaxWidth(), onOpenPhoto = { bitmap, label -> photo = bitmap to label })
 
-            if (busy) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.size(12.dp))
-                    Text(state.phase.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                    OutlinedButton(onClick = viewModel::stop) { Text("Стоп") }
-                }
-            }
-
-            Button(
-                onClick = onAsk,
-                enabled = !busy && hasApiKey,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-            ) { Text("Спросить", fontSize = 22.sp) }
-
-            FilledTonalButton(
-                onClick = onWhatDoISee,
+            // Управление: «Что я вижу» — большая кнопка микрофона — «Новый разговор».
+            // Пока что-то идёт, кнопка микрофона останавливает.
+            Text(
+                if (busy) "${state.phase.label} Нажмите, чтобы остановить." else "Нажмите и задайте вопрос",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 // Не блокируем, когда очки не подключены: кнопка сама скажет «Очки не подключены» и что делать.
-                enabled = !busy && hasApiKey,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp),
-            ) { Text("Что я вижу", fontSize = 22.sp) }
+                SideAction(R.drawable.ic_sym_visibility, "Что я вижу", enabled = !busy && hasApiKey, onClick = onWhatDoISee)
+                MicButton(
+                    phase = state.phase,
+                    level = micLevel,
+                    enabled = busy || hasApiKey,
+                    onClick = if (busy) viewModel::stop else onAsk,
+                )
+                SideAction(
+                    R.drawable.ic_sym_add_comment,
+                    "Новый разговор",
+                    enabled = state.chat.isNotEmpty() || state.pendingQuestion.isNotEmpty(),
+                    onClick = viewModel::newConversation,
+                )
+            }
         }
+    }
+
+    photo?.let { (bitmap, label) -> FullscreenPhoto(bitmap, label) { photo = null } }
+}
+
+/** Боковая круглая кнопка с подписью под ней (зона нажатия ≥ 48 dp). */
+@Composable
+private fun SideAction(@DrawableRes icon: Int, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(88.dp)) {
+        FilledTonalIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(64.dp)) {
+            Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(30.dp))
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            modifier = Modifier.padding(top = 4.dp).clearAndSetSemantics { },
+        )
     }
 }
 
 @Composable
-private fun Chat(state: UiState, modifier: Modifier) {
+private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, String?) -> Unit) {
     val listState = rememberLazyListState()
     val hasPending = state.pendingQuestion.isNotEmpty() || state.pendingFrame != null
     val rowCount = state.chat.size + (if (hasPending) 1 else 0) + (if (state.error != null) 1 else 0)
@@ -148,8 +177,8 @@ private fun Chat(state: UiState, modifier: Modifier) {
 
     if (rowCount == 0) {
         Text(
-            "Нажмите «Спросить» и задайте вопрос голосом. «Что я вижу» сначала возьмёт снимок из выбранного источника. " +
-                "Уточняющие вопросы Claude поймёт с учётом разговора. Сказать «новый разговор» или " +
+            "Нажмите на микрофон и задайте вопрос голосом. «Что я вижу» сначала возьмёт снимок из выбранного источника. " +
+                "Уточняющие вопросы модель поймёт с учётом разговора. Сказать «новый разговор» или " +
                 "«забудь всё» — начать заново.",
             modifier = modifier,
             style = MaterialTheme.typography.bodyLarge,
@@ -168,13 +197,13 @@ private fun Chat(state: UiState, modifier: Modifier) {
                 modifier = Modifier.alpha(if (item.remembered) 1f else 0.4f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                UserBubble(item.question, item.frame, item.frameSource)
+                UserBubble(item.question, item.frame, item.frameSource, onOpenPhoto)
                 AnswerBubble(item.answer, item.model)
             }
         }
         if (hasPending) {
             item(key = "pending") {
-                UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource)
+                UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource, onOpenPhoto)
             }
         }
         state.error?.let { error -> item(key = "error") { Notice(error) } }
@@ -189,7 +218,7 @@ private fun ForgottenDivider() {
     ) {
         HorizontalDivider(Modifier.weight(1f))
         Text(
-            "Выше — Claude уже не помнит",
+            "Выше — модель уже не помнит",
             modifier = Modifier.padding(horizontal = 8.dp),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -198,53 +227,66 @@ private fun ForgottenDivider() {
     }
 }
 
+/** Моя реплика — справа. Снимок со скруглёнными углами, по нажатию — на весь экран; источник — мелко под пузырём. */
 @Composable
-private fun UserBubble(text: String, frame: Bitmap?, frameSource: String? = null) {
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+private fun UserBubble(text: String, frame: Bitmap?, frameSource: String?, onOpenPhoto: (Bitmap, String?) -> Unit) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         Column(
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp))
+                .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(10.dp),
+                .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            frame?.let {
+            frame?.let { bitmap ->
                 Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = "Снимок: ${frameSource ?: "очки"}",
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Снимок, источник: ${frameSource ?: "очки"}. Нажмите, чтобы открыть на весь экран",
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp)),
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(onClickLabel = "Открыть снимок на весь экран") { onOpenPhoto(bitmap, frameSource) },
                 )
-                frameSource?.let { label ->
-                    Text(
-                        "снимок: $label",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    )
-                }
             }
-            Text(text, color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
         }
+        frameSource?.let { BubbleCaption("снимок: $it") }
+    }
+}
+
+/** Ответ модели — слева; метка модели — мелко под пузырём. */
+@Composable
+private fun AnswerBubble(text: String, model: String) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+        Text(
+            text,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+        if (model.isNotEmpty()) BubbleCaption(model)
     }
 }
 
 @Composable
-private fun AnswerBubble(text: String, model: String) {
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(10.dp),
-        ) {
-            Text(model.ifEmpty { "Ответ" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
+private fun BubbleCaption(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+    )
 }
 
 /** Источник снимков: выбор, состояние очков и видоискатель камеры телефона. */
@@ -269,7 +311,11 @@ private fun SourceCard(
                 ImageSource.GLASSES, ImageSource.SIMULATOR -> {
                     Text(status.text, style = MaterialTheme.typography.bodyMedium)
                     if (source == ImageSource.GLASSES && !status.ready) {
-                        FilledTonalButton(onClick = onConnectGlasses, enabled = enabled) { Text("Подключить очки через Meta AI") }
+                        FilledTonalButton(onClick = onConnectGlasses, enabled = enabled) {
+                            Icon(painterResource(R.drawable.ic_sym_bluetooth_connected), contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Подключить очки через Meta AI")
+                        }
                     }
                 }
                 ImageSource.PHONE_CAMERA -> if (cameraGranted) {

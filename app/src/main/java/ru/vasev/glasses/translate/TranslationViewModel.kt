@@ -170,7 +170,11 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
             if (preset != null) {
                 Heard(preset, SystemClock.elapsedRealtime())
             } else {
-                speech.listen(sourceTag, if (who == Who.PARTNER) Talker.PARTNER else Talker.USER) { partial -> _state.update { it.copy(pending = partial) } }
+                speech.listen(
+                    sourceTag,
+                    if (who == Who.PARTNER) Talker.PARTNER else Talker.USER,
+                    onPartial = { partial -> _state.update { it.copy(pending = partial) } },
+                )
             }
         } catch (e: SpeechException) {
             if ((e.noSpeech || e.transient) && quietNoSpeech) {

@@ -21,7 +21,7 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
 
     private var recognizer: SpeechRecognizer? = null
 
-    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit): Heard {
+    override suspend fun listen(languageTag: String, talker: Talker, onPartial: (String) -> Unit, onLevel: (Float) -> Unit): Heard {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             throw SpeechException("На телефоне нет службы распознавания речи (нужно приложение Google).")
         }
@@ -57,7 +57,8 @@ class PhoneMicSpeechSource(private val context: Context) : SpeechSource {
 
                 override fun onReadyForSpeech(params: Bundle?) = Unit
                 override fun onBeginningOfSpeech() = Unit
-                override fun onRmsChanged(rmsdB: Float) = Unit
+                // RMS от распознавателя Google — примерно от -2 (тишина) до 10 дБ (громко).
+                override fun onRmsChanged(rmsdB: Float) = onLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
             })

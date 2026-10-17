@@ -90,6 +90,16 @@ DAT SDK берётся из Maven Central, GitHub-токен не нужен.
 - «Симулятор очков» — только в debug-сборке; он же включает MockDeviceKit (`GlassesManager.setMockMode`, в release всегда выключен).
 - Все снимки проходят `ImagePrep`: поворот (с камеры — `rotationDegrees`, из галереи — EXIF через `ImageDecoder`), длинная сторона ≤ 1024 px и перекодирование `Bitmap.compress` — EXIF (в т. ч. GPS) не уходит. Debug-лог `Image`: `exif_в_исходнике=… exif_в_отправляемом=false`. У снимка в чате — метка источника.
 
+**Оформление** (`ui/`):
+- Тема — `GlassesTheme`: dynamic color на Android 12+, светлая/тёмная по системе; запасная палитра M3 на бирюзовом `#00696B` (цвет иконки). Заставка — `core-splashscreen` (`Theme.Glasses.Starting` → `postSplashScreenTheme`), `installSplashScreen()` до `super.onCreate`.
+- Иконка приложения — адаптивная (`mipmap-anydpi-v26/ic_launcher.xml`): облачко речи с очками + монохромный слой для тематических иконок; рисунок внутри безопасной зоны (круг R=33 из 108).
+- Иконки — Material Symbols Outlined как векторные XML (`res/drawable/ic_sym_*.xml`, скачаны из `google/material-design-icons`, атрибут `android:tint` удалён — цвет задаёт `Icon`). `material-icons-extended` не используем. Невыбранные варианты лежат в `src/debug/res` — только для витрины.
+- Витрина вариантов иконок — только debug: `adb shell am start -n ru.vasev.glasses/.debug.ShowcaseActivity`; выбор пишется в лог `Showcase` и в `shared_prefs/showcase.xml`.
+- `MicButton` — большая круглая кнопка: покой / «слушаю» (ореол по громкости — `SpeechSource.listen(onLevel)` из RMS распознавателя) / «думаю» / «говорю»; пока идёт сценарий, нажатие — «стоп». `Haptics` — щелчок в начале и двойной в конце прослушивания (только ассистент).
+- Чат: пузыри, метки модели и источника снимка — под пузырём; снимок и перевод открываются на весь экран (`FullscreenPhoto`, `FullscreenText`).
+- Доступность: у иконок без текста — `contentDescription`, у иконок рядом с текстом — `null`; строка «подпись + Switch» — один `toggleable(role = Switch)`. Проверка: `uiautomator dump` — у каждого кликабельного узла (с потомками) есть подпись и он ≥ 48 dp (на S25 это 135 px).
+- Скриншоты в светлой теме: `adb shell cmd uimode night no` — после проверки вернуть исходное значение (`cmd uimode night` показывает текущее).
+
 **Очки** (`glasses/`): `GlassesManager.captureJpeg` на каждый снимок открывает короткую DAT-сессию: `createSession` → ждать `STARTED` → `addCamera` → `stream.start()` → ждать `STREAMING` (критическая ошибка стрима ловится сразу) → `stream.capturePhoto()` → стоп. Стабильный `stream.capturePhoto()` выбран намеренно: отдельная съёмка `camera.photo` экспериментальная. `MockGlassesController` поднимает MockDeviceKit: **без `setCameraFeed` симулятор не запускает стрим**, поэтому `MockVideoEncoder` при первом включении кодирует `res/raw/mock_view.jpg` в 2-секундное HEVC-видео (ffmpeg не нужен) и кэширует его.
 
 Подводные камни DAT: `DatResult.fold` не inline — `return` из лямбды нельзя, используйте `getOrNull()` / `errorOrNull()`. Лог `Wearables SDK already initialized` безвреден (MockDeviceKit инициализирует SDK повторно).

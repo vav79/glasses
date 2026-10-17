@@ -1,6 +1,8 @@
 package ru.vasev.glasses.ui
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -33,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role as SemanticsRole
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -41,6 +47,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ru.vasev.glasses.R
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
@@ -110,13 +117,13 @@ private fun KeySection(provider: ProviderId, state: KeyState, viewModel: Setting
         if (state.confirmDelete) {
             Status("Удалить ключ ${provider.title}? Модели ${provider.title} перестанут работать.", isError = true)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.delete(provider) }) { Text("Удалить") }
+                Button(onClick = { viewModel.delete(provider) }) { IconLabel(R.drawable.ic_sym_delete, "Удалить") }
                 OutlinedButton(onClick = { viewModel.cancelDelete(provider) }) { Text("Отмена") }
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.startReplace(provider) }) { Text("Заменить ключ") }
-                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { Text("Удалить ключ") }
+                Button(onClick = { viewModel.startReplace(provider) }) { IconLabel(R.drawable.ic_sym_key, "Заменить ключ") }
+                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { IconLabel(R.drawable.ic_sym_delete, "Удалить ключ") }
             }
         }
     } else {
@@ -161,13 +168,17 @@ private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec)
 
 @Composable
 private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // Вся строка — один переключатель: TalkBack читает заголовок, пояснение и состояние вместе.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.toggleable(value = checked, enabled = enabled, role = SemanticsRole.Switch, onValueChange = onChange),
+    ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.size(8.dp))
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -195,7 +206,13 @@ private fun KeyEditor(provider: ProviderId, busy: Boolean, canCancel: Boolean, o
         ),
         keyboardActions = KeyboardActions(onDone = { if (input.isNotBlank()) submit() }),
         trailingIcon = {
-            TextButton(onClick = { visible = !visible }) { Text(if (visible) "Скрыть" else "Показать") }
+            // IconButton — зона нажатия 48 dp; подпись для TalkBack меняется вместе с состоянием.
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    painterResource(if (visible) R.drawable.ic_sym_visibility_off else R.drawable.ic_sym_visibility),
+                    contentDescription = if (visible) "Скрыть ключ" else "Показать ключ",
+                )
+            }
         },
         modifier = Modifier.fillMaxWidth(),
     )
@@ -226,4 +243,12 @@ private fun Status(text: String, isError: Boolean) {
     ) {
         Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+/** Иконка + подпись внутри кнопки; иконка декоративная, кнопку озвучивает подпись. */
+@Composable
+private fun IconLabel(@DrawableRes icon: Int, label: String) {
+    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+    Spacer(Modifier.size(8.dp))
+    Text(label)
 }

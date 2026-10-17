@@ -5,6 +5,8 @@
     <!-- Проверка «есть ли интернет» перед запросом к ИИ и перед запасной моделью. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Лёгкая вибрация в начале и конце прослушивания. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Камера телефона как источник снимков; запрашивается при выборе этого источника. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -28,10 +30,11 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.Glasses.Starting">
 
         <meta-data
             android:name="com.meta.wearable.mwdat.APPLICATION_ID"

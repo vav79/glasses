@@ -37,10 +37,10 @@ import ru.vasev.glasses.speech.Speaker
 
 enum class Phase(val label: String) {
     IDLE(""),
-    CAPTURING("Снимаю кадр с очков…"),
-    LISTENING("Слушаю вопрос…"),
+    CAPTURING("Снимаю…"),
+    LISTENING("Слушаю…"),
     THINKING("Думаю…"),
-    SPEAKING("Отвечаю…"),
+    SPEAKING("Говорю…"),
 }
 
 /** Обмен в чате. [remembered] = false — модель его уже не помнит (показывается бледным). [model] — метка модели. */
@@ -92,6 +92,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    /** Громкость голоса 0..1 во время прослушивания — отдельно от [state], чтобы не перерисовывать весь экран. */
+    private val _micLevel = MutableStateFlow(0f)
+    val micLevel: StateFlow<Float> = _micLevel.asStateFlow()
+
+    private val haptics = Haptics(app)
 
     val glassesStatus: StateFlow<GlassesStatus> = glasses.status
 
@@ -170,8 +176,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 setPhase(Phase.LISTENING)
-                val question = presetQuestion
-                    ?: speech.listen(RU_TAG) { partial -> _state.update { it.copy(pendingQuestion = partial) } }.text
+                val question = presetQuestion ?: run {
+                    haptics.listenStart()
+                    try {
+                        speech.listen(
+                            RU_TAG,
+                            onPartial = { partial -> _state.update { it.copy(pendingQuestion = partial) } },
+                            onLevel = { _micLevel.value = it },
+                        ).text
+                    } finally {
+                        _micLevel.value = 0f
+                        haptics.listenEnd()
+                    }
+                }
                 _state.update { it.copy(pendingQuestion = question) }
 
                 if (Conversation.isResetCommand(question)) {
