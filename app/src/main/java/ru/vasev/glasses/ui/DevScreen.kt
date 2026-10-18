@@ -129,6 +129,11 @@ private fun EntryCard(entry: JournalEntry) {
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
             )
+            val voice = listOfNotNull(
+                entry.firstSoundMs?.let { stringResource(R.string.dev_first_sound, it.toInt()) },
+                if (entry.interrupted) stringResource(R.string.answer_interrupted) else null,
+            )
+            if (voice.isNotEmpty()) Text(voice.joinToString(" · "), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
             entry.question?.let { Text("> $it", style = MaterialTheme.typography.bodySmall) }
             entry.answer?.let { Text("< $it", style = MaterialTheme.typography.bodySmall) }
         }

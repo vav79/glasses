@@ -41,7 +41,6 @@
     <!-- Озвучивается ассистентом -->
     <string name="say_new_conversation">Начинаем новый разговор.</string>
     <string name="say_cannot_answer">Извините, на это я ответить не могу.</string>
-    <string name="say_fallback_answers">Отвечает запасная модель. %1$s</string>
     <string name="glasses_not_connected">Очки не подключены. Чтобы снимать телефоном, выберите источник снимков «Камера телефона».</string>
     <string name="simulator_not_ready">Симулятор очков не готов.</string>
     <string name="something_went_wrong">Что-то пошло не так.</string>
@@ -217,4 +216,23 @@
     <string name="dev_clear_confirm">Очистить журнал запросов?</string>
     <string name="dev_fallback">запасная</string>
     <string name="dev_no_entries_to_share">Журнал пуст.</string>
+
+    <!-- Потоковые ответы и перебивание -->
+    <string name="mic_interrupt">Перебить и спросить</string>
+    <string name="assistant_hint_interrupt">%1$s Нажмите кнопку, чтобы перебить.</string>
+    <string name="answer_more">Подробнее</string>
+    <string name="answer_less">Свернуть</string>
+    <string name="answer_interrupted">перебит</string>
+    <string name="say_fallback_intro">Отвечает запасная модель.</string>
+    <string name="settings_headset">Гарнитура</string>
+    <string name="settings_voice_stop_title">Голосовое «стоп» во время ответа</string>
+    <string name="settings_voice_stop_subtitle">Скажите «стоп», чтобы прервать ответ. Микрофон гарнитуры остаётся включённым, пока звучит ответ, поэтому ответ звучит в качестве телефонного звонка.</string>
+    <string name="settings_voice_stop_no_headset">Работает только с Bluetooth-гарнитурой с микрофоном — сейчас она не подключена.</string>
+    <string-array name="stop_commands">
+        <item>стоп</item>
+        <item>хватит</item>
+        <item>замолчи</item>
+        <item>остановись</item>
+    </string-array>
+    <string name="dev_first_sound">до звука %1$d мс</string>
 </resources>

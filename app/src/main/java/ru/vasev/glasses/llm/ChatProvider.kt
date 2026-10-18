@@ -75,4 +75,17 @@ interface ChatProvider {
 
     /** Бросает [ProviderException]. Ключ берётся из зашифрованного хранилища в момент запроса. */
     suspend fun complete(request: ChatRequest): ChatResult
+
+    /**
+     * Потоковый ответ: [onText] получает текстовые дельты по мере генерации (размышления модели — нет),
+     * [onUsage] — счёт токенов, как только он известен (для журнала, если ответ перебили),
+     * [onEvent] — любое событие потока, включая размышления и ping (сторожевой таймер «поток завис»).
+     * Отмена корутины закрывает соединение. Итог — как у [complete].
+     */
+    suspend fun stream(
+        request: ChatRequest,
+        onText: (String) -> Unit,
+        onUsage: (Usage) -> Unit = {},
+        onEvent: () -> Unit = {},
+    ): ChatResult
 }

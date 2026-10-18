@@ -35,6 +35,10 @@ data class JournalEntry(
     val costUsd: Double?,
     val question: String? = null,
     val answer: String? = null,
+    /** Конец фразы пользователя → первый звук ответа; только для озвученных ответов ассистента. */
+    val firstSoundMs: Long? = null,
+    /** Ответ перебили (кнопкой, гарнитурой или голосом): счёт токенов может быть неполным. */
+    val interrupted: Boolean = false,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("time", time.toString())
@@ -53,6 +57,8 @@ data class JournalEntry(
         costUsd?.let { put("cost_usd", it) }
         question?.let { put("question", it) }
         answer?.let { put("answer", it) }
+        firstSoundMs?.let { put("first_sound_ms", it) }
+        if (interrupted) put("interrupted", true)
     }
 
     companion object {
@@ -75,6 +81,8 @@ data class JournalEntry(
             costUsd = if (o.has("cost_usd")) o.getDouble("cost_usd") else null,
             question = if (o.has("question")) o.getString("question") else null,
             answer = if (o.has("answer")) o.getString("answer") else null,
+            firstSoundMs = if (o.has("first_sound_ms")) o.getLong("first_sound_ms") else null,
+            interrupted = o.optBoolean("interrupted"),
         )
     }
 }

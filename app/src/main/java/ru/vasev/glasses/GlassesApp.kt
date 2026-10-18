@@ -12,8 +12,10 @@ import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.profile.ProfileSettings
 import ru.vasev.glasses.security.ApiKeyStore
+import ru.vasev.glasses.speech.AudioFocus
 import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
+import ru.vasev.glasses.speech.HeadsetButtons
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
 import ru.vasev.glasses.speech.RoutedSpeechSource
 import ru.vasev.glasses.speech.PhoneSpeakerOutput
@@ -37,6 +39,14 @@ class GlassesApp : Application() {
     lateinit var audioOutput: AudioOutput
         private set
     lateinit var speaker: Speaker
+        private set
+
+    /** Маршрут звука и гарнитура: микрофон для голосового «стоп» во время ответа. */
+    lateinit var audioRouter: AudioRouter
+        private set
+
+    /** Кнопка гарнитуры, пока звучит ответ ассистента. */
+    lateinit var headsetButtons: HeadsetButtons
         private set
 
     /** Зашифрованные API-ключи провайдеров ИИ (вводятся на экране «Настройки»). */
@@ -73,10 +83,11 @@ class GlassesApp : Application() {
         glasses = GlassesManager(this)
         imageSources = ImageSourceSettings(this, glasses)
         phoneCamera = PhoneCamera(this)
-        val router = AudioRouter(this)
-        speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), router)
+        audioRouter = AudioRouter(this)
+        speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)
-        audioOutput = PhoneSpeakerOutput(speaker, router)
+        audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this))
+        headsetButtons = HeadsetButtons(this)
     }
 
     companion object {

@@ -86,7 +86,13 @@ fun MicButton(phase: Phase, level: Float, enabled: Boolean, onClick: () -> Unit,
     }
     val haloVisible = phase == Phase.LISTENING || phase == Phase.SPEAKING
 
-    val description = stringResource(if (phase == Phase.IDLE) R.string.mic_ask else R.string.mic_stop)
+    val description = stringResource(
+        when {
+            phase == Phase.IDLE -> R.string.mic_ask
+            phase.interruptible -> R.string.mic_interrupt
+            else -> R.string.mic_stop
+        },
+    )
     val state = when (phase) {
         Phase.IDLE -> R.string.mic_state_ready
         Phase.CAPTURING -> R.string.mic_state_capturing

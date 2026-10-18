@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -40,9 +41,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -118,9 +122,15 @@ fun MainScreen(
             Chat(state, modifier = Modifier.weight(1f).fillMaxWidth(), onOpenPhoto = { bitmap, label -> photo = bitmap to label })
 
             // Управление: «Что я вижу» — большая кнопка микрофона — «Новый разговор».
-            // Пока что-то идёт, кнопка микрофона останавливает.
+            // Пока идёт ответ, кнопка микрофона перебивает его и сразу слушает новый вопрос;
+            // пока снимаем или слушаем — останавливает. Остальной экран (фото, «Подробнее») работает как обычно.
+            val phaseLabel = state.phase.labelRes?.let { stringResource(it) }.orEmpty()
             Text(
-                if (busy) stringResource(R.string.assistant_hint_busy, state.phase.labelRes?.let { stringResource(it) }.orEmpty()) else stringResource(R.string.assistant_hint_idle),
+                when {
+                    state.phase.interruptible -> stringResource(R.string.assistant_hint_interrupt, phaseLabel)
+                    busy -> stringResource(R.string.assistant_hint_busy, phaseLabel)
+                    else -> stringResource(R.string.assistant_hint_idle)
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
@@ -136,7 +146,7 @@ fun MainScreen(
                     phase = state.phase,
                     level = micLevel,
                     enabled = busy || hasApiKey,
-                    onClick = if (busy) viewModel::stop else onAsk,
+                    onClick = if (busy && !state.phase.interruptible) viewModel::stop else onAsk,
                 )
                 SideAction(
                     R.drawable.ic_sym_add_comment,
@@ -173,8 +183,12 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
     val listState = rememberLazyListState()
     val hasPending = state.pendingQuestion.isNotEmpty() || state.pendingFrame != null
     val rowCount = state.chat.size + (if (hasPending) 1 else 0) + (if (state.error != null) 1 else 0)
-    LaunchedEffect(rowCount, state.pendingQuestion) {
-        if (rowCount > 0) listState.animateScrollToItem(rowCount - 1)
+    LaunchedEffect(rowCount, state.pendingQuestion, state.pendingAnswer) {
+        if (rowCount > 0) {
+            // К концу последней строки, а не к её началу: ответ с подробностями бывает выше экрана.
+            listState.animateScrollToItem(rowCount - 1)
+            listState.animateScrollBy(SCROLL_TO_END_PX)
+        }
     }
 
     if (rowCount == 0) {
@@ -198,12 +212,16 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 UserBubble(item.question, item.frame, item.frameSource, onOpenPhoto)
-                AnswerBubble(item.answer, item.model)
+                key(item.id) { AnswerBubble(item.answer, item.details, item.model, item.interrupted) }
             }
         }
         if (hasPending) {
             item(key = "pending") {
-                UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource, onOpenPhoto)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource, onOpenPhoto)
+                    // Ответ появляется по предложениям, пока модель ещё пишет.
+                    if (state.pendingAnswer.isNotEmpty()) AnswerBubble(state.pendingAnswer, state.pendingDetails, null, interrupted = false)
+                }
             }
         }
         state.error?.let { error -> item(key = "error") { Notice(error) } }
@@ -262,21 +280,44 @@ private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, 
     }
 }
 
-/** Ответ модели — слева; метка модели — мелко под пузырём. */
+/**
+ * Ответ модели — слева. Суть (она звучала) — обычным текстом; подробности — по «Подробнее», мельче.
+ * Метка модели и «перебит» — мелко под пузырём.
+ */
 @Composable
-private fun AnswerBubble(text: String, model: ModelTag?) {
+private fun AnswerBubble(text: String, details: String, model: ModelTag?, interrupted: Boolean) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
-        Text(
-            text,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyLarge,
+        Column(
             modifier = Modifier
                 .widthIn(max = 300.dp)
                 .clip(RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
-        )
-        if (model != null) BubbleCaption(modelLabel(model))
+        ) {
+            Text(text.ifEmpty { "…" }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+            if (details.isNotEmpty()) {
+                if (expanded) {
+                    Text(
+                        details,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                ) {
+                    Text(stringResource(if (expanded) R.string.answer_less else R.string.answer_more))
+                }
+            }
+        }
+        val caption = listOfNotNull(
+            model?.let { modelLabel(it) },
+            if (interrupted) stringResource(R.string.answer_interrupted) else null,
+        ).joinToString(" · ")
+        if (caption.isNotEmpty()) BubbleCaption(caption)
     }
 }
 
@@ -390,3 +431,6 @@ private fun Notice(text: String) {
         Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
     }
 }
+
+/** Прокрутка «до упора»: список сам ограничит её концом. */
+private const val SCROLL_TO_END_PX = 100_000f

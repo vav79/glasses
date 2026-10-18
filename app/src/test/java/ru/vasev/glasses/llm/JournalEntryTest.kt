@@ -36,6 +36,18 @@ class JournalEntryTest {
     }
 
     @Test
+    fun `first sound and interrupted flag round trip`() {
+        val voiced = entry.copy(role = Role.ASSISTANT, firstSoundMs = 1450, interrupted = true)
+        val json = voiced.toJson()
+        assertEquals(1450, json.getLong("first_sound_ms"))
+        assertEquals(true, json.getBoolean("interrupted"))
+        assertEquals(voiced, JournalEntry.fromJson(JSONObject(json.toString())))
+        // Неперебитый ответ без звука — без лишних полей.
+        assertFalse(entry.toJson().has("first_sound_ms"))
+        assertFalse(entry.toJson().has("interrupted"))
+    }
+
+    @Test
     fun `texts are kept when present`() {
         val withTexts = entry.copy(question = "Merhaba", answer = "Здравствуйте")
         assertEquals(withTexts, JournalEntry.fromJson(JSONObject(withTexts.toJson().toString())))

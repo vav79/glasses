@@ -128,4 +128,40 @@ class OpenAiCompatibleFormatTest {
         assertEquals(ProviderException.Kind.BAD_REQUEST, OpenAiCompatibleFormat.kindFor(422))
         assertTrue(ProviderException(ProviderId.DEEPSEEK, ProviderException.Kind.AUTH).needsKey)
     }
+
+    @Test
+    fun `stream body asks for usage in the last chunk`() {
+        val body = OpenAiCompatibleFormat.buildBody(request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("q"))), Dialect.DEEPSEEK, stream = true)
+        assertTrue(body.getBoolean("stream"))
+        assertTrue(body.getJSONObject("stream_options").getBoolean("include_usage"))
+        val plain = OpenAiCompatibleFormat.buildBody(request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("q"))), Dialect.DEEPSEEK)
+        assertFalse(plain.getBoolean("stream"))
+        assertFalse(plain.has("stream_options"))
+    }
+
+    @Test
+    fun `sse lines - text, reasoning skipped, filter, usage, done`() {
+        val text = OpenAiCompatibleFormat.parseStreamLine("""data: {"choices":[{"index":0,"delta":{"content":"Привет"},"finish_reason":null}]}""")
+        assertEquals("Привет", text?.text)
+        assertNull(text?.finishReason)
+
+        // Размышления DeepSeek не озвучиваются и не показываются.
+        val reasoning = OpenAiCompatibleFormat.parseStreamLine(
+            """data: {"choices":[{"index":0,"delta":{"content":null,"reasoning_content":"думаю"},"finish_reason":null}]}""",
+        )
+        assertNull(reasoning?.text)
+
+        val filtered = OpenAiCompatibleFormat.parseStreamLine("""data: {"choices":[{"index":0,"delta":{},"finish_reason":"content_filter"}]}""")
+        assertEquals("content_filter", filtered?.finishReason)
+
+        val usage = OpenAiCompatibleFormat.parseStreamLine(
+            """data: {"choices":[],"usage":{"prompt_tokens":120,"completion_tokens":40,"prompt_cache_hit_tokens":64,""" +
+                """"completion_tokens_details":{"reasoning_tokens":10}}}""",
+        )
+        assertEquals(Usage(input = 120, output = 40, cacheRead = 64, reasoning = 10), usage?.usage)
+
+        assertNull(OpenAiCompatibleFormat.parseStreamLine("data: [DONE]"))
+        assertNull(OpenAiCompatibleFormat.parseStreamLine(": keep-alive"))
+        assertNull(OpenAiCompatibleFormat.parseStreamLine(""))
+    }
 }

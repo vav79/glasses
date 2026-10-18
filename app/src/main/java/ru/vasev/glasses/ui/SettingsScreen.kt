@@ -69,6 +69,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val role by viewModel.role.collectAsStateWithLifecycle()
     val showAdvanced by viewModel.showAdvanced.collectAsStateWithLifecycle()
     val journalTexts by viewModel.journalTexts.collectAsStateWithLifecycle()
+    val voiceStop by viewModel.voiceStop.collectAsStateWithLifecycle()
+    val headsetMic by viewModel.headsetMic.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
@@ -86,6 +88,17 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         SectionTitle(stringResource(R.string.settings_role))
         RolePicker(role, viewModel::setRole)
         Hint(stringResource(R.string.settings_role_hint))
+
+        HorizontalDivider()
+        SectionTitle(stringResource(R.string.settings_headset))
+        SwitchRow(
+            title = stringResource(R.string.settings_voice_stop_title),
+            subtitle = stringResource(R.string.settings_voice_stop_subtitle),
+            checked = voiceStop,
+            enabled = headsetMic,
+            onChange = viewModel::setVoiceStop,
+        )
+        if (!headsetMic) Hint(stringResource(R.string.settings_voice_stop_no_headset))
 
         for (provider in viewModel.providers) {
             HorizontalDivider()

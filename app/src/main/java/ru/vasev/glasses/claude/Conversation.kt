@@ -83,7 +83,10 @@ class Conversation(
          * (`R.array.reset_commands`). Сравнение без учёта регистра, знаков препинания и диакритики
          * (NFD + удаление диакритических знаков: «ё» → «е»; команды нормализуются так же, как фраза).
          */
-        fun isResetCommand(text: String, commands: Collection<String>): Boolean =
+        fun isResetCommand(text: String, commands: Collection<String>): Boolean = isCommand(text, commands)
+
+        /** Фраза целиком — одна из [commands] (так же сравниваются «стоп» / «stop» во время ответа). */
+        fun isCommand(text: String, commands: Collection<String>): Boolean =
             normalize(text) in commands.map(::normalize)
 
         private fun normalize(text: String): String =

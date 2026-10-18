@@ -95,7 +95,21 @@ class ProfileSettings(context: Context) {
         _journalTexts.value = enabled
     }
 
+    private val _voiceStop = MutableStateFlow(prefs.getBoolean(KEY_VOICE_STOP, false))
+
+    /**
+     * Голосовое «стоп» во время ответа — только с Bluetooth-гарнитурой: её микрофон слушает «стоп»,
+     * а ответ при этом звучит в качестве звонка. По умолчанию выключено.
+     */
+    val voiceStop: StateFlow<Boolean> = _voiceStop.asStateFlow()
+
+    fun setVoiceStop(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_VOICE_STOP, enabled).apply()
+        _voiceStop.value = enabled
+    }
+
     private companion object {
+        const val KEY_VOICE_STOP = "voice_stop"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ROLE = "role"
         const val KEY_SHOW_ADVANCED = "show_advanced"
