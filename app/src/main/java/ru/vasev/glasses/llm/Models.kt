@@ -21,11 +21,13 @@ data class ModelSpec(
     val title: String,
     /** Принимает ли картинки. Для моделей без фото снимки в истории заменяются на «[фото]». */
     val vision: Boolean,
+    /** Умеет ли искать в интернете (серверный веб-поиск есть только у Claude). */
+    val webSearch: Boolean = false,
 )
 
 object ModelCatalog {
-    val CLAUDE_SONNET = ModelSpec("claude-sonnet-5-5", ProviderId.ANTHROPIC, "Claude Sonnet 5.5", vision = true)
-    val CLAUDE_HAIKU = ModelSpec("claude-haiku-5-5", ProviderId.ANTHROPIC, "Claude Haiku 5.5", vision = true)
+    val CLAUDE_SONNET = ModelSpec("claude-sonnet-5-5", ProviderId.ANTHROPIC, "Claude Sonnet 5.5", vision = true, webSearch = true)
+    val CLAUDE_HAIKU = ModelSpec("claude-haiku-5-5", ProviderId.ANTHROPIC, "Claude Haiku 5.5", vision = true, webSearch = true)
 
     /** DeepSeek-V4.1-Flash. Старые имена deepseek-v4-flash / -vision-exp выведены из работы. */
     val DEEPSEEK_FLASH = ModelSpec("deepseek-flash", ProviderId.DEEPSEEK, "DeepSeek Flash", vision = true)

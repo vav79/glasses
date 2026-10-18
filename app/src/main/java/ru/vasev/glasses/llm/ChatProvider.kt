@@ -14,6 +14,12 @@ data class ChatRequest(
     val effort: Effort,
     /** Ограничение на весь запрос (для запасной модели); null — по умолчанию клиента. */
     val timeoutMs: Long? = null,
+    /** Инструменты приложения (заметки, курсы); null — без инструментов. */
+    val tools: ToolSet? = null,
+    /** Веб-поиск Claude; у моделей без поиска [LlmService] убирает его и предупреждает модель в промпте. */
+    val webSearch: WebSearch? = null,
+    /** Поиск был запрошен, но у модели его нет: в промпт добавлено предупреждение, у ответа — метка «без поиска». */
+    val webSearchMissing: Boolean = false,
 ) {
     /** Есть ли снимок в новой реплике (сценарий «Что я вижу»). */
     val photoInCurrentTurn: Boolean get() = (turns.lastOrNull() as? Turn.User)?.jpeg != null
@@ -34,10 +40,25 @@ data class Usage(
     val cacheRead: Long = 0,
     val cacheWrite: Long = 0,
     val reasoning: Long = 0,
-)
+    /** Поисков в интернете (у Claude — `server_tool_use.web_search_requests`, неудачные не считаются). */
+    val webSearches: Long = 0,
+) {
+    /** Сумма по раундам вызова инструментов: каждый раунд — отдельный запрос со своим счётом. */
+    operator fun plus(o: Usage) = Usage(
+        input + o.input, output + o.output, cacheRead + o.cacheRead, cacheWrite + o.cacheWrite,
+        reasoning + o.reasoning, webSearches + o.webSearches,
+    )
+}
 
 /** Ответ модели. [text] = null — модель отказалась отвечать. */
-data class ChatResult(val text: String?, val model: ModelSpec, val usage: Usage, val latencyMs: Long)
+data class ChatResult(
+    val text: String?,
+    val model: ModelSpec,
+    val usage: Usage,
+    val latencyMs: Long,
+    /** Источники веб-поиска, на которые сослалась модель. */
+    val sources: List<WebSource> = emptyList(),
+)
 
 /** Сбой запроса к провайдеру — классифицирован, чтобы решить про запасную модель. */
 class ProviderException(

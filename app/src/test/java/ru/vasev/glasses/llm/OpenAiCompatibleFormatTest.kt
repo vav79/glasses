@@ -164,4 +164,64 @@ class OpenAiCompatibleFormatTest {
         assertNull(OpenAiCompatibleFormat.parseStreamLine(": keep-alive"))
         assertNull(OpenAiCompatibleFormat.parseStreamLine(""))
     }
+
+    @Test
+    fun `tools go as functions with json schema`() {
+        val spec = ToolSpec("find_notes", "Search notes", mapOf("query" to mapOf("type" to "string")), listOf("query"))
+        val body = OpenAiCompatibleFormat.buildBody(
+            request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("где машина?"))).copy(tools = ToolSet(listOf(spec)) { ToolOutput("") }),
+            Dialect.DEEPSEEK,
+            stream = true,
+        )
+        val function = body.getJSONArray("tools").getJSONObject(0).getJSONObject("function")
+        assertEquals("find_notes", function.getString("name"))
+        assertEquals("string", function.getJSONObject("parameters").getJSONObject("properties").getJSONObject("query").getString("type"))
+        assertEquals("query", function.getJSONObject("parameters").getJSONArray("required").getString(0))
+    }
+
+    @Test
+    fun `no tools - no tools field`() {
+        val body = OpenAiCompatibleFormat.buildBody(request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("q"))), Dialect.DEEPSEEK)
+        assertFalse(body.has("tools"))
+    }
+
+    @Test
+    fun `tool call arrives in pieces and is assembled`() {
+        val lines = listOf(
+            """data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"find_notes","arguments":""}}]}}]}""",
+            """data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"query\":"}}]}}]}""",
+            """data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"машина\"}"}}]}}]}""",
+            """data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}""",
+        )
+        val assembler = OpenAiCompatibleFormat.ToolCallAssembler()
+        var finish: String? = null
+        lines.mapNotNull(OpenAiCompatibleFormat::parseStreamLine).forEach { chunk ->
+            chunk.toolCalls.forEach(assembler::add)
+            chunk.finishReason?.let { finish = it }
+        }
+        assertEquals("tool_calls", finish)
+        val (call, raw) = assembler.calls().single()
+        assertEquals("call_1", call.id)
+        assertEquals("find_notes", call.name)
+        assertEquals("машина", call.input.getString("query"))
+
+        val extra = listOf(
+            OpenAiCompatibleFormat.assistantToolTurn("", "", listOf(call to raw)),
+            OpenAiCompatibleFormat.toolResultTurn("call_1", ToolOutput("""{"notes":[]}""")),
+        )
+        val body = OpenAiCompatibleFormat.buildBody(request(ModelCatalog.DEEPSEEK_FLASH, listOf(Turn.User("где машина?"))), Dialect.DEEPSEEK, true, extra)
+        val messages = body.getJSONArray("messages")
+        assertEquals(listOf("system", "user", "assistant", "tool"), (0 until messages.length()).map { messages.getJSONObject(it).getString("role") })
+        assertEquals("call_1", messages.getJSONObject(2).getJSONArray("tool_calls").getJSONObject(0).getString("id"))
+        assertFalse(messages.getJSONObject(2).has("reasoning_content"))
+        assertEquals("call_1", messages.getJSONObject(3).getString("tool_call_id"))
+    }
+
+    @Test
+    fun `reasoning is not text, error output is marked`() {
+        val chunk = OpenAiCompatibleFormat.parseStreamLine("""data: {"choices":[{"index":0,"delta":{"content":null,"reasoning_content":"думаю"}}]}""")
+        assertNull(chunk?.text)
+        assertEquals("думаю", chunk?.reasoning)
+        assertTrue(OpenAiCompatibleFormat.toolResultTurn("c", ToolOutput("no rate", isError = true)).getString("content").startsWith("Error"))
+    }
 }

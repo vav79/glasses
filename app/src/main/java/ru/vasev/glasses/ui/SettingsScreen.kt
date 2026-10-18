@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role as SemanticsRole
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.vasev.glasses.R
+import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
 import ru.vasev.glasses.ui.glass.GlassCard
@@ -86,6 +88,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val voiceStop by viewModel.voiceStop.collectAsStateWithLifecycle()
     val headsetMic by viewModel.headsetMic.collectAsStateWithLifecycle()
     val lessTransparency by viewModel.lessTransparency.collectAsStateWithLifecycle()
+    val currency by viewModel.currency.collectAsStateWithLifecycle()
+    val rates by viewModel.rates.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     // Вся колонка — источник размытия: при прокрутке разделы уходят под стеклянную панель вкладок.
@@ -110,6 +114,15 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 subtitle = stringResource(R.string.settings_less_transparency_subtitle),
                 checked = lessTransparency,
                 onChange = viewModel::setLessTransparency,
+            )
+        }
+
+        Section(stringResource(R.string.settings_currency_title)) {
+            CurrencyPicker(currency, viewModel::setCurrency)
+            Hint(stringResource(R.string.settings_currency_subtitle))
+            Hint(
+                rates?.let { stringResource(R.string.settings_rates_cached, RATE_DATE.format(it.table.date), it.source) }
+                    ?: stringResource(R.string.settings_rates_none),
             )
         }
 
@@ -149,8 +162,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 
         BackgroundTitle(stringResource(R.string.settings_advanced))
         Section(stringResource(R.string.settings_models)) {
-            ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
-            ModelPicker(stringResource(R.string.settings_model_translation), translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
+            ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel, markNoSearch = true) { viewModel.setModel(Role.ASSISTANT, it) }
+            ModelPicker(stringResource(R.string.settings_model_translation), translationModel, markNoSearch = false) { viewModel.setModel(Role.TRANSLATION, it) }
+            if (!assistantModel.webSearch) Hint("${assistantModel.title}: ${stringResource(R.string.model_no_web_search)}")
             Hint(stringResource(R.string.settings_vision_hint))
         }
 
@@ -238,9 +252,34 @@ private fun KeySection(provider: ProviderId, state: KeyState, viewModel: Setting
     state.message?.let { Status(it, isError = false) }
 }
 
+/** «Моя валюта»: выпадающий список с названием валюты на языке экрана. */
 @Composable
-private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec) -> Unit) {
+private fun CurrencyPicker(selected: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val locale = LocalConfiguration.current.locales[0]
+    Box {
+        GlassButton(CurrencySettings.title(selected, locale) + " ▾", onClick = { expanded = true }, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp))
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
+            CurrencySettings.CHOICES.forEach { code ->
+                DropdownMenuItem(
+                    text = { Text(CurrencySettings.title(code, locale), fontWeight = if (code == selected) FontWeight.SemiBold else FontWeight.Normal) },
+                    onClick = {
+                        expanded = false
+                        onSelect(code)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private val RATE_DATE: java.time.format.DateTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+
+/** [markNoSearch] — пометить модели без веб-поиска (важно для ассистента, переводу поиск не нужен). */
+@Composable
+private fun ModelPicker(role: String, selected: ModelSpec, markNoSearch: Boolean, onSelect: (ModelSpec) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val noSearch = stringResource(R.string.model_no_web_search)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(role, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         Box {
@@ -251,7 +290,8 @@ private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec)
                     DropdownMenuItem(
                         text = {
                             Text(
-                                if (model.vision) model.title else stringResource(R.string.model_no_photo, model.title),
+                                (if (model.vision) model.title else stringResource(R.string.model_no_photo, model.title)) +
+                                    if (markNoSearch && !model.webSearch) " · $noSearch" else "",
                                 fontWeight = if (model == selected) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         },

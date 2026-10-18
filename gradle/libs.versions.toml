@@ -17,8 +17,15 @@ appcompat = "1.8.0"
 haze = "2.0.1"
 backdrop = "2.0.1"
 orgJson = "20260814"
+# Ссылки и QR: распознавание на телефоне (встроенные модели ML Kit, без сети) и Custom Tabs
+mlkitBarcode = "17.3.0"
+mlkitText = "16.0.1"
+browser = "1.10.0"
 
 [libraries]
+mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
+mlkit-text = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitText" }
+androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
 mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "mwdat" }
 mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "mwdat" }

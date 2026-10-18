@@ -52,6 +52,7 @@ data class JournalEntry(
         put("cache_read", usage.cacheRead)
         put("cache_write", usage.cacheWrite)
         put("reasoning", usage.reasoning)
+        if (usage.webSearches > 0) put("web_searches", usage.webSearches)
         put("photo", photo)
         put("fallback", fallback)
         costUsd?.let { put("cost_usd", it) }
@@ -75,6 +76,7 @@ data class JournalEntry(
                 cacheRead = o.optLong("cache_read"),
                 cacheWrite = o.optLong("cache_write"),
                 reasoning = o.optLong("reasoning"),
+                webSearches = o.optLong("web_searches"),
             ),
             photo = o.optString("photo", "none"),
             fallback = o.optBoolean("fallback"),

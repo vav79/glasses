@@ -33,7 +33,62 @@ object OpenAiCompatibleFormat {
     const val PHOTO_PLACEHOLDER = "[photo]"
 
     /** Кусок потокового ответа (одна строка SSE `data: {...}`). */
-    data class StreamChunk(val text: String?, val finishReason: String?, val usage: Usage?)
+    data class StreamChunk(
+        val text: String?,
+        val finishReason: String?,
+        val usage: Usage?,
+        val toolCalls: List<ToolCallDelta> = emptyList(),
+        /** Размышления DeepSeek: не показываются, но в цикле инструментов возвращаются модели. */
+        val reasoning: String? = null,
+    )
+
+    /** Кусок вызова инструмента: id и имя приходят в первом куске, аргументы — частями. */
+    data class ToolCallDelta(val index: Int, val id: String?, val name: String?, val arguments: String?)
+
+    /** Собирает вызовы инструментов из кусков потока. */
+    class ToolCallAssembler {
+        private class Draft(var id: String = "", var name: String = "", val arguments: StringBuilder = StringBuilder())
+
+        private val drafts = sortedMapOf<Int, Draft>()
+
+        fun add(delta: ToolCallDelta) {
+            val draft = drafts.getOrPut(delta.index) { Draft() }
+            delta.id?.let { draft.id = it }
+            delta.name?.let { draft.name += it }
+            delta.arguments?.let { draft.arguments.append(it) }
+        }
+
+        val isEmpty: Boolean get() = drafts.isEmpty()
+
+        /** Вызовы с сырыми аргументами (строкой JSON — так они и возвращаются модели в истории). */
+        fun calls(): List<Pair<ToolCall, String>> = drafts.values.map { d ->
+            val input = runCatching { JSONObject(d.arguments.toString().ifBlank { "{}" }) }.getOrElse { JSONObject() }
+            ToolCall(d.id, d.name, input) to d.arguments.toString()
+        }
+    }
+
+    /** Ход модели с вызовами инструментов — для следующего раунда. */
+    fun assistantToolTurn(text: String, reasoning: String, calls: List<Pair<ToolCall, String>>): JSONObject =
+        JSONObject().apply {
+            put("role", "assistant")
+            put("content", text)
+            if (reasoning.isNotEmpty()) put("reasoning_content", reasoning)
+            put(
+                "tool_calls",
+                JSONArray().apply {
+                    calls.forEach { (call, arguments) ->
+                        put(
+                            JSONObject().put("id", call.id).put("type", "function")
+                                .put("function", JSONObject().put("name", call.name).put("arguments", arguments.ifBlank { "{}" })),
+                        )
+                    }
+                },
+            )
+        }
+
+    fun toolResultTurn(callId: String, output: ToolOutput): JSONObject =
+        JSONObject().put("role", "tool").put("tool_call_id", callId)
+            .put("content", if (output.isError) "Error: ${output.content}" else output.content)
 
     /**
      * Строка SSE → кусок ответа; null — служебная строка, пустая строка или `[DONE]`.
@@ -49,10 +104,24 @@ object OpenAiCompatibleFormat {
         val text = delta?.takeUnless { it.isNull("content") }?.optString("content")?.takeIf { it.isNotEmpty() }
         val finish = choice?.takeUnless { it.isNull("finish_reason") }?.optString("finish_reason")
         val usage = json.optJSONObject("usage")?.let(::usageOf)
-        return StreamChunk(text, finish, usage)
+        val reasoning = delta?.takeUnless { it.isNull("reasoning_content") }?.optString("reasoning_content")?.takeIf { it.isNotEmpty() }
+        val calls = delta?.optJSONArray("tool_calls")?.let { array ->
+            (0 until array.length()).map { i ->
+                val call = array.getJSONObject(i)
+                val function = call.optJSONObject("function")
+                ToolCallDelta(
+                    index = call.optInt("index", i),
+                    id = call.stringOrNull("id"),
+                    name = function?.takeUnless { it.isNull("name") }?.optString("name")?.ifEmpty { null },
+                    arguments = function?.takeUnless { it.isNull("arguments") }?.optString("arguments"),
+                )
+            }
+        }.orEmpty()
+        return StreamChunk(text, finish, usage, calls, reasoning)
     }
 
-    fun buildBody(request: ChatRequest, dialect: Dialect, stream: Boolean = false): JSONObject {
+    /** [extra] — раунды цикла инструментов текущего ответа (ходы модели с вызовами и результаты). */
+    fun buildBody(request: ChatRequest, dialect: Dialect, stream: Boolean = false, extra: List<JSONObject> = emptyList()): JSONObject {
         val messages = JSONArray()
         messages.put(JSONObject().put("role", "system").put("content", request.system))
         for (turn in request.turns) {
@@ -61,12 +130,32 @@ object OpenAiCompatibleFormat {
                 is Turn.Assistant -> messages.put(JSONObject().put("role", "assistant").put("content", turn.text))
             }
         }
+        extra.forEach(messages::put)
         return JSONObject().apply {
             put("model", request.model.id)
             put("messages", messages)
             put("stream", stream)
             // Счёт токенов приходит последним куском потока.
             if (stream) put("stream_options", JSONObject().put("include_usage", true))
+            request.tools?.takeUnless { it.isEmpty }?.let { tools ->
+                put(
+                    "tools",
+                    JSONArray().apply {
+                        tools.specs.forEach { spec ->
+                            val parameters = JSONObject()
+                                .put("type", "object")
+                                .put("properties", JSONObject(spec.properties))
+                                .put("required", JSONArray(spec.required))
+                            put(
+                                JSONObject().put("type", "function").put(
+                                    "function",
+                                    JSONObject().put("name", spec.name).put("description", spec.description).put("parameters", parameters),
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
             when (dialect) {
                 Dialect.DEEPSEEK -> {
                     put("max_tokens", request.maxTokens)
@@ -162,6 +251,10 @@ class OpenAiCompatibleProvider(
         }
     }
 
+    /**
+     * Потоковый ответ с циклом инструментов: `finish_reason: tool_calls` — выполняем вызовы, добавляем ход модели
+     * и результаты в историю и спрашиваем снова. Текст всех раундов идёт в [onText] одним потоком.
+     */
     override suspend fun stream(
         request: ChatRequest,
         onText: (String) -> Unit,
@@ -169,55 +262,84 @@ class OpenAiCompatibleProvider(
         onEvent: () -> Unit,
     ): ChatResult =
         withContext(Dispatchers.IO) {
-            val httpRequest = httpRequest(request, stream = true)
             // Для потока ограничиваем паузу между кусками, а не весь ответ: подробности могут идти долго.
             val client = request.timeoutMs?.let { http.newBuilder().readTimeout(it, TimeUnit.MILLISECONDS).build() } ?: http
             val started = SystemClock.elapsedRealtime()
-            val response = try {
-                client.newCall(httpRequest).await()
-            } catch (e: IOException) {
-                throw ProviderException(id, ProviderException.Kind.NETWORK, detail = e.javaClass.simpleName)
-            }
             val text = StringBuilder()
-            var usage = Usage()
+            val extra = mutableListOf<JSONObject>()
+            var total = Usage()
             var filtered = false
-            response.use {
-                if (!it.isSuccessful) throw httpError(it)
-                coroutineScope {
-                    val source = it.body!!.source()
-                    // Чтение блокирующее: при отмене закрываем ответ, и чтение обрывается.
-                    val closer = launch {
+            var rounds = 0
+            while (true) {
+                val httpRequest = httpRequest(request, stream = true, extra)
+                val response = try {
+                    client.newCall(httpRequest).await()
+                } catch (e: IOException) {
+                    throw ProviderException(id, ProviderException.Kind.NETWORK, detail = e.javaClass.simpleName)
+                }
+                val roundText = StringBuilder()
+                val reasoning = StringBuilder()
+                val calls = OpenAiCompatibleFormat.ToolCallAssembler()
+                var finish: String? = null
+                var round = Usage()
+                response.use {
+                    if (!it.isSuccessful) throw httpError(it)
+                    coroutineScope {
+                        val source = it.body!!.source()
+                        // Чтение блокирующее: при отмене закрываем ответ, и чтение обрывается.
+                        val closer = launch {
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                it.close()
+                            }
+                        }
                         try {
-                            awaitCancellation()
+                            while (true) {
+                                val line = source.readUtf8Line() ?: break
+                                onEvent()
+                                val chunk = try {
+                                    OpenAiCompatibleFormat.parseStreamLine(line)
+                                } catch (e: Exception) {
+                                    throw ProviderException(id, ProviderException.Kind.EMPTY, detail = "unparsable stream")
+                                } ?: continue
+                                chunk.text?.let { piece ->
+                                    // Текст после вызова инструмента — новая мысль: отделяем от написанного до него.
+                                    val value = if (roundText.isEmpty() && text.isNotEmpty() && !text.last().isWhitespace() && !piece.startsWith(" ")) " $piece" else piece
+                                    roundText.append(piece)
+                                    text.append(value)
+                                    onText(value)
+                                }
+                                chunk.reasoning?.let(reasoning::append)
+                                chunk.toolCalls.forEach(calls::add)
+                                chunk.finishReason?.let { reason -> finish = reason }
+                                chunk.usage?.let { u ->
+                                    round = u
+                                    onUsage(total + u)
+                                }
+                            }
+                        } catch (e: IOException) {
+                            if (!isActive) throw CancellationException("stream closed on cancel")
+                            throw ProviderException(id, ProviderException.Kind.NETWORK, detail = e.javaClass.simpleName)
                         } finally {
-                            it.close()
+                            closer.cancel()
                         }
                     }
-                    try {
-                        while (true) {
-                            val line = source.readUtf8Line() ?: break
-                            onEvent()
-                            val chunk = try {
-                                OpenAiCompatibleFormat.parseStreamLine(line)
-                            } catch (e: Exception) {
-                                throw ProviderException(id, ProviderException.Kind.EMPTY, detail = "unparsable stream")
-                            } ?: continue
-                            chunk.text?.let { piece ->
-                                text.append(piece)
-                                onText(piece)
-                            }
-                            if (chunk.finishReason == "content_filter") filtered = true
-                            chunk.usage?.let { u ->
-                                usage = u
-                                onUsage(u)
-                            }
-                        }
-                    } catch (e: IOException) {
-                        if (!isActive) throw CancellationException("stream closed on cancel")
-                        throw ProviderException(id, ProviderException.Kind.NETWORK, detail = e.javaClass.simpleName)
-                    } finally {
-                        closer.cancel()
-                    }
+                }
+                total += round
+                if (finish == "content_filter") {
+                    filtered = true
+                    break
+                }
+                val tools = request.tools
+                if (finish != "tool_calls" || calls.isEmpty || tools == null || ++rounds > MAX_TOOL_ROUNDS) break
+                val assembled = calls.calls()
+                extra += OpenAiCompatibleFormat.assistantToolTurn(roundText.toString(), reasoning.toString(), assembled)
+                for ((call, _) in assembled) {
+                    // Инструмент может идти несколько секунд — сторожевой таймер потока не должен сработать.
+                    onEvent()
+                    extra += OpenAiCompatibleFormat.toolResultTurn(call.id, tools.execute(call))
+                    onEvent()
                 }
             }
             val answer = if (filtered) {
@@ -225,17 +347,17 @@ class OpenAiCompatibleProvider(
             } else {
                 text.toString().trim().ifEmpty { throw ProviderException(id, ProviderException.Kind.EMPTY) }
             }
-            ChatResult(answer, request.model, usage, SystemClock.elapsedRealtime() - started)
+            ChatResult(answer, request.model, total, SystemClock.elapsedRealtime() - started)
         }
 
-    private suspend fun httpRequest(request: ChatRequest, stream: Boolean): Request {
+    private suspend fun httpRequest(request: ChatRequest, stream: Boolean, extra: List<JSONObject> = emptyList()): Request {
         DebugFaults.consume(id)?.let { throw it }
         val apiKey = try {
             keys.decrypt(id)
         } catch (e: ApiKeyException) {
             null
         } ?: throw ProviderException(id, ProviderException.Kind.NO_KEY)
-        val body = OpenAiCompatibleFormat.buildBody(request, config.dialect, stream).toString()
+        val body = OpenAiCompatibleFormat.buildBody(request, config.dialect, stream, extra).toString()
         return Request.Builder()
             .url(config.baseUrl.trimEnd('/') + "/chat/completions")
             .header("Authorization", "Bearer $apiKey")

@@ -28,6 +28,9 @@ object ModelPrices {
         "deepseek-v4-pro" to Price(input = 1.20, output = 4.80, cacheRead = 0.12, inputIncludesCache = true, offPeakDiscount = true),
     )
 
+    /** Веб-поиск Claude: $10 за 1000 поисков (сверх токенов результатов, они уже во входных); неудачные не оплачиваются. */
+    const val WEB_SEARCH_USD = 0.01
+
     /** Скидка DeepSeek вне часов пика (оценка). */
     const val DEEPSEEK_OFF_PEAK_FACTOR = 0.5
 
@@ -35,9 +38,10 @@ object ModelPrices {
     fun estimate(modelId: String, usage: Usage, at: Instant): Double? {
         val p = prices[modelId] ?: return null
         val uncachedInput = if (p.inputIncludesCache) (usage.input - usage.cacheRead).coerceAtLeast(0) else usage.input
-        val usd = (uncachedInput * p.input + usage.output * p.output + usage.cacheRead * p.cacheRead +
+        val tokens = (uncachedInput * p.input + usage.output * p.output + usage.cacheRead * p.cacheRead +
             usage.cacheWrite * p.cacheWrite) / 1_000_000.0
-        return if (p.offPeakDiscount && !isDeepSeekPeak(at)) usd * DEEPSEEK_OFF_PEAK_FACTOR else usd
+        val usd = if (p.offPeakDiscount && !isDeepSeekPeak(at)) tokens * DEEPSEEK_OFF_PEAK_FACTOR else tokens
+        return usd + usage.webSearches * WEB_SEARCH_USD
     }
 
     /** Часы пика DeepSeek: будни, 01:00–04:00 и 06:00–10:00 UTC. */

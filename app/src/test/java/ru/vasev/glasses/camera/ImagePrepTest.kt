@@ -36,4 +36,21 @@ class ImagePrepTest {
         assertFalse(ImagePrep.hasExif(plain))
         assertFalse(ImagePrep.hasExif(ByteArray(0)))
     }
+
+    @Test
+    fun `almost black frame - phone in pocket`() {
+        val black = IntArray(1000) { 0xFF050505.toInt() }
+        assertTrue(ImagePrep.isDark(black))
+        // Немного шума и пара светлых точек (подсветка экрана сквозь ткань) — всё ещё «тёмный».
+        val noisy = IntArray(1000) { if (it % 100 == 0) 0xFFFFFFFF.toInt() else 0xFF0A0A0A.toInt() }
+        assertTrue(ImagePrep.isDark(noisy))
+    }
+
+    @Test
+    fun `dim but real scene is kept`() {
+        // Вечерняя парковка: в основном темно, но фонари и разметка видны.
+        val evening = IntArray(1000) { if (it % 10 == 0) 0xFFC8C8B4.toInt() else 0xFF141414.toInt() }
+        assertFalse(ImagePrep.isDark(evening))
+        assertFalse(ImagePrep.isDark(IntArray(1000) { 0xFF808080.toInt() }))
+    }
 }

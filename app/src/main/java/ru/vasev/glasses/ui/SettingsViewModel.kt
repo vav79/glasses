@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.vasev.glasses.GlassesApp
 import ru.vasev.glasses.R
+import ru.vasev.glasses.rates.Rates
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.i18n.LanguageChoice
 import ru.vasev.glasses.i18n.LanguageSettings
@@ -83,6 +84,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val lessTransparency: StateFlow<Boolean> = profile.lessTransparency
 
     fun setLessTransparency(enabled: Boolean) = profile.setLessTransparency(enabled)
+
+    /** «Моя валюта» и последние сохранённые курсы ЦБ. */
+    private val currencySettings = (app as GlassesApp).currency
+    val currency: StateFlow<String> = currencySettings.currency
+    val rates: StateFlow<Rates?> = (app as GlassesApp).rates.cached
+
+    fun setCurrency(code: String) = currencySettings.set(code)
 
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)

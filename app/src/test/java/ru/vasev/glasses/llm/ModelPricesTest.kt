@@ -56,4 +56,17 @@ class ModelPricesTest {
     fun `unknown model has no estimate`() {
         assertNull(ModelPrices.estimate("gpt-x", Usage(input = 10), wednesdayPeak))
     }
+
+    @Test
+    fun `web search adds ten dollars per thousand searches`() {
+        val tokens = ModelPrices.estimate("claude-sonnet-5-5", Usage(input = 10_000, output = 200), wednesdayPeak)!!
+        val withSearch = ModelPrices.estimate("claude-sonnet-5-5", Usage(input = 10_000, output = 200, webSearches = 2), wednesdayPeak)!!
+        assertEquals(0.02, withSearch - tokens, 1e-9)
+    }
+
+    @Test
+    fun `usage of tool rounds adds up`() {
+        val total = Usage(input = 100, output = 10, cacheRead = 50, webSearches = 1) + Usage(input = 300, output = 20, cacheWrite = 7, webSearches = 2)
+        assertEquals(Usage(input = 400, output = 30, cacheRead = 50, cacheWrite = 7, webSearches = 3), total)
+    }
 }

@@ -71,6 +71,9 @@ dependencies {
     implementation(libs.anthropic.java)
     // OpenAI-совместимые провайдеры (DeepSeek); та же версия, что приходит транзитивно от SDK.
     implementation(libs.okhttp)
+    implementation(libs.mlkit.barcode)
+    implementation(libs.mlkit.text)
+    implementation(libs.androidx.browser)
     // Камера телефона как источник снимков.
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)

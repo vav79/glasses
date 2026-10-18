@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +59,10 @@ import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesStatus
 import ru.vasev.glasses.llm.ModelTag
+import ru.vasev.glasses.llm.WebSource
+import ru.vasev.glasses.links.FoundLink
+import ru.vasev.glasses.links.LinkOpener
+import ru.vasev.glasses.notes.Note
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
 import ru.vasev.glasses.ui.glass.GlassCard
@@ -66,12 +72,14 @@ import ru.vasev.glasses.ui.glass.glass
 import ru.vasev.glasses.ui.glass.glassAccent
 import ru.vasev.glasses.ui.glass.glassBackgroundText
 import ru.vasev.glasses.ui.glass.glassContentSource
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
     onAsk: () -> Unit,
     onWhatDoISee: () -> Unit,
+    onTranslateView: () -> Unit,
     onConnectGlasses: () -> Unit,
     onOpenSettings: () -> Unit,
     onSelectSource: (ImageSource) -> Unit,
@@ -84,7 +92,10 @@ fun MainScreen(
     val model by viewModel.model.collectAsStateWithLifecycle()
     val micLevel by viewModel.micLevel.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
-    var photo by remember { mutableStateOf<Pair<Bitmap, ImageSource?>?>(null) }
+    var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
+    var fullText by remember { mutableStateOf<String?>(null) }
+    var showNotes by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -94,13 +105,23 @@ fun MainScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                stringResource(R.string.assistant_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 4.dp).semantics { heading() },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.assistant_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { heading() },
+                )
+                GlassIconButton(R.drawable.ic_sym_sticky_note_2, stringResource(R.string.notes_open), onClick = { showNotes = true }, size = 48.dp)
+                GlassIconButton(
+                    R.drawable.ic_sym_add_comment,
+                    stringResource(R.string.new_conversation),
+                    onClick = viewModel::newConversation,
+                    size = 48.dp,
+                    enabled = state.chat.isNotEmpty() || state.pendingQuestion.isNotEmpty(),
+                )
+            }
 
             SourceCard(
                 source = source,
@@ -116,10 +137,18 @@ fun MainScreen(
             if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
             // Чат уходит под нижнюю стеклянную панель — она его размывает.
-            Chat(state, modifier = Modifier.weight(1f).fillMaxWidth(), onOpenPhoto = { bitmap, label -> photo = bitmap to label })
+            Chat(
+                state,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                onOpenPhoto = { bitmap, label -> photo = bitmap to label },
+                onOpenText = { fullText = it },
+                onOpenLink = { LinkOpener.openSource(context, it) },
+                onLinkClick = viewModel::requestLink,
+                onRoute = { openRoute(context, it) },
+            )
         }
 
-        // Управление: «Что я вижу» — капля микрофона — «Новый разговор».
+        // Управление: «Что я вижу» — капля микрофона — «Переведи, что вижу».
         // Пока идёт ответ, кнопка микрофона перебивает его и сразу слушает новый вопрос;
         // пока снимаем или слушаем — останавливает. Остальной экран (фото, «Подробнее») работает как обычно.
         Column(
@@ -155,17 +184,26 @@ fun MainScreen(
                     enabled = busy || hasApiKey,
                     onClick = if (busy && !state.phase.interruptible) viewModel::stop else onAsk,
                 )
-                SideAction(
-                    R.drawable.ic_sym_add_comment,
-                    stringResource(R.string.new_conversation),
-                    enabled = state.chat.isNotEmpty() || state.pendingQuestion.isNotEmpty(),
-                    onClick = viewModel::newConversation,
-                )
+                SideAction(R.drawable.ic_sym_translate, stringResource(R.string.translate_what_i_see), enabled = !busy && hasApiKey, onClick = onTranslateView)
             }
         }
     }
 
-    photo?.let { (bitmap, source) -> FullscreenPhoto(bitmap, source?.let { stringResource(it.chatLabelRes) }) { photo = null } }
+    // Ссылка открывается только отсюда — после подтверждения на карточке (кнопкой или голосом).
+    LaunchedEffect(Unit) { viewModel.openLink.collect { LinkOpener.open(context, it) } }
+    state.confirmLink?.let { link ->
+        LinkConfirmDialog(link, onOpen = { viewModel.confirmLink(link) }, onDismiss = viewModel::dismissLink)
+    }
+    if (showNotes) {
+        NotesScreen(
+            viewModel = viewModel,
+            onClose = { showNotes = false },
+            onOpenPhoto = { bitmap -> photo = bitmap to null },
+            onRoute = { openRoute(context, it) },
+        )
+    }
+    photo?.let { (bitmap, label) -> FullscreenPhoto(bitmap, label) { photo = null } }
+    fullText?.let { text -> FullscreenText(text, stringResource(R.string.translate_what_i_see)) { fullText = null } }
 }
 
 /** Боковая круглая стеклянная кнопка с подписью под ней (зона нажатия ≥ 48 dp). */
@@ -190,7 +228,15 @@ private fun SideAction(@DrawableRes icon: Int, label: String, enabled: Boolean, 
 }
 
 @Composable
-private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, ImageSource?) -> Unit) {
+private fun Chat(
+    state: UiState,
+    modifier: Modifier,
+    onOpenPhoto: (Bitmap, String?) -> Unit,
+    onOpenText: (String) -> Unit,
+    onOpenLink: (String) -> Unit,
+    onLinkClick: (FoundLink) -> Unit,
+    onRoute: (Note) -> Unit,
+) {
     val listState = rememberLazyListState()
     val hasPending = state.pendingQuestion.isNotEmpty() || state.pendingFrame != null
     val rowCount = state.chat.size + (if (hasPending) 1 else 0) + (if (state.error != null) 1 else 0)
@@ -228,7 +274,25 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 UserBubble(item.question, item.frame, item.frameSource, onOpenPhoto)
-                key(item.id) { AnswerBubble(item.answer, item.details, item.model, item.interrupted) }
+                if (item.links.isNotEmpty()) {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        item.links.forEach { link -> LinkChip(link) { onLinkClick(link) } }
+                    }
+                }
+                key(item.id) {
+                    AnswerBubble(
+                        item.answer,
+                        item.details,
+                        item.model,
+                        item.interrupted,
+                        translation = item.translation,
+                        ratesNote = item.ratesNote,
+                        onOpenText = onOpenText,
+                    )
+                }
+                if (item.sources.isNotEmpty()) SourceLinks(item.sources, onOpenLink)
+                item.notes.forEach { card -> NoteCardView(card, onOpenPhoto, onRoute) }
+                item.deletedNotes.forEach { BubbleCaption(stringResource(R.string.note_deleted, it)) }
             }
         }
         if (hasPending) {
@@ -236,7 +300,17 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     UserBubble(state.pendingQuestion.ifEmpty { "…" }, state.pendingFrame, state.pendingFrameSource, onOpenPhoto)
                     // Ответ появляется по предложениям, пока модель ещё пишет.
-                    if (state.pendingAnswer.isNotEmpty()) AnswerBubble(state.pendingAnswer, state.pendingDetails, null, interrupted = false)
+                    if (state.pendingAnswer.isNotEmpty()) {
+                        AnswerBubble(
+                            state.pendingAnswer,
+                            state.pendingDetails,
+                            null,
+                            interrupted = false,
+                            translation = state.pendingTranslation,
+                            ratesNote = null,
+                            onOpenText = onOpenText,
+                        )
+                    }
                 }
             }
         }
@@ -264,7 +338,7 @@ private fun ForgottenDivider() {
 
 /** Моя реплика — справа, стекло цвета акцента. Снимок по нажатию — на весь экран; источник — мелко под пузырём. */
 @Composable
-private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, onOpenPhoto: (Bitmap, ImageSource?) -> Unit) {
+private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, onOpenPhoto: (Bitmap, String?) -> Unit) {
     val c = MaterialTheme.colorScheme
     val sourceLabel = stringResource((frameSource ?: ImageSource.GLASSES).chatLabelRes)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
@@ -283,7 +357,9 @@ private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, 
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .clickable(onClickLabel = stringResource(R.string.open_photo_full_screen)) { onOpenPhoto(bitmap, frameSource) },
+                        .clickable(onClickLabel = stringResource(R.string.open_photo_full_screen)) {
+                            onOpenPhoto(bitmap, frameSource?.let { sourceLabel })
+                        },
                 )
             }
             Text(
@@ -302,9 +378,18 @@ private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, 
  * Метка модели и «перебит» — мелко под пузырём.
  */
 @Composable
-private fun AnswerBubble(text: String, details: String, model: ModelTag?, interrupted: Boolean) {
+private fun AnswerBubble(
+    text: String,
+    details: String,
+    model: ModelTag?,
+    interrupted: Boolean,
+    translation: Boolean,
+    ratesNote: RatesNote?,
+    onOpenText: (String) -> Unit,
+) {
     val c = MaterialTheme.colorScheme
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    // Перевод снимка — ради полного текста: он виден сразу.
+    var expanded by rememberSaveable { mutableStateOf(translation) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
         Column(
             modifier = Modifier
@@ -322,23 +407,132 @@ private fun AnswerBubble(text: String, details: String, model: ModelTag?, interr
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                Text(
-                    stringResource(if (expanded) R.string.answer_less else R.string.answer_more),
-                    color = glassAccent(),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .clip(GlassShapes.pill)
-                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }
-                        .padding(vertical = 12.dp, horizontal = 4.dp),
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextAction(stringResource(if (expanded) R.string.answer_less else R.string.answer_more)) { expanded = !expanded }
+                    if (translation) TextAction(stringResource(R.string.show_translation_full_screen)) { onOpenText(details) }
+                }
             }
         }
         val caption = listOfNotNull(
             model?.let { modelLabel(it) },
+            ratesNote?.let { stringResource(if (it.offline) R.string.rates_note_offline else R.string.rates_note, DATE.format(it.date)) },
             if (interrupted) stringResource(R.string.answer_interrupted) else null,
         ).joinToString(" · ")
         if (caption.isNotEmpty()) BubbleCaption(caption)
+    }
+}
+
+/** Текстовая кнопка внутри пузыря (зона нажатия ≥ 48 dp по высоте). */
+@Composable
+private fun TextAction(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        color = glassAccent(),
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier
+            .padding(top = 2.dp)
+            .clip(GlassShapes.pill)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+    )
+}
+
+/** Ссылки веб-поиска под ответом: заголовок страницы или домен; открываются в браузере. */
+@Composable
+private fun SourceLinks(sources: List<WebSource>, onOpen: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp)) {
+        BubbleCaption(stringResource(R.string.sources_label))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            sources.forEach { source ->
+                // Нажатие — уже подтверждение, поэтому настоящий домен виден на кнопке всегда.
+                val domain = sourceDomain(source.url)
+                val title = source.title.ifBlank { domain }
+                Row(
+                    Modifier
+                        .widthIn(max = 300.dp)
+                        .glass(GlassShapes.pill)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { onOpen(source.url) }
+                        .semantics(mergeDescendants = true) { contentDescription = "$domain: $title" }
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.ui.res.painterResource(R.drawable.ic_sym_open_in_new),
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).height(18.dp),
+                    )
+                    Column {
+                        Text(
+                            title.take(MAX_LINK_TITLE).let { if (title.length > MAX_LINK_TITLE) "$it…" else it },
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                        Text(domain, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Заметка в чате: снимок (по нажатию — на весь экран), текст, время и «Проложить маршрут». */
+@Composable
+fun NoteCardView(card: NoteCard, onOpenPhoto: (Bitmap, String?) -> Unit, onRoute: (Note) -> Unit) {
+    NoteBody(
+        note = card.note,
+        photo = card.photo,
+        title = stringResource(if (card.saved) R.string.note_saved else R.string.note_found),
+        onOpenPhoto = { onOpenPhoto(it, null) },
+        onRoute = onRoute,
+        modifier = Modifier.widthIn(max = 320.dp),
+    )
+}
+
+/** Карточка заметки — общая для чата и экрана «Заметки». */
+@Composable
+fun NoteBody(
+    note: Note,
+    photo: Bitmap?,
+    title: String?,
+    onOpenPhoto: (Bitmap) -> Unit,
+    onRoute: (Note) -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    GlassCard(modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(start = 4.dp)) {
+                title?.let { Text(it, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold) }
+                Text(
+                    noteTime().format(note.createdAt.atZone(java.time.ZoneId.systemDefault())) +
+                        (note.accuracyM?.let { " · " + stringResource(R.string.note_accuracy, it.toInt()) } ?: ""),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = glassAccent(accent = MaterialTheme.colorScheme.onSurfaceVariant),
+                )
+            }
+            trailing?.invoke()
+        }
+        photo?.let { bitmap ->
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.note_photo),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClickLabel = stringResource(R.string.open_photo_full_screen)) { onOpenPhoto(bitmap) },
+            )
+        }
+        Text(note.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 4.dp))
+        if (note.hasLocation) {
+            GlassButton(
+                stringResource(R.string.note_route),
+                onClick = { onRoute(note) },
+                icon = R.drawable.ic_sym_directions,
+                kind = GlassButtonKind.PRIMARY,
+            )
+        }
     }
 }
 
@@ -458,6 +652,15 @@ private fun Notice(text: String) {
         Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
+private val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+/** Время заметки на языке приложения (а не системы). */
+@Composable
+private fun noteTime(): DateTimeFormatter {
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    return remember(locale) { DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", locale) }
+}
+private const val MAX_LINK_TITLE = 32
 
 /** Прокрутка «до упора»: список сам ограничит её концом. */
 private const val SCROLL_TO_END_PX = 100_000f

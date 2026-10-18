@@ -23,12 +23,22 @@ import java.util.concurrent.TimeUnit
 /** Ошибка для пользователя. [needsKey] — проблема с ключом: показать путь в «Настройки». */
 class LlmException(message: String, val needsKey: Boolean = false) : Exception(message)
 
-/** Метка модели у ответа; подпись («· запасная», «· для фото») собирает экран на текущем языке. */
-data class ModelTag(val title: String, val viaFallback: Boolean, val autoVision: Boolean)
+/** Метка модели у ответа; подпись («· запасная», «· для фото», «· без поиска») собирает экран на текущем языке. */
+data class ModelTag(val title: String, val viaFallback: Boolean, val autoVision: Boolean, val noWebSearch: Boolean = false)
 
-/** Ответ модели. [text] = null — модель отказалась отвечать. */
-data class Answer(val text: String?, val model: ModelSpec, val viaFallback: Boolean, val autoVision: Boolean) {
-    val tag: ModelTag get() = ModelTag(model.title, viaFallback, autoVision)
+/**
+ * Ответ модели. [text] = null — модель отказалась отвечать. [noWebSearch] — поиск был нужен, но у модели его нет
+ * (она предупреждена в промпте и говорит, что проверить сейчас не может). [sources] — ссылки веб-поиска.
+ */
+data class Answer(
+    val text: String?,
+    val model: ModelSpec,
+    val viaFallback: Boolean,
+    val autoVision: Boolean,
+    val noWebSearch: Boolean = false,
+    val sources: List<WebSource> = emptyList(),
+) {
+    val tag: ModelTag get() = ModelTag(model.title, viaFallback, autoVision, noWebSearch)
 }
 
 /** Потоковый ответ; [entry] — запись журнала, которую дописывает [LlmService.finishTurn] в конце хода. */
@@ -105,8 +115,10 @@ class LlmService(
         metrics: TurnMetrics,
         onFallback: () -> Unit,
         onText: (String) -> Unit,
+        tools: ToolSet? = null,
+        webSearch: WebSearch? = null,
     ): StreamedAnswer {
-        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort)
+        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, tools, webSearch)
         var delivered = false
         val primary = try {
             attemptStream(request, fallback = false, cause = null, metrics) {
@@ -122,10 +134,10 @@ class LlmService(
             } catch (e2: ProviderException) {
                 throw LlmException(L.s(R.string.fallback_also_failed, e.userMessage))
             }
-            return StreamedAnswer(Answer(result.text, result.model, viaFallback = true, autoVision = false), entry)
+            return StreamedAnswer(answerOf(result, retry, viaFallback = true, autoVision = false), entry)
         }
         val (result, entry) = primary
-        return StreamedAnswer(Answer(result.text, result.model, viaFallback = false, autoVision = autoVision), entry)
+        return StreamedAnswer(answerOf(result, request, viaFallback = false, autoVision = autoVision), entry)
     }
 
     /** Конец хода ассистента: запись журнала с временем до первого звука и признаком «перебит». */
@@ -134,15 +146,34 @@ class LlmService(
     }
 
     /** Нет сети — сразу ошибка; модель по роли; снимок на модели без фото — модель того же провайдера с фото. */
-    private fun prepare(role: Role, system: String, turns: List<Turn>, maxTokens: Long, effort: Effort): Pair<ChatRequest, Boolean> {
+    private fun prepare(
+        role: Role,
+        system: String,
+        turns: List<Turn>,
+        maxTokens: Long,
+        effort: Effort,
+        tools: ToolSet? = null,
+        webSearch: WebSearch? = null,
+    ): Pair<ChatRequest, Boolean> {
         if (!isOnline()) throw LlmException(L.s(R.string.no_internet))
-        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort)
+        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch)
         if (request.photoInCurrentTurn && !request.model.vision) {
             // Выбрана модель без фото (DeepSeek V4-Pro), а запрос со снимком — берём модель того же провайдера с фото.
-            ModelCatalog.visionFor(request.model)?.let { return request.copy(model = it) to true }
+            ModelCatalog.visionFor(request.model)?.let { return fitWebSearch(request.copy(model = it)) to true }
         }
-        return request to false
+        return fitWebSearch(request) to false
     }
+
+    /** Модель без поиска: поиск убираем, а модель предупреждаем — пусть честно скажет, что проверить сейчас не может. */
+    private fun fitWebSearch(request: ChatRequest): ChatRequest =
+        if (request.webSearch != null && !request.model.webSearch) {
+            request.copy(webSearch = null, webSearchMissing = true, system = request.system + "\n" + NO_WEB_SEARCH_NOTE)
+        } else {
+            request
+        }
+
+    private fun answerOf(result: ChatResult, sent: ChatRequest, viaFallback: Boolean, autoVision: Boolean) =
+        Answer(result.text, result.model, viaFallback, autoVision, noWebSearch = sent.webSearchMissing, sources = result.sources)
 
     /** Запрос для запасной модели или [LlmException] для пользователя, если повтора не будет. */
     private fun fallbackFor(e: ProviderException, request: ChatRequest): ChatRequest {
@@ -163,8 +194,10 @@ class LlmService(
                 },
                 needsKey = e.needsKey,
             )
-            is FallbackDecision.Retry -> (if (decision.stripPhotos) request.withoutPhotos() else request)
-                .copy(model = ModelCatalog.FALLBACK, timeoutMs = FALLBACK_TIMEOUT_MS)
+            is FallbackDecision.Retry -> fitWebSearch(
+                (if (decision.stripPhotos) request.withoutPhotos() else request)
+                    .copy(model = ModelCatalog.FALLBACK, timeoutMs = FALLBACK_TIMEOUT_MS),
+            )
         }
     }
 
@@ -267,7 +300,7 @@ class LlmService(
             "${prefix(request)} status=${if (r.text == null) "refused" else "ok"} latency=${latency}ms " +
                 (firstTextMs?.let { "first_text=${it}ms " } ?: "") +
                 "in=${u.input} out=${u.output} cache_read=${u.cacheRead} cache_write=${u.cacheWrite} " +
-                "reasoning=${u.reasoning} photo=${photoNote(request)} fallback=${fallbackNote(fallback, cause)}",
+                "reasoning=${u.reasoning} web=${u.webSearches} photo=${photoNote(request)} fallback=${fallbackNote(fallback, cause)}",
         )
     }
 
@@ -304,7 +337,8 @@ class LlmService(
         else -> "none"
     }
 
-    private fun isOnline(): Boolean {
+    /** Есть ли сеть с интернетом (без попытки соединения). */
+    fun isOnline(): Boolean {
         val network = connectivity.activeNetwork ?: return false
         return connectivity.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
@@ -314,5 +348,11 @@ class LlmService(
         const val FALLBACK_TIMEOUT_MS = 20_000L
         const val STREAM_STALL_MS = 20_000L
         const val STALL_CHECK_MS = 1_000L
+
+        /** Добавка к промпту для модели без веб-поиска. */
+        const val NO_WEB_SEARCH_NOTE =
+            "You cannot search the internet right now. If the answer needs fresh or local data (opening hours, news, " +
+                "schedules, weather, current prices) that your tools do not provide, say briefly and honestly in the first part " +
+                "that you cannot check it right now, then give only what you reliably know."
     }
 }

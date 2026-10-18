@@ -240,4 +240,130 @@
     <string name="settings_appearance">Оформление</string>
     <string name="settings_less_transparency_title">Меньше прозрачности</string>
     <string name="settings_less_transparency_subtitle">Стекло плотнее — для яркого солнца. Включается само, если в системе включены контрастный текст или повышенный контраст.</string>
+
+    <!-- Поиск в интернете, заметки, «Переведи, что вижу» -->
+    <string name="model_no_search_suffix">%1$s · без поиска</string>
+    <string name="model_no_web_search">без поиска в интернете</string>
+    <string name="sources_label">Источники</string>
+    <string name="open_link">Открыть %1$s</string>
+    <string name="no_browser">Нет приложения, чтобы открыть ссылку</string>
+    <string name="translate_what_i_see">Переведи, что вижу</string>
+    <string name="translate_view_question">Переведи, что вижу</string>
+    <string-array name="translate_view_commands">
+        <item>переведи что вижу</item>
+        <item>переведи что я вижу</item>
+        <item>переведи это</item>
+        <item>переведи текст</item>
+    </string-array>
+    <string-array name="remember_triggers">
+        <item>запомни</item>
+        <item>запиши</item>
+        <item>сохрани заметку</item>
+    </string-array>
+    <string-array name="delete_note_triggers">
+        <item>удали</item>
+        <item>удаля</item>
+        <item>забуд</item>
+        <item>забыв</item>
+        <item>сотри</item>
+        <item>стереть</item>
+    </string-array>
+    <string name="notes_title">Заметки</string>
+    <string name="notes_open">Заметки</string>
+    <string name="notes_close">Закрыть заметки</string>
+    <string name="notes_search">Поиск по заметкам</string>
+    <string name="notes_empty">Заметок пока нет. Скажите «Запомни, машина на втором уровне» — к заметке добавятся время, место и снимок с выбранной камеры.</string>
+    <string name="notes_nothing_found">Ничего не найдено</string>
+    <string name="notes_count">Заметок: %1$d</string>
+    <string name="note_route">Проложить маршрут</string>
+    <string name="note_delete">Удалить заметку</string>
+    <string name="note_delete_confirm">Удалить заметку вместе со снимком?</string>
+    <string name="note_saved">Заметка сохранена</string>
+    <string name="note_found">Заметка</string>
+    <string name="note_deleted">Удалено: %1$s</string>
+    <string name="note_photo">Снимок заметки</string>
+    <string name="note_accuracy">± %1$d м</string>
+    <string name="no_maps_app">Не установлено приложение карт</string>
+    <string name="rates_note">Курс ЦБ РФ на %1$s</string>
+    <string name="rates_note_offline">Курс ЦБ РФ на %1$s, сохранённый: нет интернета</string>
+    <string name="settings_currency_title">Моя валюта</string>
+    <string name="settings_currency_subtitle">В неё пересчитываются цены в «Переведи, что вижу» по официальному курсу ЦБ РФ.</string>
+    <string name="settings_rates_cached">Курс на %1$s, источник %2$s</string>
+    <string name="settings_rates_none">Курс ещё не загружен</string>
+
+    <!-- Ссылки и QR-коды на снимках -->
+    <string name="link_title_qr">QR-код</string>
+    <string name="link_title_text">Ссылка на снимке</string>
+    <string name="link_full_address">Полный адрес</string>
+    <string name="link_site">Сайт</string>
+    <string name="link_warnings_title">Предупреждения</string>
+    <string name="link_warn_no_https">нет защищённого соединения (https)</string>
+    <string name="link_warn_lookalike">адрес записан похожими символами — так маскируют поддельные сайты</string>
+    <string name="link_warn_shortener">сокращённая ссылка — настоящий адрес не виден</string>
+    <string name="link_warn_ip">вместо названия сайта — IP-адрес</string>
+    <string name="link_warn_at">в адресе «@» — настоящий сайт указан после него</string>
+    <string name="link_warn_similar">похож на %1$s, но это другой сайт</string>
+    <string name="link_warn_apk">скачивание приложения в обход магазина</string>
+    <string name="link_apk_strict">Опасно: по ссылке скачивается приложение (.apk). Так распространяют вирусы и программы, которые крадут деньги с карт. Не устанавливайте, если не уверены в источнике полностью.</string>
+    <string name="link_pay_title">Оплата</string>
+    <string name="link_pay_sbp">Система быстрых платежей (СБП)</string>
+    <string name="link_pay_amount">Сумма: %1$s</string>
+    <string name="link_pay_amount_none">Сумма не указана</string>
+    <string name="link_pay_recipient">Получатель: %1$s</string>
+    <string name="link_pay_recipient_unknown">Получатель в ссылке не указан — его покажет приложение банка</string>
+    <string name="link_pay_bank">Банк: %1$s</string>
+    <string name="link_pay_purpose">Назначение: %1$s</string>
+    <string name="link_pay_check">Проверьте получателя в приложении банка перед оплатой: поддельные QR часто наклеивают поверх настоящих.</string>
+    <string name="link_gost_no_open">Это платёжные реквизиты, а не ссылка: оплатите их сканером QR в приложении банка.</string>
+    <string name="link_blocked">Такие ссылки приложение не открывает никогда.</string>
+    <string name="link_other_scheme">Ссылка открывает другое приложение (%1$s).</string>
+    <string name="link_wifi">Сеть Wi-Fi: %1$s</string>
+    <string name="link_wifi_password">С паролем</string>
+    <string name="link_wifi_open">Без пароля</string>
+    <string name="link_phone">Номер телефона: %1$s</string>
+    <string name="link_button_only">Только кнопкой на телефоне</string>
+    <string name="link_voice_ok">Можно и голосом: «открыть»</string>
+    <string name="link_open">Открыть в браузере</string>
+    <string name="link_open_bank">Открыть в приложении банка</string>
+    <string name="link_open_anyway">Всё равно открыть</string>
+    <string name="link_wifi_connect">Подключиться</string>
+    <string name="link_dial">Набрать номер</string>
+    <string name="link_write">Написать</string>
+    <string name="link_open_app">Открыть приложение</string>
+    <string name="link_open_label">Проверить и открыть ссылку на %1$s</string>
+    <string name="link_no_app">Нет приложения, чтобы открыть ссылку</string>
+    <string name="say_link_qr_prefix">На снимке QR-код.</string>
+    <string name="say_link_text_prefix">На снимке ссылка.</string>
+    <string name="say_link_question">Ссылка ведёт на сайт %1$s. Открыть?</string>
+    <string name="say_link_to_site">Ссылка ведёт на сайт %1$s.</string>
+    <string name="say_link_warnings">Внимание: %1$s.</string>
+    <string name="say_link_button_only">Открыть можно только кнопкой на телефоне.</string>
+    <string name="say_link_many">На снимке ссылок: %1$d. Выберите на телефоне.</string>
+    <string name="say_link_payment">На снимке QR-код оплаты%1$s.</string>
+    <string name="say_link_payment_sum">на сумму %1$s</string>
+    <string name="say_link_payment_to">Получатель: %1$s.</string>
+    <string name="say_link_payment_check">Проверьте получателя в приложении банка.</string>
+    <string name="say_link_wifi">На снимке QR-код сети Wi-Fi %1$s.</string>
+    <string name="say_link_blocked">На снимке ссылка, которую приложение не открывает.</string>
+    <string name="say_link_other">На снимке QR-код, который открывает другое приложение.</string>
+    <string name="say_link_opening">Открываю.</string>
+    <string-array name="open_commands">
+        <item>открыть</item>
+        <item>открой</item>
+        <item>открывай</item>
+        <item>да открой</item>
+        <item>да открыть</item>
+    </string-array>
+    <plurals name="rubles">
+        <item quantity="one">%1$d рубль</item>
+        <item quantity="few">%1$d рубля</item>
+        <item quantity="many">%1$d рублей</item>
+        <item quantity="other">%1$d рубля</item>
+    </plurals>
+    <plurals name="kopecks">
+        <item quantity="one">%1$d копейка</item>
+        <item quantity="few">%1$d копейки</item>
+        <item quantity="many">%1$d копеек</item>
+        <item quantity="other">%1$d копейки</item>
+    </plurals>
 </resources>

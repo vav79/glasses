@@ -87,6 +87,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    /** Геопозиция для заметок «Запомни» — спрашивается при первой заметке. */
+    private var pendingLocationPermission: CompletableDeferred<Boolean>? = null
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+            pendingLocationPermission?.complete(granted.values.any { it })
+            pendingLocationPermission = null
+        }
+
     /** Системный выбор фото: приложение получает только выбранный снимок, без доступа ко всей галерее. */
     private var pendingPhoto: CompletableDeferred<Uri?>? = null
     private val photoPicker =
@@ -108,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
+        viewModel.locationPermissionRequester = ::requestLocation
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
@@ -148,6 +157,7 @@ class MainActivity : AppCompatActivity() {
                             viewModel = viewModel,
                             onAsk = { withMic(viewModel::ask) },
                             onWhatDoISee = { withMic(viewModel::whatDoISee) },
+                            onTranslateView = viewModel::translateWhatISee,
                             onConnectGlasses = { Wearables.startRegistration(this) },
                             onOpenSettings = { selectTab(AppTab.SETTINGS) },
                             onSelectSource = ::selectImageSource,
@@ -241,6 +251,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         viewModel.cameraPermissionRequester = null
         viewModel.galleryPicker = null
+        viewModel.locationPermissionRequester = null
+        pendingLocationPermission?.complete(false)
         pendingCameraPermission?.complete(false)
         pendingPhoto?.complete(null)
         super.onDestroy()
@@ -249,6 +261,8 @@ class MainActivity : AppCompatActivity() {
     /**
      * Debug-запуск сценариев без голоса:
      *  - ассистент: --es question "Текст" [--ez with_frame true]
+ *  - «Переведи, что вижу»: --ez translate_view true
+ *  - снимок из файла files/<имя>: --es frame_file qr.png (вместе с question + with_frame или translate_view)
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
@@ -285,10 +299,20 @@ class MainActivity : AppCompatActivity() {
             intent.removeExtra("fail_claude")
             DebugFaults.arm(ProviderId.ANTHROPIC, kind)
         }
+        // Снимок из файла (в личной папке приложения: adb push в /sdcard/Download, затем run-as cp).
+        intent.getStringExtra("frame_file")?.let { name ->
+            intent.removeExtra("frame_file")
+            viewModel.debugFrameFile = java.io.File(filesDir, name)
+        }
         intent.getStringExtra("question")?.let { question ->
             intent.removeExtra("question")
             selectTab(AppTab.ASSISTANT)
             viewModel.debugAsk(question, intent.getBooleanExtra("with_frame", false))
+        }
+        if (intent.getBooleanExtra("translate_view", false)) {
+            intent.removeExtra("translate_view")
+            selectTab(AppTab.ASSISTANT)
+            viewModel.translateWhatISee()
         }
         intent.getStringExtra("language")?.let { name ->
             intent.removeExtra("language")
@@ -316,6 +340,14 @@ class MainActivity : AppCompatActivity() {
         pendingCameraPermission?.complete(false)
         pendingCameraPermission = deferred
         cameraPermission.launch(Permission.CAMERA)
+        return deferred.await()
+    }
+
+    private suspend fun requestLocation(): Boolean {
+        val deferred = CompletableDeferred<Boolean>()
+        pendingLocationPermission?.complete(false)
+        pendingLocationPermission = deferred
+        locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         return deferred.await()
     }
 

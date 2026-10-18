@@ -243,4 +243,126 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_less_transparency_title">Less transparency</string>
     <string name="settings_less_transparency_subtitle">Denser glass for bright sunlight. Turns on by itself when high-contrast text or increased contrast is enabled in the system.</string>
+
+    <!-- Поиск в интернете, заметки, «Переведи, что вижу» -->
+    <string name="model_no_search_suffix">%1$s · no web search</string>
+    <string name="model_no_web_search">no web search</string>
+    <string name="sources_label">Sources</string>
+    <string name="open_link">Open %1$s</string>
+    <string name="no_browser">No app to open the link</string>
+    <string name="translate_what_i_see">Translate what I see</string>
+    <string name="translate_view_question">Translate what I see</string>
+    <string-array name="translate_view_commands">
+        <item>translate what I see</item>
+        <item>translate what I am seeing</item>
+        <item>translate this</item>
+        <item>translate the text</item>
+    </string-array>
+    <!-- Начало фразы «запомни»: снимок и координаты для заметки готовятся заранее. -->
+    <string-array name="remember_triggers">
+        <item>remember</item>
+        <item>note that</item>
+        <item>make a note</item>
+        <item>save a note</item>
+    </string-array>
+    <!-- Слова, с которых начинается явная просьба удалить заметку: только тогда модель получает удаление. -->
+    <string-array name="delete_note_triggers">
+        <item>delete</item>
+        <item>forget</item>
+        <item>remove</item>
+        <item>erase</item>
+    </string-array>
+    <string name="notes_title">Notes</string>
+    <string name="notes_open">Notes</string>
+    <string name="notes_close">Close notes</string>
+    <string name="notes_search">Search notes</string>
+    <string name="notes_empty">No notes yet. Say “Remember, I parked on level 2” — the note gets the time, the location and a photo from the selected camera.</string>
+    <string name="notes_nothing_found">Nothing found</string>
+    <string name="notes_count">%1$d notes</string>
+    <string name="note_route">Get directions</string>
+    <string name="note_delete">Delete note</string>
+    <string name="note_delete_confirm">Delete this note and its photo?</string>
+    <string name="note_saved">Note saved</string>
+    <string name="note_found">Note</string>
+    <string name="note_deleted">Deleted: %1$s</string>
+    <string name="note_photo">Note photo</string>
+    <string name="note_accuracy">± %1$d m</string>
+    <string name="no_maps_app">No maps app installed</string>
+    <string name="rates_note">Bank of Russia rate on %1$s</string>
+    <string name="rates_note_offline">Bank of Russia rate on %1$s, saved earlier: no internet</string>
+    <string name="settings_currency_title">My currency</string>
+    <string name="settings_currency_subtitle">Prices in “Translate what I see” are converted into it at the official Bank of Russia rate.</string>
+    <string name="settings_rates_cached">Rate on %1$s from %2$s</string>
+    <string name="settings_rates_none">Rates have not been downloaded yet</string>
+
+    <!-- Ссылки и QR-коды на снимках -->
+    <string name="link_title_qr">QR code</string>
+    <string name="link_title_text">Link in the photo</string>
+    <string name="link_full_address">Full address</string>
+    <string name="link_site">Site</string>
+    <string name="link_warnings_title">Warnings</string>
+    <string name="link_warn_no_https">no secure connection (https)</string>
+    <string name="link_warn_lookalike">the address uses look-alike characters, a common trick of fake sites</string>
+    <string name="link_warn_shortener">a short link: the real address is hidden</string>
+    <string name="link_warn_ip">an IP address instead of a site name</string>
+    <string name="link_warn_at">“@” in the address: the real site is the part after it</string>
+    <string name="link_warn_similar">looks like %1$s, but it is a different site</string>
+    <string name="link_warn_apk">downloads an app bypassing the store</string>
+    <string name="link_apk_strict">Danger: this link downloads an app (.apk). This is how viruses and card-stealing programs spread. Do not install it unless you fully trust the source.</string>
+    <string name="link_pay_title">Payment</string>
+    <string name="link_pay_sbp">Faster Payments System (SBP)</string>
+    <string name="link_pay_amount">Amount: %1$s</string>
+    <string name="link_pay_amount_none">The amount is not specified</string>
+    <string name="link_pay_recipient">Recipient: %1$s</string>
+    <string name="link_pay_recipient_unknown">The link does not name the recipient: your bank app will show it</string>
+    <string name="link_pay_bank">Bank: %1$s</string>
+    <string name="link_pay_purpose">Purpose: %1$s</string>
+    <string name="link_pay_check">Check the recipient in your bank app before paying: fake QR codes are often stuck over real ones.</string>
+    <string name="link_gost_no_open">These are payment details, not a link: pay with the QR scanner in your bank app.</string>
+    <string name="link_blocked">The app never opens links like this.</string>
+    <string name="link_other_scheme">The link opens another app (%1$s).</string>
+    <string name="link_wifi">Wi-Fi network: %1$s</string>
+    <string name="link_wifi_password">With a password</string>
+    <string name="link_wifi_open">Without a password</string>
+    <string name="link_phone">Phone number: %1$s</string>
+    <string name="link_button_only">Only with the button on the phone</string>
+    <string name="link_voice_ok">You can also say “open”</string>
+    <string name="link_open">Open in browser</string>
+    <string name="link_open_bank">Open in bank app</string>
+    <string name="link_open_anyway">Open anyway</string>
+    <string name="link_wifi_connect">Connect</string>
+    <string name="link_dial">Dial the number</string>
+    <string name="link_write">Write</string>
+    <string name="link_open_app">Open the app</string>
+    <string name="link_open_label">Check and open the link to %1$s</string>
+    <string name="link_no_app">No app to open this link</string>
+    <string name="say_link_qr_prefix">There is a QR code in the photo.</string>
+    <string name="say_link_text_prefix">There is a link in the photo.</string>
+    <string name="say_link_question">The link leads to the site %1$s. Open it?</string>
+    <string name="say_link_to_site">The link leads to the site %1$s.</string>
+    <string name="say_link_warnings">Warning: %1$s.</string>
+    <string name="say_link_button_only">It can be opened only with the button on the phone.</string>
+    <string name="say_link_many">There are %1$d links in the photo. Choose one on the phone.</string>
+    <string name="say_link_payment">There is a payment QR code in the photo%1$s.</string>
+    <string name="say_link_payment_sum">for %1$s</string>
+    <string name="say_link_payment_to">Recipient: %1$s.</string>
+    <string name="say_link_payment_check">Check the recipient in your bank app.</string>
+    <string name="say_link_wifi">There is a QR code for the Wi-Fi network %1$s in the photo.</string>
+    <string name="say_link_blocked">There is a link in the photo that the app never opens.</string>
+    <string name="say_link_other">There is a QR code in the photo that opens another app.</string>
+    <string name="say_link_opening">Opening.</string>
+    <string-array name="open_commands">
+        <item>open</item>
+        <item>open it</item>
+        <item>yes open</item>
+        <item>yes open it</item>
+    </string-array>
+    <plurals name="rubles">
+        <item quantity="one">%1$d ruble</item>
+        <item quantity="other">%1$d rubles</item>
+    </plurals>
+    <plurals name="kopecks">
+        <item quantity="one">%1$d kopeck</item>
+        <item quantity="other">%1$d kopecks</item>
+    </plurals>
 </resources>

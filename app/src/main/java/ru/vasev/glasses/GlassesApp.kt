@@ -1,8 +1,14 @@
 package ru.vasev.glasses
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import android.util.Log
 import com.meta.wearable.dat.core.Wearables
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesManager
@@ -10,7 +16,11 @@ import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
+import ru.vasev.glasses.location.DeviceLocation
+import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.profile.ProfileSettings
+import ru.vasev.glasses.rates.CbrRates
+import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.security.ApiKeyStore
 import ru.vasev.glasses.speech.AudioFocus
 import ru.vasev.glasses.speech.AudioOutput
@@ -69,6 +79,22 @@ class GlassesApp : Application() {
     lateinit var llm: LlmService
         private set
 
+    /** Заметки «Запомни» — только на телефоне. */
+    lateinit var notes: NoteStore
+        private set
+
+    /** Курсы ЦБ РФ (кеш на день) и «Моя валюта». */
+    lateinit var rates: CbrRates
+        private set
+    lateinit var currency: CurrencySettings
+        private set
+
+    /** Координаты для заметок и страна для валюты на ценниках. */
+    lateinit var location: DeviceLocation
+        private set
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     override fun onCreate() {
         super.onCreate()
         // Строки на языке приложения нужны уже при создании остальных объектов (сообщения об ошибках).
@@ -88,6 +114,18 @@ class GlassesApp : Application() {
         speaker = Speaker(this)
         audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this))
         headsetButtons = HeadsetButtons(this)
+        notes = NoteStore(this)
+        location = DeviceLocation(this)
+        currency = CurrencySettings(this)
+        rates = CbrRates(this, llm::isOnline)
+        // Кеш курсов обновляется, пока есть сеть: за границей интернет бывает не всегда, а курс нужен у ценника.
+        getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    scope.launch { rates.refreshIfStale() }
+                }
+            },
+        )
     }
 
     companion object {

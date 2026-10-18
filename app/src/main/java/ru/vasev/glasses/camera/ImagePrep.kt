@@ -18,6 +18,9 @@ object ImagePrep {
 
     const val MAX_SIDE = 1024
     private const val QUALITY = 85
+    private const val DARK_MEAN = 20.0
+    private const val DARK_BRIGHT = 60.0
+    private const val DARK_BRIGHT_SHARE = 0.02
     private const val TAG = "Image"
 
     /** EXIF лежит в начале JPEG — для проверки хватает первых 64 КБ. */
@@ -32,6 +35,31 @@ object ImagePrep {
             total += n
         }
         return buffer.copyOf(total)
+    }
+
+    /**
+     * «Почти чёрный» кадр — телефон в кармане или камера закрыта: средняя яркость ниже [DARK_MEAN] и светлых
+     * точек (ярче [DARK_BRIGHT]) меньше [DARK_BRIGHT_SHARE]. [pixels] — ARGB, как у `Bitmap.getPixels`.
+     */
+    fun isDark(pixels: IntArray): Boolean {
+        if (pixels.isEmpty()) return true
+        var sum = 0.0
+        var bright = 0
+        for (p in pixels) {
+            val luma = 0.299 * (p shr 16 and 0xFF) + 0.587 * (p shr 8 and 0xFF) + 0.114 * (p and 0xFF)
+            sum += luma
+            if (luma > DARK_BRIGHT) bright++
+        }
+        return sum / pixels.size < DARK_MEAN && bright.toDouble() / pixels.size < DARK_BRIGHT_SHARE
+    }
+
+    /** [isDark] для готового JPEG (по уменьшенной копии). */
+    fun isDark(jpeg: ByteArray): Boolean {
+        val small = android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = 8 })
+            ?: return false
+        val pixels = IntArray(small.width * small.height)
+        small.getPixels(pixels, 0, small.width, 0, 0, small.width, small.height)
+        return isDark(pixels)
     }
 
     /** Размер после уменьшения: длинная сторона ≤ [max], пропорции сохраняются, увеличение не делается. */
