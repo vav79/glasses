@@ -79,6 +79,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setVoiceStop(enabled: Boolean) = profile.setVoiceStop(enabled)
 
+    /** «Меньше прозрачности» — стекло плотнее. */
+    val lessTransparency: StateFlow<Boolean> = profile.lessTransparency
+
+    fun setLessTransparency(enabled: Boolean) = profile.setLessTransparency(enabled)
+
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)
     fun setFallbackPhotos(enabled: Boolean) = ai.setFallbackPhotos(enabled)

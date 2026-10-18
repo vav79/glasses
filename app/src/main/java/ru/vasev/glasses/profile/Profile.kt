@@ -108,7 +108,18 @@ class ProfileSettings(context: Context) {
         _voiceStop.value = enabled
     }
 
+    private val _lessTransparency = MutableStateFlow(prefs.getBoolean(KEY_LESS_TRANSPARENCY, false))
+
+    /** «Меньше прозрачности»: стекло плотнее и сильнее размыто — для яркого солнца. */
+    val lessTransparency: StateFlow<Boolean> = _lessTransparency.asStateFlow()
+
+    fun setLessTransparency(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_LESS_TRANSPARENCY, enabled).apply()
+        _lessTransparency.value = enabled
+    }
+
     private companion object {
+        const val KEY_LESS_TRANSPARENCY = "less_transparency"
         const val KEY_VOICE_STOP = "voice_stop"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ROLE = "role"

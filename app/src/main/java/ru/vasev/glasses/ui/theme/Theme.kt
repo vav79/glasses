@@ -16,8 +16,7 @@ import androidx.compose.ui.platform.LocalContext
  * Для телефонов без dynamic color — запасная палитра Material 3 на бирюзовом цвете иконки приложения.
  */
 @Composable
-fun GlassesTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun GlassesTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colors = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current

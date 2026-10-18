@@ -238,4 +238,9 @@
         <item>be quiet</item>
     </string-array>
     <string name="dev_first_sound">%1$d ms to sound</string>
+
+    <!-- Стеклянный интерфейс -->
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_less_transparency_title">Less transparency</string>
+    <string name="settings_less_transparency_subtitle">Denser glass for bright sunlight. Turns on by itself when high-contrast text or increased contrast is enabled in the system.</string>
 </resources>

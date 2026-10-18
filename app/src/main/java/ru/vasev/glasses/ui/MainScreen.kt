@@ -2,41 +2,30 @@ package ru.vasev.glasses.ui
 
 import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,25 +35,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.camera.view.PreviewView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.vasev.glasses.R
@@ -72,6 +57,15 @@ import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.glasses.GlassesStatus
 import ru.vasev.glasses.llm.ModelTag
+import ru.vasev.glasses.ui.glass.GlassButton
+import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.GlassIconButton
+import ru.vasev.glasses.ui.glass.GlassShapes
+import ru.vasev.glasses.ui.glass.glass
+import ru.vasev.glasses.ui.glass.glassAccent
+import ru.vasev.glasses.ui.glass.glassBackgroundText
+import ru.vasev.glasses.ui.glass.glassContentSource
 
 @Composable
 fun MainScreen(
@@ -92,18 +86,20 @@ fun MainScreen(
     val busy = state.phase != Phase.IDLE
     var photo by remember { mutableStateOf<Pair<Bitmap, ImageSource?>?>(null) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(top = LocalTabBarInset.current)
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 stringResource(R.string.assistant_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.semantics { heading() },
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 4.dp).semantics { heading() },
             )
 
             SourceCard(
@@ -119,11 +115,18 @@ fun MainScreen(
 
             if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
+            // Чат уходит под нижнюю стеклянную панель — она его размывает.
             Chat(state, modifier = Modifier.weight(1f).fillMaxWidth(), onOpenPhoto = { bitmap, label -> photo = bitmap to label })
+        }
 
-            // Управление: «Что я вижу» — большая кнопка микрофона — «Новый разговор».
-            // Пока идёт ответ, кнопка микрофона перебивает его и сразу слушает новый вопрос;
-            // пока снимаем или слушаем — останавливает. Остальной экран (фото, «Подробнее») работает как обычно.
+        // Управление: «Что я вижу» — капля микрофона — «Новый разговор».
+        // Пока идёт ответ, кнопка микрофона перебивает его и сразу слушает новый вопрос;
+        // пока снимаем или слушаем — останавливает. Остальной экран (фото, «Подробнее») работает как обычно.
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             val phaseLabel = state.phase.labelRes?.let { stringResource(it) }.orEmpty()
             Text(
                 when {
@@ -131,9 +134,13 @@ fun MainScreen(
                     busy -> stringResource(R.string.assistant_hint_busy, phaseLabel)
                     else -> stringResource(R.string.assistant_hint_idle)
                 },
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .glass(GlassShapes.pill, blur = true)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -161,19 +168,23 @@ fun MainScreen(
     photo?.let { (bitmap, source) -> FullscreenPhoto(bitmap, source?.let { stringResource(it.chatLabelRes) }) { photo = null } }
 }
 
-/** Боковая круглая кнопка с подписью под ней (зона нажатия ≥ 48 dp). */
+/** Боковая круглая стеклянная кнопка с подписью под ней (зона нажатия ≥ 48 dp). */
 @Composable
 private fun SideAction(@DrawableRes icon: Int, label: String, enabled: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(88.dp)) {
-        FilledTonalIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(64.dp)) {
-            Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(30.dp))
-        }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(92.dp)) {
+        GlassIconButton(icon, label, onClick, size = 60.dp, enabled = enabled, blur = true)
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 2,
-            modifier = Modifier.padding(top = 4.dp).clearAndSetSemantics { },
+            modifier = Modifier
+                .padding(top = 6.dp)
+                // Подпись мелкая — размытие под ней не видно, а каждый размытый элемент перерисовывается при прокрутке чата.
+                .glass(GlassShapes.pill, elevation = 0.dp)
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .clearAndSetSemantics { },
         )
     }
 }
@@ -192,17 +203,22 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
     }
 
     if (rowCount == 0) {
-        Text(
-            stringResource(R.string.assistant_empty),
-            modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Box(modifier) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.assistant_empty), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
         return
     }
 
     val firstRemembered = state.chat.indexOfFirst { it.remembered }
-    LazyColumn(modifier = modifier, state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = modifier.glassContentSource(),
+        state = listState,
+        // Снизу — место под панель управления: последний ответ можно докрутить над ней.
+        contentPadding = PaddingValues(top = 4.dp, bottom = CONTROLS_SPACE),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         itemsIndexed(state.chat, key = { _, item -> item.id }) { index, item ->
             if (index == firstRemembered && firstRemembered > 0) {
                 ForgottenDivider()
@@ -230,50 +246,51 @@ private fun Chat(state: UiState, modifier: Modifier, onOpenPhoto: (Bitmap, Image
 
 @Composable
 private fun ForgottenDivider() {
+    val color = glassBackgroundText()
     Row(
         modifier = Modifier.padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HorizontalDivider(Modifier.weight(1f))
+        HorizontalDivider(Modifier.weight(1f), color = color.copy(alpha = 0.4f))
         Text(
             stringResource(R.string.forgotten_divider),
             modifier = Modifier.padding(horizontal = 8.dp),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = color,
         )
-        HorizontalDivider(Modifier.weight(1f))
+        HorizontalDivider(Modifier.weight(1f), color = color.copy(alpha = 0.4f))
     }
 }
 
-/** Моя реплика — справа. Снимок со скруглёнными углами, по нажатию — на весь экран; источник — мелко под пузырём. */
+/** Моя реплика — справа, стекло цвета акцента. Снимок по нажатию — на весь экран; источник — мелко под пузырём. */
 @Composable
 private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, onOpenPhoto: (Bitmap, ImageSource?) -> Unit) {
+    val c = MaterialTheme.colorScheme
     val sourceLabel = stringResource((frameSource ?: ImageSource.GLASSES).chatLabelRes)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         Column(
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer)
+                .glass(RoundedCornerShape(24.dp, 24.dp, 8.dp, 24.dp), tint = c.primaryContainer, text = c.onPrimaryContainer)
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-        frame?.let { bitmap ->
+            frame?.let { bitmap ->
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = stringResource(R.string.photo_with_source, sourceLabel),
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(18.dp))
                         .clickable(onClickLabel = stringResource(R.string.open_photo_full_screen)) { onOpenPhoto(bitmap, frameSource) },
                 )
             }
             Text(
                 text,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = c.onPrimaryContainer,
                 style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             )
         }
         if (frameSource != null) BubbleCaption(stringResource(R.string.photo_caption, sourceLabel))
@@ -281,36 +298,40 @@ private fun UserBubble(text: String, frame: Bitmap?, frameSource: ImageSource?, 
 }
 
 /**
- * Ответ модели — слева. Суть (она звучала) — обычным текстом; подробности — по «Подробнее», мельче.
+ * Ответ модели — слева, светлое стекло. Суть (она звучала) — обычным текстом; подробности — по «Подробнее», мельче.
  * Метка модели и «перебит» — мелко под пузырём.
  */
 @Composable
 private fun AnswerBubble(text: String, details: String, model: ModelTag?, interrupted: Boolean) {
+    val c = MaterialTheme.colorScheme
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
         Column(
             modifier = Modifier
                 .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .glass(RoundedCornerShape(24.dp, 24.dp, 24.dp, 8.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
-            Text(text.ifEmpty { "…" }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+            Text(text.ifEmpty { "…" }, color = c.onSurface, style = MaterialTheme.typography.bodyLarge)
             if (details.isNotEmpty()) {
                 if (expanded) {
                     Text(
                         details,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = glassAccent(accent = c.onSurfaceVariant),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                TextButton(
-                    onClick = { expanded = !expanded },
-                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
-                ) {
-                    Text(stringResource(if (expanded) R.string.answer_less else R.string.answer_more))
-                }
+                Text(
+                    stringResource(if (expanded) R.string.answer_less else R.string.answer_more),
+                    color = glassAccent(),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .clip(GlassShapes.pill)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }
+                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                )
             }
         }
         val caption = listOfNotNull(
@@ -326,8 +347,8 @@ private fun BubbleCaption(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+        color = glassBackgroundText(),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
     )
 }
 
@@ -343,35 +364,40 @@ private fun SourceCard(
     onSelect: (ImageSource) -> Unit,
     onConnectGlasses: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.photos_label), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                SourcePicker(source, sources, enabled, onSelect)
-            }
-            when (source) {
-                ImageSource.GLASSES, ImageSource.SIMULATOR -> {
-                    Text(stringResource(status.textRes), style = MaterialTheme.typography.bodyMedium)
-                    if (source == ImageSource.GLASSES && !status.ready) {
-                        FilledTonalButton(onClick = onConnectGlasses, enabled = enabled) {
-                            Icon(painterResource(R.drawable.ic_sym_bluetooth_connected), contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text(stringResource(R.string.connect_glasses))
-                        }
-                    }
+    GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.photos_label),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f).padding(start = 4.dp),
+            )
+            SourcePicker(source, sources, enabled, onSelect)
+        }
+        when (source) {
+            ImageSource.GLASSES, ImageSource.SIMULATOR -> {
+                Text(stringResource(status.textRes), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
+                if (source == ImageSource.GLASSES && !status.ready) {
+                    GlassButton(
+                        stringResource(R.string.connect_glasses),
+                        onClick = onConnectGlasses,
+                        icon = R.drawable.ic_sym_bluetooth_connected,
+                        kind = GlassButtonKind.PRIMARY,
+                        enabled = enabled,
+                    )
                 }
-                ImageSource.PHONE_CAMERA -> if (cameraGranted) {
-                    PhoneViewfinder(camera)
-                } else {
-                    // Доступ отозвали в настройках Android — объясняем вместо чёрного видоискателя.
-                    Text(stringResource(R.string.no_camera_access), style = MaterialTheme.typography.bodyMedium)
-                    FilledTonalButton(onClick = { onSelect(ImageSource.PHONE_CAMERA) }, enabled = enabled) { Text(stringResource(R.string.allow)) }
-                }
-                ImageSource.GALLERY -> Text(
-                    stringResource(R.string.gallery_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
             }
+            ImageSource.PHONE_CAMERA -> if (cameraGranted) {
+                PhoneViewfinder(camera)
+            } else {
+                // Доступ отозвали в настройках Android — объясняем вместо чёрного видоискателя.
+                Text(stringResource(R.string.no_camera_access), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
+                GlassButton(stringResource(R.string.allow), onClick = { onSelect(ImageSource.PHONE_CAMERA) }, kind = GlassButtonKind.PRIMARY, enabled = enabled)
+            }
+            ImageSource.GALLERY -> Text(
+                stringResource(R.string.gallery_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
         }
     }
 }
@@ -380,8 +406,14 @@ private fun SourceCard(
 private fun SourcePicker(selected: ImageSource, sources: List<ImageSource>, enabled: Boolean, onSelect: (ImageSource) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        OutlinedButton(onClick = { expanded = true }, enabled = enabled) { Text(stringResource(selected.titleRes) + " ▾", maxLines = 1) }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        GlassButton(
+            stringResource(selected.titleRes) + " ▾",
+            onClick = { expanded = true },
+            enabled = enabled,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        )
+        // Меню — отдельное окно, размыть под ним приложение нельзя: оно непрозрачное, как в Material 3.
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
             sources.forEach { source ->
                 DropdownMenuItem(
                     text = {
@@ -415,22 +447,20 @@ private fun PhoneViewfinder(camera: PhoneCamera) {
         modifier = Modifier
             .fillMaxWidth()
             .height(160.dp)
-            .clip(RoundedCornerShape(10.dp)),
+            .clip(RoundedCornerShape(18.dp)),
     )
 }
 
 @Composable
 private fun Notice(text: String) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+    val c = MaterialTheme.colorScheme
+    GlassCard(Modifier.fillMaxWidth(), tint = c.errorContainer, text = c.onErrorContainer, contentPadding = PaddingValues(14.dp)) {
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 /** Прокрутка «до упора»: список сам ограничит её концом. */
 private const val SCROLL_TO_END_PX = 100_000f
+
+/** Высота нижней панели управления: подсказка, капля и подписи кнопок. */
+private val CONTROLS_SPACE = 230.dp

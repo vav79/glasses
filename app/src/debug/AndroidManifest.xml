@@ -7,5 +7,10 @@
             android:exported="true"
             android:label="Витрина иконок"
             android:theme="@style/Theme.Glasses" />
+        <!-- Варианты «стеклянного» интерфейса: adb shell am start -n ru.vasev.glasses/.debug.GlassShowcaseActivity -->
+        <activity
+            android:name=".debug.GlassShowcaseActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Glasses" />
     </application>
 </manifest>

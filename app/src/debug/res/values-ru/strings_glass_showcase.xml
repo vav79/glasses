@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gs_title">Варианты стекла (debug)</string>
+    <string name="gs_hint">Нажмите на вариант — откроется на весь экран, «Назад» — вернуться. Чат под стеклом прокручивается.</string>
+    <string name="gs_theme_system">Системная</string>
+    <string name="gs_theme_light">Светлая</string>
+    <string name="gs_theme_dark">Тёмная</string>
+    <string name="gs_less_transparency">Меньше прозрачности</string>
+    <string name="gs_animate_background">Движение фона</string>
+    <string name="gs_light">Лёгкое стекло</string>
+    <string name="gs_light_desc">Haze: слабое размытие, прозрачная подложка, яркий край</string>
+    <string name="gs_frosted">Матовое стекло</string>
+    <string name="gs_frosted_desc">Haze: сильное размытие, плотная подложка, зерно</string>
+    <string name="gs_liquid">Жидкое стекло</string>
+    <string name="gs_liquid_desc">Backdrop: преломление везде (Android 13+)</string>
+    <string name="gs_hybrid">Гибрид</string>
+    <string name="gs_hybrid_desc">Преломление только у микрофона, остальное — Haze</string>
+    <string name="gs_contrast">Контраст текста ≥ %1$s:1</string>
+    <string name="gs_question">Почему небо голубое?</string>
+    <string name="gs_answer">Воздух рассеивает короткие синие волны сильнее длинных красных.</string>
+    <string name="gs_filler_q">Что это за здание?</string>
+    <string name="gs_filler_a">Похоже на Айя-Софию, её построили в VI веке.</string>
+    <string name="gs_card">Снимки: камера телефона</string>
+    <string name="gs_listening">слушаю</string>
+    <string name="gs_thinking">думаю</string>
+    <string name="gs_speaking">говорю</string>
+    <string name="gs_no_blur">Android %1$d: без размытия, только полупрозрачная подложка</string>
+</resources>

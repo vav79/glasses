@@ -5,6 +5,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -52,6 +60,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.vasev.glasses.R
+import ru.vasev.glasses.ui.glass.GlassButton
+import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.glassAccent
+import ru.vasev.glasses.ui.glass.glassBackgroundText
+import ru.vasev.glasses.ui.glass.glassContentSource
 import ru.vasev.glasses.i18n.LanguageChoice
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
@@ -71,103 +85,144 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val journalTexts by viewModel.journalTexts.collectAsStateWithLifecycle()
     val voiceStop by viewModel.voiceStop.collectAsStateWithLifecycle()
     val headsetMic by viewModel.headsetMic.collectAsStateWithLifecycle()
+    val lessTransparency by viewModel.lessTransparency.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
+    // Вся колонка — источник размытия: при прокрутке разделы уходят под стеклянную панель вкладок.
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .glassContentSource()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(top = LocalTabBarInset.current)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SectionTitle(stringResource(R.string.settings_app_language))
-        LanguagePicker(language, viewModel::setLanguage)
-        Hint(stringResource(R.string.settings_app_language_hint))
+        Section(stringResource(R.string.settings_app_language)) {
+            LanguagePicker(language, viewModel::setLanguage)
+            Hint(stringResource(R.string.settings_app_language_hint))
+        }
 
-        HorizontalDivider()
-        SectionTitle(stringResource(R.string.settings_role))
+        Section(stringResource(R.string.settings_appearance)) {
+            SwitchRow(
+                title = stringResource(R.string.settings_less_transparency_title),
+                subtitle = stringResource(R.string.settings_less_transparency_subtitle),
+                checked = lessTransparency,
+                onChange = viewModel::setLessTransparency,
+            )
+        }
+
+        // Роли — сами стеклянные карточки, без общей подложки.
+        BackgroundTitle(stringResource(R.string.settings_role))
         RolePicker(role, viewModel::setRole)
-        Hint(stringResource(R.string.settings_role_hint))
+        BackgroundHint(stringResource(R.string.settings_role_hint))
 
-        HorizontalDivider()
-        SectionTitle(stringResource(R.string.settings_headset))
-        SwitchRow(
-            title = stringResource(R.string.settings_voice_stop_title),
-            subtitle = stringResource(R.string.settings_voice_stop_subtitle),
-            checked = voiceStop,
-            enabled = headsetMic,
-            onChange = viewModel::setVoiceStop,
-        )
-        if (!headsetMic) Hint(stringResource(R.string.settings_voice_stop_no_headset))
+        Section(stringResource(R.string.settings_headset)) {
+            SwitchRow(
+                title = stringResource(R.string.settings_voice_stop_title),
+                subtitle = stringResource(R.string.settings_voice_stop_subtitle),
+                checked = voiceStop,
+                enabled = headsetMic,
+                onChange = viewModel::setVoiceStop,
+            )
+            if (!headsetMic) Hint(stringResource(R.string.settings_voice_stop_no_headset))
+        }
 
         for (provider in viewModel.providers) {
-            HorizontalDivider()
-            KeySection(provider, keys.getValue(provider), viewModel)
+            Section(stringResource(R.string.key_section_title, provider.title)) {
+                KeySection(provider, keys.getValue(provider), viewModel)
+            }
         }
-        Hint(stringResource(R.string.settings_keys_hint))
+        BackgroundHint(stringResource(R.string.settings_keys_hint))
 
         // Расширенные: разработчику — сразу, остальным — по кнопке. Значения действуют независимо от видимости.
-        HorizontalDivider()
         if (!role.advancedAlwaysVisible) {
-            OutlinedButton(onClick = { viewModel.setShowAdvanced(!showAdvanced) }, modifier = Modifier.fillMaxWidth()) {
-                IconLabel(R.drawable.ic_sym_tune, stringResource(if (showAdvanced) R.string.hide_advanced else R.string.show_advanced))
-            }
+            GlassButton(
+                stringResource(if (showAdvanced) R.string.hide_advanced else R.string.show_advanced),
+                onClick = { viewModel.setShowAdvanced(!showAdvanced) },
+                icon = R.drawable.ic_sym_tune,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         if (!role.advancedAlwaysVisible && !showAdvanced) return@Column
 
-        SectionTitle(stringResource(R.string.settings_advanced))
-        SubsectionTitle(stringResource(R.string.settings_models))
-        ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
-        ModelPicker(stringResource(R.string.settings_model_translation), translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
-        Hint(stringResource(R.string.settings_vision_hint))
+        BackgroundTitle(stringResource(R.string.settings_advanced))
+        Section(stringResource(R.string.settings_models)) {
+            ModelPicker(stringResource(R.string.settings_model_assistant), assistantModel) { viewModel.setModel(Role.ASSISTANT, it) }
+            ModelPicker(stringResource(R.string.settings_model_translation), translationModel) { viewModel.setModel(Role.TRANSLATION, it) }
+            Hint(stringResource(R.string.settings_vision_hint))
+        }
 
-        SubsectionTitle(stringResource(R.string.settings_fallback))
-        SwitchRow(
-            title = stringResource(R.string.settings_fallback_title),
-            subtitle = stringResource(R.string.settings_fallback_subtitle),
-            checked = fallbackEnabled,
-            onChange = viewModel::setFallbackEnabled,
-        )
-        SwitchRow(
-            title = stringResource(R.string.settings_fallback_photos_title),
-            subtitle = stringResource(R.string.settings_fallback_photos_subtitle),
-            checked = fallbackPhotos,
-            enabled = fallbackEnabled,
-            onChange = viewModel::setFallbackPhotos,
-        )
+        Section(stringResource(R.string.settings_fallback)) {
+            SwitchRow(
+                title = stringResource(R.string.settings_fallback_title),
+                subtitle = stringResource(R.string.settings_fallback_subtitle),
+                checked = fallbackEnabled,
+                onChange = viewModel::setFallbackEnabled,
+            )
+            SwitchRow(
+                title = stringResource(R.string.settings_fallback_photos_title),
+                subtitle = stringResource(R.string.settings_fallback_photos_subtitle),
+                checked = fallbackPhotos,
+                enabled = fallbackEnabled,
+                onChange = viewModel::setFallbackPhotos,
+            )
+        }
 
-        SubsectionTitle(stringResource(R.string.settings_journal))
-        SwitchRow(
-            title = stringResource(R.string.settings_journal_texts_title),
-            subtitle = stringResource(R.string.settings_journal_texts_subtitle),
-            checked = journalTexts,
-            onChange = viewModel::setJournalTexts,
-        )
+        Section(stringResource(R.string.settings_journal)) {
+            SwitchRow(
+                title = stringResource(R.string.settings_journal_texts_title),
+                subtitle = stringResource(R.string.settings_journal_texts_subtitle),
+                checked = journalTexts,
+                onChange = viewModel::setJournalTexts,
+            )
+        }
     }
 }
 
+/** Раздел настроек — стеклянная карточка с заголовком. */
 @Composable
-private fun SubsectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(title)
+        content()
+    }
+}
+
+/** Заголовок прямо на фоне (над карточками ролей и расширенными настройками). */
+@Composable
+private fun BackgroundTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+    )
+}
+
+@Composable
+private fun BackgroundHint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = glassBackgroundText(), modifier = Modifier.padding(horizontal = 4.dp))
 }
 
 @Composable
 private fun KeySection(provider: ProviderId, state: KeyState, viewModel: SettingsViewModel) {
-    SectionTitle(stringResource(R.string.key_section_title, provider.title))
     val key = state.key
     if (key != null && !state.editing) {
         Text(stringResource(R.string.key_saved, key.tail), style = MaterialTheme.typography.titleMedium, fontFamily = FontFamily.Monospace)
         Hint(stringResource(R.string.key_encrypted, if (key.strongBox) stringResource(R.string.key_strongbox_suffix) else ""))
         if (state.confirmDelete) {
             Status(stringResource(R.string.key_delete_confirm, provider.title), isError = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.delete(provider) }) { IconLabel(R.drawable.ic_sym_delete, stringResource(R.string.delete)) }
-                OutlinedButton(onClick = { viewModel.cancelDelete(provider) }) { Text(stringResource(R.string.cancel)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassButton(stringResource(R.string.delete), onClick = { viewModel.delete(provider) }, icon = R.drawable.ic_sym_delete, kind = GlassButtonKind.ERROR)
+                GlassButton(stringResource(R.string.cancel), onClick = { viewModel.cancelDelete(provider) })
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { viewModel.startReplace(provider) }) { IconLabel(R.drawable.ic_sym_key, stringResource(R.string.key_replace)) }
-                OutlinedButton(onClick = { viewModel.askDelete(provider) }) { IconLabel(R.drawable.ic_sym_delete, stringResource(R.string.key_delete)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassButton(stringResource(R.string.key_replace), onClick = { viewModel.startReplace(provider) }, icon = R.drawable.ic_sym_key, kind = GlassButtonKind.PRIMARY)
+                GlassButton(stringResource(R.string.key_delete), onClick = { viewModel.askDelete(provider) }, icon = R.drawable.ic_sym_delete)
             }
         }
     } else {
@@ -189,8 +244,9 @@ private fun ModelPicker(role: String, selected: ModelSpec, onSelect: (ModelSpec)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(role, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         Box {
-            OutlinedButton(onClick = { expanded = true }) { Text("${selected.title} ▾", maxLines = 1) }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            GlassButton("${selected.title} ▾", onClick = { expanded = true }, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp))
+            // Меню — отдельное окно, размыть под ним приложение нельзя: оно непрозрачное, как в Material 3.
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
                 ModelCatalog.all.forEach { model ->
                     DropdownMenuItem(
                         text = {
@@ -219,7 +275,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = glassAccent(accent = MaterialTheme.colorScheme.onSurfaceVariant))
         }
         Spacer(Modifier.size(8.dp))
         Switch(checked = checked, onCheckedChange = null, enabled = enabled)
@@ -261,40 +317,33 @@ private fun KeyEditor(provider: ProviderId, busy: Boolean, canCancel: Boolean, o
         modifier = Modifier.fillMaxWidth(),
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = submit, enabled = !busy && input.isNotBlank()) { Text(stringResource(R.string.save)) }
-        if (canCancel) OutlinedButton(onClick = onCancel, enabled = !busy) { Text(stringResource(R.string.cancel)) }
+        GlassButton(stringResource(R.string.save), onClick = submit, enabled = !busy && input.isNotBlank(), kind = GlassButtonKind.PRIMARY)
+        if (canCancel) GlassButton(stringResource(R.string.cancel), onClick = onCancel, enabled = !busy)
     }
 }
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+    Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
 }
 
+/** Пояснение внутри стеклянной карточки: второстепенный цвет, подтемнённый до контраста 4.5:1. */
 @Composable
 private fun Hint(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, style = MaterialTheme.typography.bodySmall, color = glassAccent(accent = MaterialTheme.colorScheme.onSurfaceVariant))
 }
 
 @Composable
 private fun Status(text: String, isError: Boolean) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-        ),
-        modifier = Modifier.fillMaxWidth(),
+    val c = MaterialTheme.colorScheme
+    GlassCard(
+        Modifier.fillMaxWidth(),
+        tint = if (isError) c.errorContainer else c.secondaryContainer,
+        text = if (isError) c.onErrorContainer else c.onSecondaryContainer,
+        contentPadding = PaddingValues(12.dp),
     ) {
-        Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
-}
-
-/** Иконка + подпись внутри кнопки; иконка декоративная, кнопку озвучивает подпись. */
-@Composable
-private fun IconLabel(@DrawableRes icon: Int, label: String) {
-    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
-    Spacer(Modifier.size(8.dp))
-    Text(label)
 }
 
 /** Системный / Русский / English. Смена языка пересоздаёт экран; история разговора и перевода сохраняются. */
@@ -319,6 +368,9 @@ private fun LanguagePicker(selected: LanguageChoice, onSelect: (LanguageChoice) 
                         },
                     ),
                     maxLines = 1,
+                    softWrap = false,
+                    // «Системный» при крупном шрифте не влезает в треть строки — уменьшается, а не обрезается.
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
                 )
             }
         }

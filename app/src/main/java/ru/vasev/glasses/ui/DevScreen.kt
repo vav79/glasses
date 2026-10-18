@@ -2,6 +2,7 @@ package ru.vasev.glasses.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +36,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import ru.vasev.glasses.R
+import ru.vasev.glasses.ui.glass.GlassButton
+import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.glassAccent
+import ru.vasev.glasses.ui.glass.glassContentSource
 import ru.vasev.glasses.llm.JournalEntry
 import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.llm.Role
@@ -49,50 +55,50 @@ fun DevScreen(entries: StateFlow<List<JournalEntry>>, onExport: () -> Unit, onCl
     var confirmClear by remember { mutableStateOf(false) }
     val total = list.sumOf { it.costUsd ?: 0.0 }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().padding(top = LocalTabBarInset.current).padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(
             stringResource(R.string.dev_journal_title),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.semantics { heading() },
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 4.dp).semantics { heading() },
         )
-        Text(stringResource(R.string.dev_journal_summary, list.size, usd(total)), style = MaterialTheme.typography.titleMedium)
-        Text(
-            stringResource(R.string.dev_journal_hint, RequestJournal.MAX_ENTRIES),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        GlassCard(Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.dev_journal_summary, list.size, usd(total)), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.dev_journal_hint, RequestJournal.MAX_ENTRIES),
+                style = MaterialTheme.typography.bodySmall,
+                color = glassAccent(accent = MaterialTheme.colorScheme.onSurfaceVariant),
+            )
+        }
         if (confirmClear) {
-            Text(stringResource(R.string.dev_clear_confirm), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.dev_clear_confirm), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { confirmClear = false; onClear() }) { Text(stringResource(R.string.dev_clear)) }
-                OutlinedButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
+                GlassButton(stringResource(R.string.dev_clear), onClick = { confirmClear = false; onClear() }, kind = GlassButtonKind.ERROR)
+                GlassButton(stringResource(R.string.cancel), onClick = { confirmClear = false })
             }
         } else {
             // При крупном шрифте кнопки не помещаются в строку — вторая переносится целиком, а не по слогам.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onExport, enabled = list.isNotEmpty()) {
-                    Icon(painterResource(R.drawable.ic_sym_share), contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.dev_export), maxLines = 1)
-                }
-                OutlinedButton(onClick = { confirmClear = true }, enabled = list.isNotEmpty()) {
-                    Icon(painterResource(R.drawable.ic_sym_delete), contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.dev_clear), maxLines = 1)
-                }
+                GlassButton(stringResource(R.string.dev_export), onClick = onExport, icon = R.drawable.ic_sym_share, kind = GlassButtonKind.PRIMARY, enabled = list.isNotEmpty())
+                GlassButton(stringResource(R.string.dev_clear), onClick = { confirmClear = true }, icon = R.drawable.ic_sym_delete, enabled = list.isNotEmpty())
             }
         }
 
         if (list.isEmpty()) {
-            Text(
-                stringResource(R.string.dev_journal_empty),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dev_journal_empty), style = MaterialTheme.typography.bodyLarge)
+            }
         } else {
             // Новые сверху.
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth().glassContentSource(),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 items(list.asReversed(), key = { "${it.time}-${it.model}-${it.status}" }) { EntryCard(it) }
             }
         }
@@ -103,14 +109,13 @@ fun DevScreen(entries: StateFlow<List<JournalEntry>>, onExport: () -> Unit, onCl
 private fun EntryCard(entry: JournalEntry) {
     val failed = entry.status.startsWith("error")
     val colors = MaterialTheme.colorScheme
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (failed) colors.errorContainer else colors.surfaceContainer,
-            contentColor = if (failed) colors.onErrorContainer else colors.onSurface,
-        ),
-        modifier = Modifier.fillMaxWidth(),
+    GlassCard(
+        Modifier.fillMaxWidth(),
+        tint = if (failed) colors.errorContainer else colors.surface,
+        text = if (failed) colors.onErrorContainer else colors.onSurface,
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val mode = stringResource(if (entry.role == Role.ASSISTANT) R.string.tab_assistant else R.string.tab_translate)
                 Text(

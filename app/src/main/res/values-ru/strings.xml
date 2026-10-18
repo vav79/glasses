@@ -235,4 +235,9 @@
         <item>остановись</item>
     </string-array>
     <string name="dev_first_sound">до звука %1$d мс</string>
+
+    <!-- Стеклянный интерфейс -->
+    <string name="settings_appearance">Оформление</string>
+    <string name="settings_less_transparency_title">Меньше прозрачности</string>
+    <string name="settings_less_transparency_subtitle">Стекло плотнее — для яркого солнца. Включается само, если в системе включены контрастный текст или повышенный контраст.</string>
 </resources>

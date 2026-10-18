@@ -40,6 +40,7 @@ import ru.vasev.glasses.translate.Who
 import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
+import ru.vasev.glasses.ui.glass.GlassRoot
 import ru.vasev.glasses.ui.OnboardingScreen
 import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.MainViewModel
@@ -118,18 +119,21 @@ class MainActivity : AppCompatActivity() {
             GlassesTheme {
                 val onboarded by profile.onboarded.collectAsStateWithLifecycle()
                 val role by profile.role.collectAsStateWithLifecycle()
+                val lessTransparency by profile.lessTransparency.collectAsStateWithLifecycle()
                 if (!onboarded) {
                     val language by settings.language.collectAsStateWithLifecycle()
-                    OnboardingScreen(
-                        language = language,
-                        systemLanguage = LanguageSettings.system(),
-                        onLanguage = settings::setLanguage,
-                        initialRole = role,
-                        onFinish = { chosen ->
-                            profile.completeOnboarding(chosen)
-                            selectTab(chosen.startTab)
-                        },
-                    )
+                    GlassRoot(denser = lessTransparency, animate = true) {
+                        OnboardingScreen(
+                            language = language,
+                            systemLanguage = LanguageSettings.system(),
+                            onLanguage = settings::setLanguage,
+                            initialRole = role,
+                            onFinish = { chosen ->
+                                profile.completeOnboarding(chosen)
+                                selectTab(chosen.startTab)
+                            },
+                        )
+                    }
                     return@GlassesTheme
                 }
                 // Роль сменили в настройках, а открытой вкладки у новой роли нет — на стартовую.
@@ -138,6 +142,7 @@ class MainActivity : AppCompatActivity() {
                     tabs = role.tabs,
                     tab = role.keep(tab),
                     onTabChange = ::selectTab,
+                    denserGlass = lessTransparency,
                     assistant = {
                         MainScreen(
                             viewModel = viewModel,

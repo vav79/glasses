@@ -80,6 +80,12 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     // Per-app language (setApplicationLocales) на Android 10–12 и AppCompatActivity.
     implementation(libs.androidx.appcompat)
+    // «Стеклянный» интерфейс: размытие и стекло. Backdrop (преломление) — пока только в debug-витрине.
+    implementation(libs.haze)
+    implementation(libs.haze.glass)
+    implementation(libs.haze.blur)
+    implementation(libs.haze.blur.materials)
+    debugImplementation(libs.backdrop)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

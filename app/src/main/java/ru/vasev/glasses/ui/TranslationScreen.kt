@@ -1,11 +1,10 @@
 package ru.vasev.glasses.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,20 +16,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,10 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -50,13 +43,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.vasev.glasses.R
+import ru.vasev.glasses.llm.ModelTag
+import ru.vasev.glasses.speech.VoiceStatus
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslatePhase
 import ru.vasev.glasses.translate.TranslateUiState
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
-import ru.vasev.glasses.llm.ModelTag
-import ru.vasev.glasses.speech.VoiceStatus
+import ru.vasev.glasses.ui.glass.GlassButton
+import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.GlassShapes
+import ru.vasev.glasses.ui.glass.glass
+import ru.vasev.glasses.ui.glass.glassBackgroundText
+import ru.vasev.glasses.ui.glass.glassContentSource
 
 @Composable
 fun TranslationScreen(
@@ -73,95 +73,106 @@ fun TranslationScreen(
     /** Перевод на весь экран крупным текстом (текст, подпись). */
     var large by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                LanguagePicker(state.language, PartnerLanguage.partnersFor(state.my), enabled = !busy, onSelect = viewModel::setLanguage)
-            }
-            Spacer(Modifier.size(8.dp))
-            // Подпись и переключатель — один элемент: TalkBack читает «Непрерывно, переключатель, вкл/выкл».
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .toggleable(value = state.continuous, role = Role.Switch, onValueChange = viewModel::setContinuous)
-                    .padding(start = 8.dp),
-            ) {
-                Text(stringResource(R.string.continuous), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                Spacer(Modifier.size(8.dp))
-                Switch(checked = state.continuous, onCheckedChange = null)
-            }
-        }
-
-        if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
-        state.voiceHint?.let { (language, status) ->
-            val title = stringResource(language.titleRes)
-            Hint(stringResource(if (status == VoiceStatus.UNSUPPORTED) R.string.voice_unsupported else R.string.voice_not_downloaded, title)) {
-                TextButton(onClick = onInstallVoice) {
-                    Icon(painterResource(R.drawable.ic_sym_download), contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.download_voice))
-                }
-            }
-        }
-
-        Feed(
-            state,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            onShowLarge = { text, caption -> large = text to caption },
-        )
-
-        if (busy) {
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = LocalTabBarInset.current)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                Spacer(Modifier.size(12.dp))
-                Text(state.phase.labelRes?.let { stringResource(it) }.orEmpty(), modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = viewModel::stop) {
-                    Icon(painterResource(R.drawable.ic_sym_stop), contentDescription = null, modifier = Modifier.size(18.dp))
+                Box(Modifier.weight(1f)) {
+                    LanguagePicker(state.language, PartnerLanguage.partnersFor(state.my), enabled = !busy, onSelect = viewModel::setLanguage)
+                }
+                Spacer(Modifier.size(8.dp))
+                // Подпись и переключатель — один элемент: TalkBack читает «Непрерывно, переключатель, вкл/выкл».
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .glass(GlassShapes.pill)
+                        .toggleable(value = state.continuous, role = Role.Switch, onValueChange = viewModel::setContinuous)
+                        .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                ) {
+                    Text(stringResource(R.string.continuous), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
                     Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.stop))
+                    Switch(checked = state.continuous, onCheckedChange = null)
                 }
             }
-        } else if (state.feed.isNotEmpty()) {
-            TextButton(onClick = viewModel::clearFeed, modifier = Modifier.align(Alignment.End)) {
-                Icon(painterResource(R.drawable.ic_sym_clear_all), contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.clear_feed))
+
+            if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
+            state.voiceHint?.let { (language, status) ->
+                val title = stringResource(language.titleRes)
+                Hint(stringResource(if (status == VoiceStatus.UNSUPPORTED) R.string.voice_unsupported else R.string.voice_not_downloaded, title)) {
+                    GlassButton(
+                        stringResource(R.string.download_voice),
+                        onClick = onInstallVoice,
+                        icon = R.drawable.ic_sym_download,
+                        kind = GlassButtonKind.NORMAL,
+                    )
+                }
             }
+
+            // Лента уходит под нижние стеклянные кнопки — они её размывают.
+            Feed(
+                state,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                onShowLarge = { text, caption -> large = text to caption },
+            )
         }
 
-        // Цвета кнопок совпадают с цветами реплик: собеседник — tertiary, я — primary.
-        Button(
-            onClick = onPartnerSpeaks,
-            enabled = hasApiKey && (!busy || state.phase == TranslatePhase.LISTENING_PARTNER),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.onTertiary,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(painterResource(R.drawable.ic_sym_hearing), contentDescription = null, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.size(12.dp))
-            Text(stringResource(R.string.partner_speaks, state.language.flag), fontSize = 20.sp)
-        }
+            if (busy) {
+                Row(
+                    Modifier.fillMaxWidth().glass(GlassShapes.pill, blur = true).padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
+                    Spacer(Modifier.size(12.dp))
+                    Text(
+                        state.phase.labelRes?.let { stringResource(it) }.orEmpty(),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    GlassButton(stringResource(R.string.stop), onClick = viewModel::stop, icon = R.drawable.ic_sym_stop, blur = true)
+                }
+            } else if (state.feed.isNotEmpty()) {
+                GlassButton(
+                    stringResource(R.string.clear_feed),
+                    onClick = viewModel::clearFeed,
+                    icon = R.drawable.ic_sym_clear_all,
+                    blur = true,
+                    modifier = Modifier.align(Alignment.End),
+                )
+            }
 
-        Button(
-            onClick = onMeReplies,
-            enabled = hasApiKey,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
-        ) {
-            Icon(painterResource(R.drawable.ic_sym_campaign), contentDescription = null, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.size(12.dp))
-            Text(stringResource(R.string.i_reply) + " " + state.my.flag, fontSize = 20.sp)
+            // Цвета кнопок совпадают с цветами реплик: собеседник — tertiary, я — primary.
+            GlassButton(
+                stringResource(R.string.partner_speaks, state.language.flag),
+                onClick = onPartnerSpeaks,
+                icon = R.drawable.ic_sym_hearing,
+                kind = GlassButtonKind.TONAL_TERTIARY,
+                enabled = hasApiKey && (!busy || state.phase == TranslatePhase.LISTENING_PARTNER),
+                blur = true,
+                minHeight = 72.dp,
+                textStyle = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            GlassButton(
+                stringResource(R.string.i_reply) + " " + state.my.flag,
+                onClick = onMeReplies,
+                icon = R.drawable.ic_sym_campaign,
+                kind = GlassButtonKind.PRIMARY,
+                enabled = hasApiKey,
+                blur = true,
+                minHeight = 72.dp,
+                textStyle = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
@@ -174,14 +185,15 @@ private fun LanguagePicker(selected: PartnerLanguage, languages: List<PartnerLan
     val selectedTitle = stringResource(selected.titleRes)
     val description = stringResource(R.string.partner_language_cd, selectedTitle)
     Box {
-        OutlinedButton(
+        GlassButton(
+            selected.flag + "  " + selectedTitle + " ▾",
             onClick = { expanded = true },
             enabled = enabled,
             modifier = Modifier.semantics { contentDescription = description },
-        ) {
-            Text(selected.flag + "  " + selectedTitle + " ▾", maxLines = 1)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        )
+        // Меню — отдельное окно, размыть под ним приложение нельзя: оно непрозрачное, как в Material 3.
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
             languages.forEach { language ->
                 DropdownMenuItem(
                     leadingIcon = { Text(language.flag, fontSize = 22.sp) },
@@ -210,19 +222,24 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
     }
 
     if (rows == 0) {
-        Text(
-            stringResource(R.string.translate_empty, stringResource(state.my.titleRes)),
-            modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Box(modifier) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.translate_empty, stringResource(state.my.titleRes)), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
         return
     }
 
     val partnerCaption = state.language.flag + "  " + stringResource(state.language.titleRes)
     val myCaption = state.my.flag + "  " + stringResource(state.my.titleRes)
     val unavailable = stringResource(R.string.translation_unavailable)
-    LazyColumn(modifier = modifier, state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = modifier.glassContentSource(),
+        state = listState,
+        // Снизу — место под кнопки: последнюю реплику можно докрутить над ними.
+        contentPadding = PaddingValues(top = 4.dp, bottom = BUTTONS_SPACE),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         items(state.feed, key = { it.id }) { item ->
             val flag = if (item.line.who == Who.PARTNER) state.language.flag else state.my.flag
             Utterance(
@@ -250,8 +267,8 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
 }
 
 /**
- * Реплика: оригинал мелко, перевод крупно. Собеседник — слева, цвет tertiary; я — справа, цвет primary.
- * Нажатие на перевод — показать его на весь экран крупным текстом.
+ * Реплика — стеклянный пузырь: оригинал мелко, перевод крупно. Собеседник — слева, стекло цвета tertiary;
+ * я — справа, primary. Нажатие на перевод — показать его на весь экран крупным текстом (непрозрачно).
  */
 @Composable
 private fun Utterance(
@@ -266,12 +283,12 @@ private fun Utterance(
     val colors = MaterialTheme.colorScheme
     val container = if (mine) colors.primaryContainer else colors.tertiaryContainer
     val content = if (mine) colors.onPrimaryContainer else colors.onTertiaryContainer
+    val shape = if (mine) RoundedCornerShape(24.dp, 24.dp, 8.dp, 24.dp) else RoundedCornerShape(24.dp, 24.dp, 24.dp, 8.dp)
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
         Column(
             modifier = Modifier
                 .widthIn(max = 320.dp)
-                .clip(if (mine) RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp) else RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp))
-                .background(container)
+                .glass(shape, tint = container, text = content)
                 .then(
                     if (onShowLarge != null) {
                         Modifier.clickable(onClickLabel = stringResource(R.string.show_translation_full_screen), onClick = onShowLarge)
@@ -279,10 +296,11 @@ private fun Utterance(
                         Modifier
                     },
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("$flag  $original", style = MaterialTheme.typography.bodySmall, color = content.copy(alpha = 0.75f))
+            // Оригинал — тем же цветом, что и перевод (контраст 4.5:1), но мельче.
+            Text("$flag  $original", style = MaterialTheme.typography.bodySmall, color = content)
             if (translation != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(translation, style = MaterialTheme.typography.titleLarge, color = content, modifier = Modifier.weight(1f, fill = false))
@@ -291,7 +309,7 @@ private fun Utterance(
                         Icon(
                             painterResource(R.drawable.ic_sym_fullscreen),
                             contentDescription = null,
-                            tint = content.copy(alpha = 0.6f),
+                            tint = content,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -302,8 +320,8 @@ private fun Utterance(
             Text(
                 modelLabel(model),
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                color = glassBackgroundText(),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
             )
         }
     }
@@ -311,16 +329,12 @@ private fun Utterance(
 
 @Composable
 private fun Hint(text: String, action: (@Composable () -> Unit)? = null) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Text(text, style = MaterialTheme.typography.bodyMedium)
-            action?.let { Box(Modifier.align(Alignment.End)) { it() } }
-        }
+    val c = MaterialTheme.colorScheme
+    GlassCard(Modifier.fillMaxWidth(), tint = c.errorContainer, text = c.onErrorContainer, contentPadding = PaddingValues(14.dp)) {
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+        action?.let { Box(Modifier.align(Alignment.End)) { it() } }
     }
 }
+
+/** Высота нижних кнопок с полосой «Стоп» / «Очистить ленту». */
+private val BUTTONS_SPACE = 250.dp

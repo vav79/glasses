@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,11 @@ import ru.vasev.glasses.R
 import ru.vasev.glasses.i18n.AppLanguage
 import ru.vasev.glasses.i18n.LanguageChoice
 import ru.vasev.glasses.profile.UserRole
+import ru.vasev.glasses.ui.glass.GlassButton
+import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.GlassShapes
+import ru.vasev.glasses.ui.glass.glassBackgroundText
 
 /**
  * Первый запуск: язык, затем роль. Шаг и выбранная роль переживают пересоздание Activity —
@@ -62,7 +68,7 @@ fun OnboardingScreen(
     var roleName by rememberSaveable { mutableStateOf(initialRole.name) }
     val role = UserRole.restore(roleName)
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -70,8 +76,8 @@ fun OnboardingScreen(
             ) {
                 if (step == 0) {
                     Title(stringResource(R.string.onboarding_language_title))
-                    Text(stringResource(R.string.onboarding_language_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Column(Modifier.selectableGroup()) {
+                    Text(stringResource(R.string.onboarding_language_hint), color = glassBackgroundText())
+                    GlassCard(Modifier.fillMaxWidth().selectableGroup(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.Top) {
                         LanguageChoice.entries.forEach { choice ->
                             LanguageRow(
                                 title = when (choice) {
@@ -86,18 +92,20 @@ fun OnboardingScreen(
                     }
                 } else {
                     Title(stringResource(R.string.onboarding_role_title))
-                    Text(stringResource(R.string.onboarding_role_hint), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.onboarding_role_hint), color = glassBackgroundText())
                     RolePicker(role) { roleName = it.name }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (step == 1) {
-                    OutlinedButton(onClick = { step = 0 }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.back)) }
+                    GlassButton(stringResource(R.string.back), onClick = { step = 0 }, modifier = Modifier.weight(1f))
                 }
-                Button(
+                GlassButton(
+                    stringResource(if (step == 0) R.string.next else R.string.start),
                     onClick = { if (step == 0) step = 1 else onFinish(role) },
                     modifier = Modifier.weight(1f),
-                ) { Text(stringResource(if (step == 0) R.string.next else R.string.start)) }
+                    kind = GlassButtonKind.PRIMARY,
+                )
             }
         }
     }
@@ -148,19 +156,20 @@ fun RolePicker(selected: UserRole, onSelect: (UserRole) -> Unit) {
 @Composable
 private fun RoleCard(role: UserRole, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) colors.secondaryContainer else colors.surfaceContainer,
-            contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
-        ),
+    val tint = if (selected) colors.secondaryContainer else colors.surface
+    val text = if (selected) colors.onSecondaryContainer else colors.onSurface
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(CardDefaults.shape)
+            .clip(GlassShapes.card)
             .selectable(selected = selected, role = SemanticsRole.RadioButton, onClick = onClick),
+        tint = tint,
+        text = text,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(48.dp).clip(CircleShape).background(if (selected) colors.primary else colors.surfaceContainerHighest),
+                Modifier.size(48.dp).clip(CircleShape).background(if (selected) colors.primary else colors.surfaceContainerHighest.copy(alpha = 0.7f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
