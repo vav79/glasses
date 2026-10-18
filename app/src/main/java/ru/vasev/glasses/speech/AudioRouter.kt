@@ -36,6 +36,9 @@ data class Headset(val name: String, val mic: AudioDeviceInfo?, val output: Audi
  */
 class AudioRouter(context: Context) {
 
+    /** Выбор микрофона из «Камеры» ([MicChoice]); «Телефон» — гарнитуру для моего голоса не берём. */
+    var micChoice: () -> MicChoice = { MicChoice.AUTO }
+
     private val appContext = context.applicationContext
     private val audio = context.getSystemService(AudioManager::class.java)
     private var settled: CompletableDeferred<Unit>? = null
@@ -63,7 +66,7 @@ class AudioRouter(context: Context) {
 
     /** Подготовить микрофон для того, кто сейчас говорит. Возвращает описание выбранного входа (для логов). */
     suspend fun routeMic(talker: Talker): String {
-        val mic = _headset.value?.mic
+        val mic = _headset.value?.mic?.takeIf { micChoice().allowsHeadset }
         if (talker != Talker.USER || mic == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             releaseMic()
             return log("in", "phone mic" + if (talker == Talker.PARTNER) " (partner speaking)" else "")
@@ -159,6 +162,7 @@ class AudioRouter(context: Context) {
      * false — гарнитуры с микрофоном нет или она не ответила: держать нечего.
      */
     suspend fun holdMic(): Boolean {
+        if (!micChoice().allowsHeadset) return false
         val mic = _headset.value?.mic ?: return false
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !switchToHeadsetMic(mic)) {
             releaseMic()

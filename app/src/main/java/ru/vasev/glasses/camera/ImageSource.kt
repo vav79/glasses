@@ -15,10 +15,13 @@ enum class ImageSource(
     @StringRes val chatLabelRes: Int,
     val logName: String,
     val debugOnly: Boolean = false,
+    /** Можно выбрать источником снимков (галерея — нет). */
+    val pickable: Boolean = true,
 ) {
     GLASSES(R.string.source_glasses, R.string.source_label_glasses, "glasses"),
     PHONE_CAMERA(R.string.source_phone_camera, R.string.source_label_phone, "phone"),
-    GALLERY(R.string.source_gallery, R.string.source_label_gallery, "gallery"),
+    /** Не источник для выбора: так помечаются снимки, взятые из галереи (плитка в ленте «Камеры»). */
+    GALLERY(R.string.source_gallery, R.string.source_label_gallery, "gallery", pickable = false),
     SIMULATOR(R.string.source_simulator, R.string.source_label_simulator, "simulator", debugOnly = true),
     ;
 
@@ -29,7 +32,7 @@ enum class ImageSource(
         val DEFAULT = GLASSES
 
         /** Симулятор очков — только в debug-сборке. */
-        fun available(debug: Boolean): List<ImageSource> = entries.filter { debug || !it.debugOnly }
+        fun available(debug: Boolean): List<ImageSource> = entries.filter { it.pickable && (debug || !it.debugOnly) }
 
         /** Сохранённое значение; недоступное в этой сборке (симулятор в release) — источник по умолчанию. */
         fun restore(name: String?, debug: Boolean): ImageSource =

@@ -365,4 +365,64 @@
         <item quantity="one">%1$d kopeck</item>
         <item quantity="other">%1$d kopecks</item>
     </plurals>
+
+    <!-- Новая структура: «Камера», шестерёнка, вопрос текстом -->
+    <string name="tab_camera">Camera</string>
+    <string name="settings_close">Close settings</string>
+    <string name="mic_label">Microphone</string>
+    <string name="mic_auto">Auto</string>
+    <string name="mic_glasses">Glasses</string>
+    <string name="mic_glasses_soon">soon</string>
+    <string name="mic_headset">Headset</string>
+    <string name="mic_phone">Phone</string>
+    <string name="mic_auto_hint">The headset if connected, otherwise the phone microphone. In Translate the other person is always heard by the phone.</string>
+    <string name="photos_source_title">Photos</string>
+    <string name="glasses_connect_short">Connect glasses</string>
+    <string name="glasses_on">Glasses</string>
+    <string name="glasses_on_battery">Glasses · %1$d %%</string>
+    <string name="glasses_off">Not connected</string>
+    <string name="glasses_indicator_label">Glasses: %1$s. Open Camera</string>
+    <string name="what_do_i_see_question">What do I see?</string>
+    <string-array name="what_do_i_see_commands">
+        <item>what do I see</item>
+        <item>what am I looking at</item>
+        <item>what is in front of me</item>
+        <item>describe what I see</item>
+    </string-array>
+    <string name="assistant_empty_hint">Ask by voice or by text. “Remember…” saves a note, “What do I see” takes a photo, “Translate what I see” translates the text around you.</string>
+    <string name="status_idle">Tap and speak</string>
+    <string name="status_interrupt">%1$s · tap to interrupt</string>
+    <string name="status_busy">%1$s · tap to stop</string>
+    <string name="type_question">Type a question</string>
+    <string name="type_question_hint">Your question</string>
+    <string name="type_question_note">The answer is shown on screen only, without voice</string>
+    <string name="send">Send</string>
+    <string name="speak_answer">Read aloud</string>
+    <string name="sources_count">Sources (%1$d)</string>
+    <string name="camera_hint">Tap to describe · hold to ask</string>
+    <string name="camera_hint_shot">Questions are about the selected photo</string>
+    <string name="camera_translate">Translate</string>
+    <string name="camera_remember">Remember</string>
+    <string name="camera_shutter_label">What do I see. Hold to ask your own question</string>
+    <string name="camera_ask_more">Ask more</string>
+    <string name="camera_close_sheet">Close the answer</string>
+    <string name="frame_phone">Phone camera</string>
+    <string name="frame_glasses_last">Last frame from the glasses</string>
+    <string name="frame_glasses_empty">Tap “What do I see” — the frame from the glasses appears here</string>
+    <string name="frame_glasses_off">The glasses are not connected. Connect them or choose the phone camera.</string>
+    <string name="frame_shot">Photo from the strip</string>
+    <string name="back_to_live">Back to live view</string>
+    <string name="gallery_tile">Pick a photo from the gallery</string>
+    <string name="shot_label">Photo from %1$s</string>
+    <string name="shot_delete">Delete photo</string>
+    <string name="shot_save">Save to gallery</string>
+    <string name="shot_saved">Saved to the gallery (Pictures/Glasses)</string>
+    <string name="shot_save_failed">Could not save to the gallery</string>
+    <string name="shots_hint">Photos stay on the phone only, the last 30</string>
+    <string name="say_what_to_remember">What should I remember?</string>
+    <string name="note_saved_spoken">Remembered.</string>
+    <string name="note_saved_photo_only">Saved the photo with the time and place.</string>
+    <string name="remember_question">Remember: %1$s</string>
+    <string name="remember_question_photo">Remember this photo</string>
+    <string name="note_no_text">Photo without text</string>
 </resources>

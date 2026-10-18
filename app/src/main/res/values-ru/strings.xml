@@ -366,4 +366,64 @@
         <item quantity="many">%1$d копеек</item>
         <item quantity="other">%1$d копейки</item>
     </plurals>
+
+    <!-- Новая структура: «Камера», шестерёнка, вопрос текстом -->
+    <string name="tab_camera">Камера</string>
+    <string name="settings_close">Закрыть настройки</string>
+    <string name="mic_label">Микрофон</string>
+    <string name="mic_auto">Авто</string>
+    <string name="mic_glasses">Очки</string>
+    <string name="mic_glasses_soon">скоро</string>
+    <string name="mic_headset">Гарнитура</string>
+    <string name="mic_phone">Телефон</string>
+    <string name="mic_auto_hint">Гарнитура, если подключена, иначе микрофон телефона. Собеседника в «Переводе» всегда слушает телефон.</string>
+    <string name="photos_source_title">Снимки</string>
+    <string name="glasses_connect_short">Подключить очки</string>
+    <string name="glasses_on">Очки</string>
+    <string name="glasses_on_battery">Очки · %1$d %%</string>
+    <string name="glasses_off">Не подключены</string>
+    <string name="glasses_indicator_label">Очки: %1$s. Открыть «Камеру»</string>
+    <string name="what_do_i_see_question">Что я вижу?</string>
+    <string-array name="what_do_i_see_commands">
+        <item>что я вижу</item>
+        <item>что вижу</item>
+        <item>что передо мной</item>
+        <item>опиши что вижу</item>
+    </string-array>
+    <string name="assistant_empty_hint">Спросите голосом или текстом. «Запомни…» — заметка, «Что я вижу» — снимок, «Переведи, что вижу» — перевод текста вокруг.</string>
+    <string name="status_idle">Нажмите и говорите</string>
+    <string name="status_interrupt">%1$s · нажмите, чтобы перебить</string>
+    <string name="status_busy">%1$s · нажмите, чтобы остановить</string>
+    <string name="type_question">Написать текстом</string>
+    <string name="type_question_hint">Ваш вопрос</string>
+    <string name="type_question_note">Ответ — только на экране, без голоса</string>
+    <string name="send">Отправить</string>
+    <string name="speak_answer">Озвучить</string>
+    <string name="sources_count">Источники (%1$d)</string>
+    <string name="camera_hint">Нажмите — описать · удерживайте — спросить</string>
+    <string name="camera_hint_shot">Вопрос — о выбранном снимке</string>
+    <string name="camera_translate">Переведи</string>
+    <string name="camera_remember">Запомни</string>
+    <string name="camera_shutter_label">Что я вижу. Удерживайте, чтобы задать свой вопрос</string>
+    <string name="camera_ask_more">Спросить ещё</string>
+    <string name="camera_close_sheet">Закрыть ответ</string>
+    <string name="frame_phone">Камера телефона</string>
+    <string name="frame_glasses_last">Последний кадр с очков</string>
+    <string name="frame_glasses_empty">Нажмите «Что я вижу» — кадр с очков появится здесь</string>
+    <string name="frame_glasses_off">Очки не подключены. Подключите их или выберите камеру телефона.</string>
+    <string name="frame_shot">Снимок из ленты</string>
+    <string name="back_to_live">К живому кадру</string>
+    <string name="gallery_tile">Выбрать фото из галереи</string>
+    <string name="shot_label">Снимок от %1$s</string>
+    <string name="shot_delete">Удалить снимок</string>
+    <string name="shot_save">Сохранить в галерею</string>
+    <string name="shot_saved">Сохранено в галерею (Pictures/Glasses)</string>
+    <string name="shot_save_failed">Не удалось сохранить в галерею</string>
+    <string name="shots_hint">Снимки хранятся только на телефоне, последние 30</string>
+    <string name="say_what_to_remember">Что запомнить?</string>
+    <string name="note_saved_spoken">Запомнила.</string>
+    <string name="note_saved_photo_only">Сохранила снимок с временем и местом.</string>
+    <string name="remember_question">Запомни: %1$s</string>
+    <string name="remember_question_photo">Запомни снимок</string>
+    <string name="note_no_text">Снимок без текста</string>
 </resources>

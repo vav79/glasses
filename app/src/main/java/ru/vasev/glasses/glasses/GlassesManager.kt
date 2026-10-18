@@ -23,12 +23,16 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,8 +88,28 @@ class GlassesManager(private val context: Context) {
             GlassesStatus(_mockMode.value, Wearables.registrationState.value, Wearables.devices.value.size),
         )
 
+    /** Заряд подключённых очков в процентах; null — очков нет или они ещё не прислали значение. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val battery: StateFlow<Int?> = Wearables.devices
+        .flatMapLatest { ids ->
+            ids.firstOrNull()?.let { Wearables.devicesMetadata[it] }?.map { device -> device.batteryLevel.takeIf { it in 0..100 } }
+                ?: flowOf(null)
+        }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
+    private val _everConnected = MutableStateFlow(prefs.getBoolean(KEY_EVER_CONNECTED, false))
+
+    /** Очки хоть раз подключались: пока нет и снимки с телефона, индикатор очков в «Ассистенте» не показывается. */
+    val everConnected: StateFlow<Boolean> = _everConnected.asStateFlow()
+
     init {
         if (_mockMode.value) scope.launch { mock.enable() }
+        scope.launch {
+            status.collect { if (it.ready && !_everConnected.value) {
+                prefs.edit().putBoolean(KEY_EVER_CONNECTED, true).apply()
+                _everConnected.value = true
+            } }
+        }
     }
 
     fun setMockMode(requested: Boolean) {
@@ -186,6 +210,7 @@ class GlassesManager(private val context: Context) {
 
     private companion object {
         const val KEY_MOCK = "mock_mode"
+        const val KEY_EVER_CONNECTED = "ever_connected"
         const val SESSION_TIMEOUT_MS = 15_000L
         const val STREAM_TIMEOUT_MS = 10_000L
     }

@@ -34,6 +34,8 @@ class MockGlassesController(private val context: Context) {
         glasses.powerOn()
         glasses.unfold()
         glasses.don()
+        // Заряд для индикатора очков (симулятор сам его не задаёт).
+        glasses.setBatteryLevel(MOCK_BATTERY)
 
         // Стрим симулятора требует видеоисточник, поэтому тестовая картинка подаётся и как видео, и как снимок.
         runCatching { testVideo() }
@@ -59,4 +61,8 @@ class MockGlassesController(private val context: Context) {
         .appendPath("raw")
         .appendPath(context.resources.getResourceEntryName(R.raw.mock_view))
         .build()
+
+    private companion object {
+        const val MOCK_BATTERY = 76
+    }
 }

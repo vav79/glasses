@@ -7,11 +7,31 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
+import ru.vasev.glasses.llm.ModelCatalog
+import ru.vasev.glasses.llm.Role
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -79,22 +99,23 @@ fun MainScreen(
     viewModel: MainViewModel,
     onAsk: () -> Unit,
     onWhatDoISee: () -> Unit,
-    onTranslateView: () -> Unit,
-    onConnectGlasses: () -> Unit,
+    onOpenCamera: () -> Unit,
     onOpenSettings: () -> Unit,
-    onSelectSource: (ImageSource) -> Unit,
-    cameraGranted: Boolean,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
+    val battery by viewModel.glassesBattery.collectAsStateWithLifecycle()
+    val everConnected by viewModel.glassesEverConnected.collectAsStateWithLifecycle()
     val source by viewModel.imageSource.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val model by viewModel.model.collectAsStateWithLifecycle()
     val micLevel by viewModel.micLevel.collectAsStateWithLifecycle()
+    val allLabels by viewModel.showAllModelLabels.collectAsStateWithLifecycle()
     val busy = state.phase != Phase.IDLE
     var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
     var fullText by remember { mutableStateOf<String?>(null) }
     var showNotes by rememberSaveable { mutableStateOf(false) }
+    var typing by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     Box(Modifier.fillMaxSize()) {
@@ -106,13 +127,9 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.assistant_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { heading() },
-                )
+                // Индикатор очков; пока очки ни разу не подключались и снимки с телефона — не показываем вовсе.
+                if (everConnected || source.usesGlasses) GlassesIndicator(status.ready, battery, onOpenCamera)
+                Spacer(Modifier.weight(1f))
                 GlassIconButton(R.drawable.ic_sym_sticky_note_2, stringResource(R.string.notes_open), onClick = { showNotes = true }, size = 48.dp)
                 GlassIconButton(
                     R.drawable.ic_sym_add_comment,
@@ -123,77 +140,62 @@ fun MainScreen(
                 )
             }
 
-            SourceCard(
-                source = source,
-                sources = viewModel.availableSources,
-                status = status,
-                camera = viewModel.phoneCamera,
-                cameraGranted = cameraGranted,
-                enabled = !busy,
-                onSelect = onSelectSource,
-                onConnectGlasses = onConnectGlasses,
-            )
-
             if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
             // Чат уходит под нижнюю стеклянную панель — она его размывает.
             Chat(
                 state,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
+                defaultModel = ModelCatalog.default(Role.ASSISTANT).title,
+                allLabels = allLabels,
                 onOpenPhoto = { bitmap, label -> photo = bitmap to label },
                 onOpenText = { fullText = it },
                 onOpenLink = { LinkOpener.openSource(context, it) },
                 onLinkClick = viewModel::requestLink,
                 onRoute = { openRoute(context, it) },
+                onSpeak = viewModel::speakAnswer,
             )
         }
 
-        // Управление: «Что я вижу» — капля микрофона — «Переведи, что вижу».
-        // Пока идёт ответ, кнопка микрофона перебивает его и сразу слушает новый вопрос;
-        // пока снимаем или слушаем — останавливает. Остальной экран (фото, «Подробнее») работает как обычно.
+        // Управление: «Написать текстом» — капля микрофона — «Что я вижу». Состояние — короткой подписью над каплей.
+        // Пока идёт ответ, капля перебивает его и сразу слушает новый вопрос; пока снимаем или слушаем — останавливает.
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val phaseLabel = state.phase.labelRes?.let { stringResource(it) }.orEmpty()
             Text(
                 when {
-                    state.phase.interruptible -> stringResource(R.string.assistant_hint_interrupt, phaseLabel)
-                    busy -> stringResource(R.string.assistant_hint_busy, phaseLabel)
-                    else -> stringResource(R.string.assistant_hint_idle)
+                    state.phase.interruptible -> stringResource(R.string.status_interrupt, phaseLabel)
+                    busy -> stringResource(R.string.status_busy, phaseLabel)
+                    else -> stringResource(R.string.status_idle)
                 },
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelLarge,
+                color = glassBackgroundText(),
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .glass(GlassShapes.pill, blur = true)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Не блокируем, когда очки не подключены: кнопка сама скажет «Очки не подключены» и что делать.
-                SideAction(R.drawable.ic_sym_visibility, stringResource(R.string.what_do_i_see), enabled = !busy && hasApiKey, onClick = onWhatDoISee)
+                GlassIconButton(R.drawable.ic_sym_keyboard, stringResource(R.string.type_question), onClick = { typing = true }, size = 56.dp, enabled = !busy && hasApiKey, blur = true)
                 MicButton(
                     phase = state.phase,
                     level = micLevel,
                     enabled = busy || hasApiKey,
                     onClick = if (busy && !state.phase.interruptible) viewModel::stop else onAsk,
                 )
-                SideAction(R.drawable.ic_sym_translate, stringResource(R.string.translate_what_i_see), enabled = !busy && hasApiKey, onClick = onTranslateView)
+                // Не блокируем, когда очки не подключены: кнопка сама скажет «Очки не подключены» и что делать.
+                GlassIconButton(R.drawable.ic_sym_visibility, stringResource(R.string.what_do_i_see), onClick = onWhatDoISee, size = 56.dp, enabled = !busy && hasApiKey, blur = true)
             }
         }
     }
 
-    // Ссылка открывается только отсюда — после подтверждения на карточке (кнопкой или голосом).
-    LaunchedEffect(Unit) { viewModel.openLink.collect { LinkOpener.open(context, it) } }
-    state.confirmLink?.let { link ->
-        LinkConfirmDialog(link, onOpen = { viewModel.confirmLink(link) }, onDismiss = viewModel::dismissLink)
-    }
+    AssistantOverlays(viewModel)
+    if (typing) TypeQuestionSheet(onSend = { viewModel.askText(it); typing = false }, onDismiss = { typing = false })
     if (showNotes) {
         NotesScreen(
             viewModel = viewModel,
@@ -206,36 +208,89 @@ fun MainScreen(
     fullText?.let { text -> FullscreenText(text, stringResource(R.string.translate_what_i_see)) { fullText = null } }
 }
 
-/** Боковая круглая стеклянная кнопка с подписью под ней (зона нажатия ≥ 48 dp). */
+/**
+ * Общее для «Ассистента» и «Камеры»: проверка ссылки перед открытием и само открытие — только отсюда, после
+ * подтверждения на карточке (кнопкой или голосом).
+ */
 @Composable
-private fun SideAction(@DrawableRes icon: Int, label: String, enabled: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(92.dp)) {
-        GlassIconButton(icon, label, onClick, size = 60.dp, enabled = enabled, blur = true)
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            modifier = Modifier
-                .padding(top = 6.dp)
-                // Подпись мелкая — размытие под ней не видно, а каждый размытый элемент перерисовывается при прокрутке чата.
-                .glass(GlassShapes.pill, elevation = 0.dp)
-                .padding(horizontal = 8.dp, vertical = 2.dp)
-                .clearAndSetSemantics { },
-        )
+fun AssistantOverlays(viewModel: MainViewModel) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { viewModel.openLink.collect { LinkOpener.open(context, it) } }
+    state.confirmLink?.let { link ->
+        LinkConfirmDialog(link, onOpen = { viewModel.confirmLink(link) }, onDismiss = viewModel::dismissLink)
     }
+}
+
+/** Индикатор очков: «● Очки · 76 %» или серое «Не подключены»; нажатие — вкладка «Камера» с подключением. */
+@Composable
+private fun GlassesIndicator(ready: Boolean, battery: Int?, onClick: () -> Unit) {
+    val text = when {
+        !ready -> stringResource(R.string.glasses_off)
+        battery != null -> stringResource(R.string.glasses_on_battery, battery)
+        else -> stringResource(R.string.glasses_on)
+    }
+    val label = stringResource(R.string.glasses_indicator_label, text)
+    val c = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .heightIn(min = 44.dp)
+            .glass(GlassShapes.pill)
+            .clip(GlassShapes.pill)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = label }
+            .padding(start = 10.dp, end = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(painterResource(R.drawable.ic_sym_eyeglasses), contentDescription = null, modifier = Modifier.size(22.dp))
+        // «Не подключены» — нейтральный серый, не тревожный красный: это обычное состояние, а не ошибка.
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (ready) glassAccent(accent = Color(0xFF2E9D57)) else c.outline))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = if (ready) c.onSurface else glassBackgroundText())
+    }
+}
+
+/** Вопрос с клавиатуры: ответ — только на экране, «Озвучить» — по кнопке. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TypeQuestionSheet(onSend: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by rememberSaveable { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    // Enter с клавиатуры (в том числе аппаратной) — «Отправить», а не перенос строки.
+                    onValueChange = { value -> if (value.contains(CHAR_NEWLINE)) { if (value.isNotBlank()) onSend(value.replace(CHAR_NEWLINE, CHAR_SPACE)) } else text = value },
+                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    label = { Text(stringResource(R.string.type_question_hint)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend(text) }),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 4,
+                )
+                GlassIconButton(R.drawable.ic_sym_send, stringResource(R.string.send), onClick = { onSend(text) }, size = 52.dp, enabled = text.isNotBlank(), kind = GlassButtonKind.PRIMARY)
+            }
+            Text(stringResource(R.string.type_question_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    LaunchedEffect(Unit) { focus.requestFocus() }
 }
 
 @Composable
 private fun Chat(
     state: UiState,
     modifier: Modifier,
+    /** Основная модель ассистента: её метку под ответом не показываем (кроме роли «Разработчик»). */
+    defaultModel: String,
+    allLabels: Boolean,
     onOpenPhoto: (Bitmap, String?) -> Unit,
     onOpenText: (String) -> Unit,
     onOpenLink: (String) -> Unit,
     onLinkClick: (FoundLink) -> Unit,
     onRoute: (Note) -> Unit,
+    onSpeak: (Long) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val hasPending = state.pendingQuestion.isNotEmpty() || state.pendingFrame != null
@@ -249,10 +304,15 @@ private fun Chat(
     }
 
     if (rowCount == 0) {
-        Box(modifier) {
-            GlassCard(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.assistant_empty), style = MaterialTheme.typography.bodyLarge)
-            }
+        // Пустой чат — короткая подсказка мелким шрифтом, без карточки.
+        Box(modifier.padding(bottom = CONTROLS_SPACE), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.assistant_empty_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = glassBackgroundText(),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
         }
         return
     }
@@ -283,11 +343,13 @@ private fun Chat(
                     AnswerBubble(
                         item.answer,
                         item.details,
-                        item.model,
+                        // Метка — только когда ответила не основная модель (запасная, DeepSeek, без поиска) или разработчику.
+                        item.model?.takeIf { allLabels || it.viaFallback || it.autoVision || it.noWebSearch || it.title != defaultModel },
                         item.interrupted,
                         translation = item.translation,
                         ratesNote = item.ratesNote,
                         onOpenText = onOpenText,
+                        onSpeak = if (item.silent) ({ onSpeak(item.id) }) else null,
                     )
                 }
                 if (item.sources.isNotEmpty()) SourceLinks(item.sources, onOpenLink)
@@ -386,6 +448,8 @@ private fun AnswerBubble(
     translation: Boolean,
     ratesNote: RatesNote?,
     onOpenText: (String) -> Unit,
+    /** Вопрос был текстом: ответ не звучал — «Озвучить» по кнопке. */
+    onSpeak: (() -> Unit)? = null,
 ) {
     val c = MaterialTheme.colorScheme
     // Перевод снимка — ради полного текста: он виден сразу.
@@ -398,6 +462,7 @@ private fun AnswerBubble(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
             Text(text.ifEmpty { "…" }, color = c.onSurface, style = MaterialTheme.typography.bodyLarge)
+            if (details.isEmpty() && onSpeak != null) TextAction(stringResource(R.string.speak_answer), onSpeak)
             if (details.isNotEmpty()) {
                 if (expanded) {
                     Text(
@@ -410,6 +475,7 @@ private fun AnswerBubble(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextAction(stringResource(if (expanded) R.string.answer_less else R.string.answer_more)) { expanded = !expanded }
                     if (translation) TextAction(stringResource(R.string.show_translation_full_screen)) { onOpenText(details) }
+                    if (onSpeak != null) TextAction(stringResource(R.string.speak_answer), onSpeak)
                 }
             }
         }
@@ -437,12 +503,29 @@ private fun TextAction(label: String, onClick: () -> Unit) {
     )
 }
 
-/** Ссылки веб-поиска под ответом: заголовок страницы или домен; открываются в браузере. */
+/** Ссылки веб-поиска под ответом — свёрнутым чипом «Источники (N)»; раскрытые: заголовок и настоящий домен. */
 @Composable
 private fun SourceLinks(sources: List<WebSource>, onOpen: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(start = 4.dp)) {
-        BubbleCaption(stringResource(R.string.sources_label))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            Modifier
+                .heightIn(min = 44.dp)
+                .glass(GlassShapes.pill)
+                .clip(GlassShapes.pill)
+                .clickable(role = androidx.compose.ui.semantics.Role.Button) { open = !open }
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(stringResource(R.string.sources_count, sources.size), style = MaterialTheme.typography.labelLarge)
+            Icon(
+                painterResource(R.drawable.ic_sym_expand_more),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp).rotate(if (open) 180f else 0f),
+            )
+        }
+        if (open) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             sources.forEach { source ->
                 // Нажатие — уже подтверждение, поэтому настоящий домен виден на кнопке всегда.
                 val domain = sourceDomain(source.url)
@@ -524,7 +607,11 @@ fun NoteBody(
                     .clickable(onClickLabel = stringResource(R.string.open_photo_full_screen)) { onOpenPhoto(bitmap) },
             )
         }
-        Text(note.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 4.dp))
+        Text(
+            note.text.ifEmpty { stringResource(R.string.note_no_text) },
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
         if (note.hasLocation) {
             GlassButton(
                 stringResource(R.string.note_route),
@@ -543,105 +630,6 @@ private fun BubbleCaption(text: String) {
         style = MaterialTheme.typography.labelSmall,
         color = glassBackgroundText(),
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp),
-    )
-}
-
-/** Источник снимков: выбор, состояние очков и видоискатель камеры телефона. */
-@Composable
-private fun SourceCard(
-    source: ImageSource,
-    sources: List<ImageSource>,
-    status: GlassesStatus,
-    camera: PhoneCamera,
-    cameraGranted: Boolean,
-    enabled: Boolean,
-    onSelect: (ImageSource) -> Unit,
-    onConnectGlasses: () -> Unit,
-) {
-    GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.photos_label),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).padding(start = 4.dp),
-            )
-            SourcePicker(source, sources, enabled, onSelect)
-        }
-        when (source) {
-            ImageSource.GLASSES, ImageSource.SIMULATOR -> {
-                Text(stringResource(status.textRes), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                if (source == ImageSource.GLASSES && !status.ready) {
-                    GlassButton(
-                        stringResource(R.string.connect_glasses),
-                        onClick = onConnectGlasses,
-                        icon = R.drawable.ic_sym_bluetooth_connected,
-                        kind = GlassButtonKind.PRIMARY,
-                        enabled = enabled,
-                    )
-                }
-            }
-            ImageSource.PHONE_CAMERA -> if (cameraGranted) {
-                PhoneViewfinder(camera)
-            } else {
-                // Доступ отозвали в настройках Android — объясняем вместо чёрного видоискателя.
-                Text(stringResource(R.string.no_camera_access), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
-                GlassButton(stringResource(R.string.allow), onClick = { onSelect(ImageSource.PHONE_CAMERA) }, kind = GlassButtonKind.PRIMARY, enabled = enabled)
-            }
-            ImageSource.GALLERY -> Text(
-                stringResource(R.string.gallery_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SourcePicker(selected: ImageSource, sources: List<ImageSource>, enabled: Boolean, onSelect: (ImageSource) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        GlassButton(
-            stringResource(selected.titleRes) + " ▾",
-            onClick = { expanded = true },
-            enabled = enabled,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        )
-        // Меню — отдельное окно, размыть под ним приложение нельзя: оно непрозрачное, как в Material 3.
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
-            sources.forEach { source ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(source.titleRes).let { if (source.debugOnly) stringResource(R.string.source_debug_suffix, it) else it },
-                            fontWeight = if (source == selected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onSelect(source)
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** Небольшой видоискатель: камера работает, только пока он на экране. */
-@Composable
-private fun PhoneViewfinder(camera: PhoneCamera) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val context = LocalContext.current
-    val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
-    DisposableEffect(lifecycleOwner) {
-        camera.bind(lifecycleOwner, previewView)
-        onDispose { camera.unbind() }
-    }
-    AndroidView(
-        factory = { previewView },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .clip(RoundedCornerShape(18.dp)),
     )
 }
 
@@ -666,4 +654,6 @@ private const val MAX_LINK_TITLE = 32
 private const val SCROLL_TO_END_PX = 100_000f
 
 /** Высота нижней панели управления: подсказка, капля и подписи кнопок. */
-private val CONTROLS_SPACE = 230.dp
+private val CONTROLS_SPACE = 190.dp
+private val CHAR_NEWLINE = 0x0A.toChar()
+private val CHAR_SPACE = 0x20.toChar()

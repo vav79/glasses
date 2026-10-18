@@ -123,7 +123,7 @@ fun TranslationScreen(
 
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (busy) {
                 Row(
@@ -158,8 +158,10 @@ fun TranslationScreen(
                 kind = GlassButtonKind.TONAL_TERTIARY,
                 enabled = hasApiKey && (!busy || state.phase == TranslatePhase.LISTENING_PARTNER),
                 blur = true,
-                minHeight = 72.dp,
-                textStyle = MaterialTheme.typography.titleLarge,
+                // Ниже на четверть и на шаг мельче, чем было (72 dp, titleLarge); зона нажатия всё равно ≥ 48 dp.
+                minHeight = 54.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                textStyle = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth(),
             )
             GlassButton(
@@ -169,8 +171,10 @@ fun TranslationScreen(
                 kind = GlassButtonKind.PRIMARY,
                 enabled = hasApiKey,
                 blur = true,
-                minHeight = 72.dp,
-                textStyle = MaterialTheme.typography.titleLarge,
+                // Ниже на четверть и на шаг мельче, чем было (72 dp, titleLarge); зона нажатия всё равно ≥ 48 dp.
+                minHeight = 54.dp,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                textStyle = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -224,7 +228,7 @@ private fun Feed(state: TranslateUiState, modifier: Modifier, onShowLarge: (Stri
     if (rows == 0) {
         Box(modifier) {
             GlassCard(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.translate_empty, stringResource(state.my.titleRes)), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.translate_empty, stringResource(state.my.titleRes)), style = MaterialTheme.typography.bodyMedium)
             }
         }
         return
@@ -337,4 +341,4 @@ private fun Hint(text: String, action: (@Composable () -> Unit)? = null) {
 }
 
 /** Высота нижних кнопок с полосой «Стоп» / «Очистить ленту». */
-private val BUTTONS_SPACE = 250.dp
+private val BUTTONS_SPACE = 210.dp

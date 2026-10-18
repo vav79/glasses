@@ -18,6 +18,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
@@ -37,6 +38,10 @@ class PhoneCamera(private val context: Context) {
 
     @Volatile
     private var bound = false
+
+    /** Камеру держит видоискатель (а не разовый снимок). */
+    @Volatile
+    private var previewBound = false
 
     // ~2 Мп хватает с запасом: дальше снимок всё равно уменьшается до 1024 px.
     private val imageCapture = ImageCapture.Builder()
@@ -60,6 +65,7 @@ class PhoneCamera(private val context: Context) {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
                 bound = true
+                previewBound = true
                 Log.d(TAG, "phone camera on")
             } catch (e: Exception) {
                 bound = false
@@ -68,8 +74,46 @@ class PhoneCamera(private val context: Context) {
         }, mainExecutor)
     }
 
+    /**
+     * Снимок без видоискателя (кнопка «Что я вижу» в «Ассистенте» при источнике «Камера телефона»): камера
+     * включается только на этот снимок и сразу выключается. Видоискатель на экране — обычный [capture].
+     */
+    suspend fun captureWithoutPreview(owner: LifecycleOwner): ByteArray {
+        if (bound) return capture()
+        val cameraProvider = withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine<ProcessCameraProvider> { cont ->
+                val future = ProcessCameraProvider.getInstance(context)
+                future.addListener({ cont.resume(future.get()) }, mainExecutor)
+            }
+        }
+        provider = cameraProvider
+        withContext(Dispatchers.Main) {
+            try {
+                cameraProvider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, imageCapture)
+            } catch (e: Exception) {
+                Log.w(TAG, "phone camera failed to start: ${e.javaClass.simpleName}")
+                throw PhoneCameraException(L.s(R.string.phone_camera_failed))
+            }
+        }
+        bound = true
+        Log.d(TAG, "phone camera on for one shot")
+        try {
+            return capture()
+        } finally {
+            withContext(NonCancellable + Dispatchers.Main) {
+                // Пока снимали, мог открыться видоискатель (вкладка «Камера») — его не трогаем.
+                if (!previewBound) {
+                    cameraProvider.unbind(imageCapture)
+                    bound = false
+                    Log.d(TAG, "phone camera off")
+                }
+            }
+        }
+    }
+
     fun unbind() {
         provider?.unbindAll()
+        previewBound = false
         if (bound) Log.d(TAG, "phone camera off")
         bound = false
     }

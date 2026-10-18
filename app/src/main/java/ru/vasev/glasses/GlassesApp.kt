@@ -11,6 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
+import ru.vasev.glasses.camera.ShotStore
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.AiSettings
@@ -26,6 +27,7 @@ import ru.vasev.glasses.speech.AudioFocus
 import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
 import ru.vasev.glasses.speech.HeadsetButtons
+import ru.vasev.glasses.speech.MicSettings
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
 import ru.vasev.glasses.speech.RoutedSpeechSource
 import ru.vasev.glasses.speech.PhoneSpeakerOutput
@@ -89,6 +91,14 @@ class GlassesApp : Application() {
     lateinit var currency: CurrencySettings
         private set
 
+    /** Лента последних снимков «Камеры» — только на телефоне. */
+    lateinit var shots: ShotStore
+        private set
+
+    /** Чем слушать мой голос: авто / гарнитура / телефон. */
+    lateinit var micSettings: MicSettings
+        private set
+
     /** Координаты для заметок и страна для валюты на ценниках. */
     lateinit var location: DeviceLocation
         private set
@@ -110,6 +120,9 @@ class GlassesApp : Application() {
         imageSources = ImageSourceSettings(this, glasses)
         phoneCamera = PhoneCamera(this)
         audioRouter = AudioRouter(this)
+        micSettings = MicSettings(this)
+        audioRouter.micChoice = { micSettings.choice.value }
+        shots = ShotStore(this)
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)
         audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this))

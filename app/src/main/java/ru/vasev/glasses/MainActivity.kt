@@ -43,6 +43,8 @@ import ru.vasev.glasses.ui.DevScreen
 import ru.vasev.glasses.ui.glass.GlassRoot
 import ru.vasev.glasses.ui.OnboardingScreen
 import ru.vasev.glasses.ui.MainScreen
+import ru.vasev.glasses.ui.CameraScreen
+import ru.vasev.glasses.ui.AssistantOverlays
 import ru.vasev.glasses.ui.MainViewModel
 import ru.vasev.glasses.ui.SettingsScreen
 import ru.vasev.glasses.ui.SettingsViewModel
@@ -56,6 +58,9 @@ class MainActivity : AppCompatActivity() {
     private val settings: SettingsViewModel by viewModels()
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
+
+    /** Настройки открыты поверх вкладки (шестерёнка). */
+    private var settingsOpen by mutableStateOf(false)
 
     /** Есть ли доступ к камере телефона; перепроверяется при каждом возврате в приложение (могли отозвать в настройках). */
     private var cameraGranted by mutableStateOf(false)
@@ -113,9 +118,11 @@ class MainActivity : AppCompatActivity() {
         // Первый показ — стартовая вкладка роли; после пересоздания — та, что была открыта.
         tab = savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name } }
             ?: profile.role.value.startTab
+        settingsOpen = savedInstanceState?.getBoolean(STATE_SETTINGS) ?: false
         enableEdgeToEdge()
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
+        viewModel.cameraOwner = this
         viewModel.locationPermissionRequester = ::requestLocation
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
@@ -152,17 +159,30 @@ class MainActivity : AppCompatActivity() {
                     tab = role.keep(tab),
                     onTabChange = ::selectTab,
                     denserGlass = lessTransparency,
+                    settingsOpen = settingsOpen,
+                    onToggleSettings = { settingsOpen = !settingsOpen },
                     assistant = {
                         MainScreen(
                             viewModel = viewModel,
                             onAsk = { withMic(viewModel::ask) },
-                            onWhatDoISee = { withMic(viewModel::whatDoISee) },
-                            onTranslateView = viewModel::translateWhatISee,
-                            onConnectGlasses = { Wearables.startRegistration(this) },
-                            onOpenSettings = { selectTab(AppTab.SETTINGS) },
-                            onSelectSource = ::selectImageSource,
-                            cameraGranted = cameraGranted,
+                            onWhatDoISee = viewModel::whatDoISee,
+                            onOpenCamera = { selectTab(AppTab.CAMERA) },
+                            onOpenSettings = { settingsOpen = true },
                         )
+                    },
+                    camera = {
+                        CameraScreen(
+                            viewModel = viewModel,
+                            cameraGranted = cameraGranted,
+                            onSelectSource = ::selectImageSource,
+                            onConnectGlasses = { Wearables.startRegistration(this) },
+                            onDescribe = viewModel::cameraDescribe,
+                            onAsk = { withMic(viewModel::cameraAsk) },
+                            onTranslate = viewModel::cameraTranslate,
+                            onRemember = { withMic(viewModel::cameraRemember) },
+                            onFollowUp = { withMic(viewModel::cameraFollowUp) },
+                        )
+                        AssistantOverlays(viewModel)
                     },
                     translation = {
                         TranslationScreen(
@@ -170,7 +190,7 @@ class MainActivity : AppCompatActivity() {
                             onPartnerSpeaks = { withMic(translation::partnerSpeaks) },
                             onMeReplies = { withMic(translation::meReplies) },
                             onInstallVoice = ::openVoiceInstaller,
-                            onOpenSettings = { selectTab(AppTab.SETTINGS) },
+                            onOpenSettings = { settingsOpen = true },
                         )
                     },
                     development = {
@@ -200,11 +220,16 @@ class MainActivity : AppCompatActivity() {
 
     /** Вкладки независимы: при переключении всё, что звучит или слушает на другой вкладке, останавливается. */
     private fun selectTab(newTab: AppTab) {
+        settingsOpen = false
         if (newTab == tab) return
-        when (tab) {
-            AppTab.ASSISTANT -> viewModel.stop()
-            AppTab.TRANSLATE -> translation.stop()
-            AppTab.DEVELOPMENT, AppTab.SETTINGS -> Unit
+        // «Ассистент» и «Камера» — один разговор: между ними ответ не прерывается.
+        val sameConversation = tab in CONVERSATION_TABS && newTab in CONVERSATION_TABS
+        if (!sameConversation) {
+            when (tab) {
+                AppTab.ASSISTANT, AppTab.CAMERA -> viewModel.stop()
+                AppTab.TRANSLATE -> translation.stop()
+                AppTab.DEVELOPMENT -> Unit
+            }
         }
         tab = newTab
     }
@@ -241,6 +266,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_TAB, tab.name)
+        outState.putBoolean(STATE_SETTINGS, settingsOpen)
     }
 
     override fun onResume() {
@@ -251,6 +277,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         viewModel.cameraPermissionRequester = null
         viewModel.galleryPicker = null
+        viewModel.cameraOwner = null
         viewModel.locationPermissionRequester = null
         pendingLocationPermission?.complete(false)
         pendingCameraPermission?.complete(false)
@@ -266,8 +293,9 @@ class MainActivity : AppCompatActivity() {
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
-     *  - снимки:    --es image_source glasses|phone|gallery|simulator
-     *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
+     *  - снимки:    --es image_source glasses|phone|simulator
+     *  - вкладка:    --es tab assistant|camera|translate|development|settings
+ *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
      * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
     private fun handleDebugIntent(intent: Intent) {
@@ -278,12 +306,16 @@ class MainActivity : AppCompatActivity() {
             // Только флаг первого запуска: роль, ключи и история остаются.
             app.profile.resetOnboarding()
         }
+        intent.getStringExtra("tab")?.let { name ->
+            intent.removeExtra("tab")
+            // Скриншоты и проверки: вкладка или «settings» — настройки поверх.
+            if (name == "settings") settingsOpen = true else AppTab.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let(::selectTab)
+        }
         intent.getStringExtra("image_source")?.let { name ->
             intent.removeExtra("image_source")
             val source = when (name) {
                 "glasses" -> ImageSource.GLASSES
                 "phone" -> ImageSource.PHONE_CAMERA
-                "gallery" -> ImageSource.GALLERY
                 "simulator" -> ImageSource.SIMULATOR
                 else -> null
             }
@@ -373,5 +405,7 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val STATE_TAB = "tab"
+        const val STATE_SETTINGS = "settings_open"
+        val CONVERSATION_TABS = setOf(AppTab.ASSISTANT, AppTab.CAMERA)
     }
 }

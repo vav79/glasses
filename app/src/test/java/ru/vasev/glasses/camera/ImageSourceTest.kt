@@ -18,7 +18,7 @@ class ImageSourceTest {
         assertFalse(ImageSource.SIMULATOR in ImageSource.available(debug = false))
         assertTrue(ImageSource.SIMULATOR in ImageSource.available(debug = true))
         assertEquals(
-            listOf(ImageSource.GLASSES, ImageSource.PHONE_CAMERA, ImageSource.GALLERY),
+            listOf(ImageSource.GLASSES, ImageSource.PHONE_CAMERA),
             ImageSource.available(debug = false),
         )
     }
@@ -29,6 +29,8 @@ class ImageSourceTest {
         assertEquals(ImageSource.SIMULATOR, ImageSource.restore("SIMULATOR", debug = true))
         assertEquals(ImageSource.PHONE_CAMERA, ImageSource.restore("PHONE_CAMERA", debug = false))
         assertEquals(ImageSource.GLASSES, ImageSource.restore("WHATEVER", debug = false))
+        // Галерея больше не источник, а плитка в ленте снимков: сохранённый выбор — на источник по умолчанию.
+        assertEquals(ImageSource.GLASSES, ImageSource.restore("GALLERY", debug = false))
     }
 
     @Test
