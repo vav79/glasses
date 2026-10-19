@@ -35,6 +35,19 @@
         <package android:name="com.google.android.apps.maps" />
         <package android:name="ru.yandex.yandexmaps" />
         <package android:name="app.organicmaps" />
+        <!-- Такси: какие приложения установлены (кнопки на экране «Адрес для таксиста»). -->
+        <package android:name="com.grabtaxi.passenger" />
+        <package android:name="ee.mtakso.client" />
+        <package android:name="ru.yandex.taxi" />
+        <package android:name="com.ubercab" />
+        <package android:name="sinet.startup.inDriver" />
+        <package android:name="com.gojek.app" />
+        <package android:name="com.careem.acma" />
+        <package android:name="com.didiglobal.passenger" />
+        <package android:name="com.taxsee.taxsee" />
+        <package android:name="taxi.android.client" />
+        <package android:name="com.cabify.rider" />
+        <package android:name="me.lyft.android" />
     </queries>
 
     <application

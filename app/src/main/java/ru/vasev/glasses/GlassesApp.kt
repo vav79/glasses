@@ -18,8 +18,10 @@ import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.location.DeviceLocation
+import ru.vasev.glasses.nav.AddressGeocoder
 import ru.vasev.glasses.nav.CompassController
 import ru.vasev.glasses.nav.NavigatorSettings
+import ru.vasev.glasses.nav.TaxiAddresses
 import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.places.PlaceStore
 import ru.vasev.glasses.profile.ProfileSettings
@@ -119,6 +121,10 @@ class GlassesApp : Application() {
     lateinit var compass: CompassController
         private set
 
+    /** Адреса моих мест для таксиста на местном языке (переводятся заранее, хранятся для офлайна). */
+    lateinit var taxiAddresses: TaxiAddresses
+        private set
+
     /** Какой навигатор открывать: Авто / Яндекс / Google. */
     lateinit var navigator: NavigatorSettings
         private set
@@ -153,6 +159,7 @@ class GlassesApp : Application() {
         places = PlaceStore(this)
         compass = CompassController(this, audioOutput)
         navigator = NavigatorSettings(this)
+        taxiAddresses = TaxiAddresses(places, AddressGeocoder(this, llm::isOnline), llm, navigator)
         currency = CurrencySettings(this)
         rates = CbrRates(this, llm::isOnline)
         // Кеш курсов обновляется, пока есть сеть: за границей интернет бывает не всегда, а курс нужен у ценника.
@@ -160,6 +167,8 @@ class GlassesApp : Application() {
             object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     scope.launch { rates.refreshIfStale() }
+                    // Адреса моих мест для таксиста — переводим, пока есть сеть: за границей её бывает нет.
+                    taxiAddresses.refreshMissing()
                 }
             },
         )

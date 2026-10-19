@@ -70,6 +70,17 @@ class PlaceStore(context: Context) {
         }
     }
 
+    /** Адрес для таксиста, переведённый заранее (пока была сеть). */
+    suspend fun setLocal(id: String, name: String?, address: String, language: String, by: String?) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val place = byId(id) ?: return@withContext
+            _places.value = _places.value.map {
+                if (it.id == id) place.copy(localName = name, localAddress = address, localLanguage = language, localBy = by) else it
+            }
+            savePlaces()
+        }
+    }
+
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
         synchronized(lock) {
             photoFile(id).delete()

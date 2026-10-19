@@ -90,7 +90,7 @@ import java.time.format.DateTimeFormatter
  * экран моего места и подтверждение адреса. [onMic] — слушать «Куда?» (с разрешением на микрофон).
  */
 @Composable
-fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLink: (MapsLink) -> Unit) {
+fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLink: (MapsLink) -> Unit, onLaunchApp: (String) -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val places by viewModel.places.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
@@ -102,6 +102,12 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
         while (true) {
             viewModel.refreshLocation()
             delay(LOCATION_REFRESH_MS)
+        }
+    }
+    LaunchedEffect(state.launch) {
+        state.launch?.let {
+            onLaunchApp(it)
+            viewModel.launched()
         }
     }
     LaunchedEffect(state.open) {
@@ -122,6 +128,7 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
             else -> Home(viewModel, state, places, recent, diagnostics, onMic)
         }
         state.confirm?.let { ConfirmScreen(viewModel, it, state.here) }
+        state.taxi?.let { card -> TaxiScreen(viewModel, card, card.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics) }
         state.offlineWalk?.let {
             AlertDialog(
                 onDismissRequest = viewModel::dismissOfflineWalk,
@@ -397,6 +404,15 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
                 external = false,
             )
         }
+        val taxiRow: @Composable () -> Unit = {
+            OptionRow(
+                icon = R.drawable.ic_sym_local_taxi,
+                title = stringResource(R.string.nav_taxi),
+                subtitle = stringResource(R.string.nav_taxi_hint),
+                onClick = viewModel::openTaxi,
+                external = false,
+            )
+        }
         // Близко (до 1,5 км по прямой) — «Компас» первым среди пеших вариантов.
         val nearby = distance != null && Geo.compassSuitable(distance)
         val walk: @Composable () -> Unit = {
@@ -417,12 +433,14 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
         }
         if (transitFirst) {
             transit()
+            taxiRow()
             if (nearby) compassRow()
             walk()
         } else {
             if (nearby) compassRow()
             walk()
             transit()
+            taxiRow()
         }
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -570,6 +588,16 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
                     },
                     icon = R.drawable.ic_sym_navigation,
                     kind = GlassButtonKind.PRIMARY,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                GlassButton(
+                    stringResource(R.string.nav_address_for_driver),
+                    onClick = {
+                        viewModel.closePlace()
+                        viewModel.openPlaceTarget(place)
+                        viewModel.openTaxi()
+                    },
+                    icon = R.drawable.ic_sym_local_taxi,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

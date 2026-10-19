@@ -628,4 +628,28 @@
         <item quantity="many">около %d минут</item>
         <item quantity="other">около %d минуты</item>
     </plurals>
+
+    <!-- Такси -->
+    <string name="nav_taxi">Такси</string>
+    <string name="nav_taxi_hint">Адрес для водителя на местном языке</string>
+    <string name="nav_address_for_driver">Адрес таксисту</string>
+    <string name="taxi_show_driver">Покажите водителю</string>
+    <string name="taxi_close">Закрыть</string>
+    <string name="taxi_speak">Произнести адрес на местном языке</string>
+    <string name="taxi_plus_code">Plus Code %1$s</string>
+    <string name="taxi_translating">Перевожу адрес…</string>
+    <string name="taxi_translated_by">Перевод: %1$s</string>
+    <string name="taxi_main_model">основная модель</string>
+    <string name="taxi_saved_offline">Перевод сохранён — работает без интернета.</string>
+    <string name="taxi_offline">Нет интернета: перевод появится, когда будет сеть. Покажите адрес и Plus Code.</string>
+    <string name="taxi_not_translated">Страна неизвестна или адрес не удалось перевести. Выберите язык в Настройках → Навигация.</string>
+    <string name="taxi_home_consent">У геокодера нет адреса на местном языке. Адрес «Дом» уходит модели только по вашей просьбе.</string>
+    <string name="taxi_translate_home">Перевести через ИИ</string>
+    <string name="taxi_no_apps">Приложения такси не установлены.</string>
+    <string name="taxi_open_app">Открыть %1$s</string>
+    <string name="taxi_yandex_go">Яндекс Go</string>
+    <string name="taxi_no_voice">Голос для этого языка не установлен — покажите экран водителю.</string>
+    <string name="settings_taxi_language">Язык адреса для такси</string>
+    <string name="settings_taxi_language_auto">Авто — по стране цели</string>
+    <string name="settings_taxi_language_hint">Адреса моих мест переводятся заранее, пока есть интернет, и хранятся для офлайна.</string>
 </resources>

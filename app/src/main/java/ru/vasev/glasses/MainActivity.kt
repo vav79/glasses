@@ -241,6 +241,7 @@ class MainActivity : AppCompatActivity() {
                             viewModel = navigation,
                             onMic = { withMic(navigation::listenQuery) },
                             onOpenLink = { openMapsLink(this, it) },
+                            onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
                         )
                     },
                     settings = {

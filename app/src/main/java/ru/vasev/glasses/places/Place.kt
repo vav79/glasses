@@ -30,6 +30,11 @@ data class Place(
     /** ISO 3166-1 alpha-2. */
     val country: String? = null,
     val locality: String? = null,
+    /** Для таксиста — на языке [localLanguage]: название и адрес; [localBy] — модель, которая переводила (null — геокодер). */
+    val localName: String? = null,
+    val localAddress: String? = null,
+    val localLanguage: String? = null,
+    val localBy: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -43,6 +48,10 @@ data class Place(
         address?.let { put("address", it) }
         country?.let { put("country", it) }
         locality?.let { put("locality", it) }
+        localName?.let { put("local_name", it) }
+        localAddress?.let { put("local_address", it) }
+        localLanguage?.let { put("local_language", it) }
+        localBy?.let { put("local_by", it) }
     }
 
     companion object {
@@ -57,6 +66,10 @@ data class Place(
             address = o.optString("address").ifEmpty { null },
             country = o.optString("country").ifEmpty { null },
             locality = o.optString("locality").ifEmpty { null },
+            localName = o.optString("local_name").ifEmpty { null },
+            localAddress = o.optString("local_address").ifEmpty { null },
+            localLanguage = o.optString("local_language").ifEmpty { null },
+            localBy = o.optString("local_by").ifEmpty { null },
         )
     }
 }

@@ -103,6 +103,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setNavigator(choice: NavigatorChoice) = navigatorSettings.setChoice(choice)
 
+    val taxiLanguage: StateFlow<String?> = navigatorSettings.taxiLanguage
+
+    /** Сменили язык адреса для такси — переводим адреса моих мест заново, пока есть сеть. */
+    fun setTaxiLanguage(language: String?) {
+        navigatorSettings.setTaxiLanguage(language)
+        (getApplication<GlassesApp>()).taxiAddresses.refreshMissing()
+    }
+
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)
     fun setFallbackPhotos(enabled: Boolean) = ai.setFallbackPhotos(enabled)

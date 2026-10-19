@@ -34,6 +34,8 @@ import ru.vasev.glasses.places.Destination
 import ru.vasev.glasses.places.Place
 import ru.vasev.glasses.places.PlaceKind
 import ru.vasev.glasses.profile.UserRole
+import ru.vasev.glasses.speech.AudioChannel
+import ru.vasev.glasses.speech.VoiceStatus
 import ru.vasev.glasses.speech.SpeechException
 import java.time.Instant
 import java.util.Locale
@@ -65,6 +67,20 @@ data class AddressConfirm(
 /** Экран моего места: [placeId] — существующее, иначе новое вида [kind]. */
 data class PlaceEdit(val kind: PlaceKind, val placeId: String? = null, val name: String = "")
 
+/**
+ * Экран «Адрес для таксиста». [local] — перевод (из моих мест — сразу, иначе считается; без сети — нет);
+ * [homeConsent] — адрес «Дом» переводится моделью только по явной просьбе: показать кнопку.
+ */
+data class TaxiCard(
+    val target: Target,
+    val plusCode: String,
+    val apps: List<TaxiApp>,
+    val local: LocalAddress? = null,
+    val loading: Boolean = false,
+    val homeConsent: Boolean = false,
+    val offline: Boolean = false,
+)
+
 /** Что сейчас делается — для подписи и блокировки кнопок. */
 enum class NavBusy { LISTENING, SEARCHING, CAPTURING, RECOGNIZING, ASKING_AI, LOCATING }
 
@@ -90,6 +106,9 @@ data class NavState(
     val offlineWalk: Target? = null,
     /** Ссылка, которую экран должен открыть (одноразово). */
     val open: MapsLink? = null,
+    /** Приложение, которое экран должен запустить (одноразово). */
+    val launch: String? = null,
+    val taxi: TaxiCard? = null,
 )
 
 /**
@@ -299,6 +318,65 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeTarget() = _state.update { it.copy(target = null) }
 
+    // --- Такси ---
+
+    /** «Адрес для таксиста»: для цели из карточки (или моего места). */
+    fun openTaxi() {
+        val target = _state.value.target ?: return
+        val place = target.placeId?.let(store::byId)
+        val stored = place?.let { p ->
+            p.localAddress?.takeIf { p.localLanguage == g.taxiAddresses.languageFor(p.country) }
+                ?.let { LocalAddress(p.localName, it, p.localLanguage!!, p.localBy) }
+        }
+        val apps = TaxiApp.entries.filter { installed(it.packageName) }
+        val online = llm.isOnline()
+        _state.update { it.copy(taxi = TaxiCard(target, PlusCode.encode(target.point), apps, stored, loading = stored == null && online, offline = !online)) }
+        if (stored != null || !online) return
+        viewModelScope.launch {
+            val local = if (place != null) g.taxiAddresses.ensure(place) else g.taxiAddresses.forTarget(target)
+            val consent = local == null && place?.kind == PlaceKind.HOME
+            _state.update { s -> s.copy(taxi = s.taxi?.copy(local = local, loading = false, homeConsent = consent)) }
+        }
+    }
+
+    /** «Перевести через ИИ» для «Дома» — явная просьба: только тогда адрес дома уходит модели. */
+    fun translateHomeWithAi() {
+        val card = _state.value.taxi ?: return
+        val place = card.target.placeId?.let(store::byId) ?: return
+        _state.update { it.copy(taxi = card.copy(loading = true, homeConsent = false)) }
+        viewModelScope.launch {
+            val local = g.taxiAddresses.ensure(place, force = true, allowHomeModel = true)
+            _state.update { s -> s.copy(taxi = s.taxi?.copy(local = local, loading = false)) }
+        }
+    }
+
+    fun sameAsApp(language: String) = g.taxiAddresses.sameAsApp(language)
+
+    fun closeTaxi() = _state.update { it.copy(taxi = null) }
+
+    /** Произнести адрес на местном языке — в динамик телефона, для водителя. */
+    fun speakTaxi() {
+        val local = _state.value.taxi?.local ?: return
+        viewModelScope.launch {
+            val locale = Locale.forLanguageTag(local.language)
+            if (g.audioOutput.voiceStatus(locale) != VoiceStatus.READY) {
+                _state.update { it.copy(notice = L.s(R.string.taxi_no_voice)) }
+                return@launch
+            }
+            runCatching { g.audioOutput.speak(listOfNotNull(local.name, local.address).joinToString(". "), locale, AudioChannel.PARTNER) }
+        }
+    }
+
+    /** Приложение такси: с пунктом назначения, если у него есть документированная ссылка, иначе просто открыть. */
+    fun openTaxiApp(app: TaxiApp) {
+        val target = _state.value.taxi?.target ?: return
+        val link = TaxiLinks.destination(app, target.point, target.label)
+        Log.d(TAG, "taxi app=${app.name} with_destination=${link != null}")
+        if (link != null) _state.update { it.copy(open = MapsLink(link, app.packageName)) } else _state.update { it.copy(launch = app.packageName) }
+    }
+
+    fun launched() = _state.update { it.copy(launch = null) }
+
     // --- Компас ---
 
     val compass: StateFlow<CompassState?> = g.compass.state
@@ -380,8 +458,9 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
         return NavigatorLinks.pick(navigatorChoice.value, country, installed)
     }
 
-    private fun installed(app: MapsApp): Boolean {
-        val pkg = app.packageName ?: return false
+    private fun installed(app: MapsApp): Boolean = app.packageName?.let(::installed) ?: false
+
+    private fun installed(pkg: String): Boolean {
         return try {
             getApplication<Application>().packageManager.getPackageInfo(pkg, 0)
             true
@@ -405,6 +484,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
                 jpeg = null,
             )
             _state.update { it.copy(target = target.copy(placeId = saved.id)) }
+            g.taxiAddresses.refreshLater(saved.id)
         }
     }
 
@@ -446,6 +526,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
             keepPhoto = photo == null && edit.placeId != null,
             replaceId = edit.placeId,
         )
+        g.taxiAddresses.refreshLater(saved.id)
         Log.d(TAG, "place saved kind=${saved.kind} photo=${saved.hasPhoto} accuracy=${fix.accuracyM}")
         _state.update { it.copy(place = edit.copy(placeId = saved.id), purpose = AddressPurpose.ForPlace(edit.copy(placeId = saved.id))) }
     }
@@ -476,6 +557,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
             replaceId = edit.placeId,
         )
         _state.update { it.copy(place = edit.copy(placeId = saved.id), purpose = AddressPurpose.ForPlace(edit.copy(placeId = saved.id)), query = "") }
+        g.taxiAddresses.refreshLater(saved.id)
     }
 
     fun deletePlace() {

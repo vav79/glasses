@@ -608,4 +608,28 @@
         <item quantity="one">about %d minute</item>
         <item quantity="other">about %d minutes</item>
     </plurals>
+
+    <!-- Такси -->
+    <string name="nav_taxi">Taxi</string>
+    <string name="nav_taxi_hint">Address for the driver in the local language</string>
+    <string name="nav_address_for_driver">Address for a taxi driver</string>
+    <string name="taxi_show_driver">Show the driver</string>
+    <string name="taxi_close">Close</string>
+    <string name="taxi_speak">Say the address in the local language</string>
+    <string name="taxi_plus_code">Plus Code %1$s</string>
+    <string name="taxi_translating">Translating the address…</string>
+    <string name="taxi_translated_by">Translation: %1$s</string>
+    <string name="taxi_main_model">main model</string>
+    <string name="taxi_saved_offline">Translation saved — works without internet.</string>
+    <string name="taxi_offline">No internet: the translation will appear when the network is back. Show the address and the Plus Code.</string>
+    <string name="taxi_not_translated">The country is unknown or the address could not be translated. Choose the language in Settings → Navigation.</string>
+    <string name="taxi_home_consent">The geocoder has no address in the local language. The Home address is sent to a model only if you ask.</string>
+    <string name="taxi_translate_home">Translate with AI</string>
+    <string name="taxi_no_apps">No taxi apps installed.</string>
+    <string name="taxi_open_app">Open %1$s</string>
+    <string name="taxi_yandex_go">Yandex Go</string>
+    <string name="taxi_no_voice">No voice for this language is installed — show the screen to the driver.</string>
+    <string name="settings_taxi_language">Taxi address language</string>
+    <string name="settings_taxi_language_auto">Auto — by the destination country</string>
+    <string name="settings_taxi_language_hint">Addresses of my places are translated in advance while there is internet and kept for offline use.</string>
 </resources>

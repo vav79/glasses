@@ -73,6 +73,7 @@ import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
+import ru.vasev.glasses.nav.CountryLanguage
 import ru.vasev.glasses.nav.NavigatorChoice
 
 @Composable
@@ -92,6 +93,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val currency by viewModel.currency.collectAsStateWithLifecycle()
     val rates by viewModel.rates.collectAsStateWithLifecycle()
     val navigator by viewModel.navigator.collectAsStateWithLifecycle()
+    val taxiLanguage by viewModel.taxiLanguage.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     // Вся колонка — источник размытия: при прокрутке разделы уходят под стеклянную панель вкладок.
@@ -131,6 +133,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
         Section(stringResource(R.string.settings_navigation)) {
             NavigatorPicker(navigator, viewModel::setNavigator)
             Hint(stringResource(R.string.settings_navigator_hint))
+            Text(stringResource(R.string.settings_taxi_language), style = MaterialTheme.typography.bodyLarge)
+            TaxiLanguagePicker(taxiLanguage, viewModel::setTaxiLanguage)
+            Hint(stringResource(R.string.settings_taxi_language_hint))
         }
 
         // Роли — сами стеклянные карточки, без общей подложки.
@@ -396,6 +401,37 @@ private fun Status(text: String, isError: Boolean) {
         contentPadding = PaddingValues(12.dp),
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Язык адреса для таксиста: «Авто» (по стране цели) или язык из списка — названия на языке экрана. */
+@Composable
+private fun TaxiLanguagePicker(selected: String?, onSelect: (String?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val locale = LocalConfiguration.current.locales[0]
+    val auto = stringResource(R.string.settings_taxi_language_auto)
+    fun title(tag: String) = java.util.Locale.forLanguageTag(tag).getDisplayName(locale).replaceFirstChar { it.titlecase(locale) }
+    val options = remember(locale) { CountryLanguage.all.sortedBy(::title) }
+    Box {
+        GlassButton((selected?.let(::title) ?: auto) + " ▾", onClick = { expanded = true }, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp))
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, shape = RoundedCornerShape(20.dp)) {
+            DropdownMenuItem(
+                text = { Text(auto, fontWeight = if (selected == null) FontWeight.SemiBold else FontWeight.Normal) },
+                onClick = {
+                    expanded = false
+                    onSelect(null)
+                },
+            )
+            options.forEach { tag ->
+                DropdownMenuItem(
+                    text = { Text(title(tag), fontWeight = if (tag == selected) FontWeight.SemiBold else FontWeight.Normal) },
+                    onClick = {
+                        expanded = false
+                        onSelect(tag)
+                    },
+                )
+            }
+        }
     }
 }
 
