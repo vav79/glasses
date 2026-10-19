@@ -1,7 +1,9 @@
 package ru.vasev.glasses.ui.theme
 
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -17,15 +19,14 @@ import androidx.compose.ui.platform.LocalContext
  */
 @Composable
 fun GlassesTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        dark -> FallbackDark
-        else -> FallbackLight
-    }
-    MaterialTheme(colorScheme = colors, content = content)
+    MaterialTheme(colorScheme = glassesColorScheme(LocalContext.current, dark), content = content)
+}
+
+/** Та же схема без Compose — для фона окна, который система показывает до первого кадра. */
+fun glassesColorScheme(context: Context, dark: Boolean): ColorScheme = when {
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    dark -> FallbackDark
+    else -> FallbackLight
 }
 
 private val FallbackLight = lightColorScheme(

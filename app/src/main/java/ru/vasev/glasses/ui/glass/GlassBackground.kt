@@ -6,20 +6,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.PowerManager
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import android.os.SystemClock
+import androidx.compose.animation.core.withInfiniteAnimationFrameMillis
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -57,6 +53,13 @@ data class GlassBackgroundPalette(val base: Color, val blobs: List<Color>) {
     }
 }
 
+/** Часы фона на весь процесс: доля текущего круга анимации 0..1. */
+private object BackgroundClock {
+    private val origin = SystemClock.uptimeMillis()
+
+    fun phase(): Float = ((SystemClock.uptimeMillis() - origin) % PERIOD_MS).toFloat() / PERIOD_MS
+}
+
 /**
  * Мягкий градиент из цветов обоев с медленным движением пятен (круг за 50–150 с — движение заметно
  * только боковым зрением). Рисуется в фазе отрисовки, без перекомпоновки. [animate] = false — фон застывает.
@@ -68,15 +71,15 @@ fun GlassBackground(
     palette: GlassBackgroundPalette = fromScheme(),
     content: @Composable () -> Unit = {},
 ) {
-    val time: State<Float> = if (animate) {
-        rememberInfiniteTransition(label = "glass-bg").animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
-            label = "glass-bg-time",
-        )
-    } else {
-        remember { mutableStateOf(STILL_TIME) }
+    // Время — от общих часов процесса, а не от нуля при каждом создании экрана: после пересоздания Activity
+    // (смена темы, язык на Android 10–12) или возврата на вкладку пятна продолжают движение с того же места.
+    val time = remember { mutableFloatStateOf(if (animate) BackgroundClock.phase() else STILL_TIME) }
+    LaunchedEffect(animate) {
+        if (!animate) {
+            time.floatValue = STILL_TIME
+            return@LaunchedEffect
+        }
+        while (true) withInfiniteAnimationFrameMillis { time.floatValue = BackgroundClock.phase() }
     }
     Box(
         modifier.drawBehind {

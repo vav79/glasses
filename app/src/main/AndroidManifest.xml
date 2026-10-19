@@ -48,9 +48,13 @@
             android:name="com.meta.wearable.mwdat.CLIENT_TOKEN"
             android:value="${mwdat_client_token}" />
 
+        <!-- configChanges: смена языка приложения (Android 13+) без пересоздания — экран не моргает, Compose сам перерисует строки. -->
+
+        <!-- configChanges: смена языка приложения (Android 13+) без пересоздания — экран не моргает, Compose сам перерисует строки. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="locale|layoutDirection"
             android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

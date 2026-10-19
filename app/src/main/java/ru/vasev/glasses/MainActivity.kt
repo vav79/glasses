@@ -2,6 +2,8 @@ package ru.vasev.glasses
 
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -37,6 +39,8 @@ import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
+import androidx.compose.ui.graphics.toArgb
+import ru.vasev.glasses.ui.theme.glassesColorScheme
 import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
@@ -120,6 +124,9 @@ class MainActivity : AppCompatActivity() {
             ?: profile.role.value.startTab
         settingsOpen = savedInstanceState?.getBoolean(STATE_SETTINGS) ?: false
         enableEdgeToEdge()
+        // До первого кадра Compose система показывает фон окна: пусть он будет цвета нашего градиента, а не чёрный/белый.
+        val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        window.setBackgroundDrawable(ColorDrawable(glassesColorScheme(this, night).surface.toArgb()))
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
         viewModel.cameraOwner = this
@@ -267,6 +274,13 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_TAB, tab.name)
         outState.putBoolean(STATE_SETTINGS, settingsOpen)
+    }
+
+    /** Язык приложения сменился без пересоздания (configChanges): строки вне экрана и язык общения — на новый. */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        LanguageSettings.refresh()
+        settings.syncLanguage()
     }
 
     override fun onResume() {

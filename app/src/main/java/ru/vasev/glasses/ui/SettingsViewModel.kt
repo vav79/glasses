@@ -58,6 +58,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val _language = MutableStateFlow(LanguageSettings.choice())
     val language: StateFlow<LanguageChoice> = _language.asStateFlow()
 
+    /** Язык сменился не кнопками (система, adb) — подсветка выбора следует за ним. */
+    fun syncLanguage() {
+        _language.value = LanguageSettings.choice()
+    }
+
     fun setLanguage(choice: LanguageChoice) {
         _language.value = choice
         LanguageSettings.set(choice)
@@ -98,6 +103,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Обновить сведения о ключах. Расшифровка — только здесь, при открытом экране, и только ради последних 4 символов. */
     fun refresh() = viewModelScope.launch {
+        syncLanguage()
         for (provider in providers) {
             if (!store.has(provider)) {
                 update(provider) { it.copy(key = null, editing = true) }
