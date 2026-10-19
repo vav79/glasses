@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- «Компас» работает с выключенным экраном: фоновый сервис с типом location и уведомление «Стоп». -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Android 11+: доступ к системным сервисам распознавания речи и синтеза. -->
     <queries>
@@ -92,5 +96,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <service
+            android:name=".nav.CompassService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
     </application>
 </manifest>

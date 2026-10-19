@@ -1,6 +1,9 @@
 package ru.vasev.glasses.speech
 
 import android.os.Build
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 /** Куда звучит речь: [ME] — мне (гарнитура, позже — очки), [PARTNER] — собеседнику (динамик телефона). */
@@ -33,9 +36,41 @@ class PhoneSpeakerOutput(
     private val speaker: Speaker,
     private val router: AudioRouter,
     private val focus: AudioFocus,
+    private val navigator: NavigatorVoice,
 ) : AudioOutput {
 
+    /**
+     * Мы уступаем навигатору: перед фразой ждём, пока он договорит; заговорил посреди нашей фразы — замолкаем
+     * и повторяем её, когда он закончит (один раз, иначе при длинной подсказке фраза потерялась бы совсем).
+     */
     override suspend fun speak(text: String, locale: Locale, channel: AudioChannel, onStart: () -> Unit) {
+        var started = false
+        val once = {
+            if (!started) {
+                started = true
+                onStart()
+            }
+        }
+        repeat(ATTEMPTS) { attempt ->
+            navigator.awaitQuiet()
+            val interrupted = coroutineScope {
+                val watcher = launch {
+                    navigator.speaking.first { it }
+                    router.log("out $channel", "navigator started speaking — yielding")
+                    speaker.stop()
+                }
+                try {
+                    speakOnce(text, locale, channel, once)
+                } finally {
+                    watcher.cancel()
+                }
+                navigator.speaking.value
+            }
+            if (!interrupted || attempt == ATTEMPTS - 1) return
+        }
+    }
+
+    private suspend fun speakOnce(text: String, locale: Locale, channel: AudioChannel, onStart: () -> Unit) {
         // Пока жив SCO-канал микрофона гарнитуры, телефон «в звонке»: звук ушёл бы в гарнитуру с громкостью звонка.
         // Исключение — голосовое «стоп» во время ответа: микрофон держится намеренно (AudioRouter.holdMic).
         router.releaseMic()
@@ -75,4 +110,9 @@ class PhoneSpeakerOutput(
         } else {
             "unknown (Android < 13)"
         }
+
+    private companion object {
+        /** Фраза и один повтор после подсказки навигатора. */
+        const val ATTEMPTS = 2
+    }
 }

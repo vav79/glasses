@@ -137,6 +137,11 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
     /** Обновить координаты (экран виден — раз в несколько секунд). Без разрешения — тихо ничего. */
     fun refreshLocation() {
         _state.update { it.copy(locationGranted = location.granted) }
+        // Только debug: компас за столом — подменённое место и в карточках.
+        g.compass.fakeLocation?.let { p ->
+            _state.update { it.copy(here = DeviceLocation.Fix(p.latitude, p.longitude, FAKE_ACCURACY_M)) }
+            return
+        }
         if (!location.granted) return
         viewModelScope.launch {
             location.current(LOCATION_TIMEOUT_MS)?.let { fix -> _state.update { it.copy(here = fix) } }
@@ -293,6 +298,40 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeTarget() = _state.update { it.copy(target = null) }
+
+    // --- Компас ---
+
+    val compass: StateFlow<CompassState?> = g.compass.state
+
+    /** Разрешение на уведомление компаса (Android 13+); отказ не мешает — компас работает, просто без уведомления. */
+    var notificationPermissionRequester: (suspend () -> Boolean)? = null
+
+    /** «Компас» к цели: без интернета, голосом. Нужна геопозиция; уведомление «Стоп» — по возможности. */
+    fun startCompass() {
+        val target = _state.value.target ?: return
+        viewModelScope.launch {
+            if (!location.granted && locationPermissionRequester?.invoke() != true) {
+                _state.update { it.copy(notice = L.s(R.string.nav_location_needed), locationGranted = false) }
+                return@launch
+            }
+            notificationPermissionRequester?.invoke()
+            g.compass.start(target)
+        }
+    }
+
+    fun compassStatus() = g.compass.sayStatus()
+
+    fun compassContinue() = g.compass.dismissStuck()
+
+    fun closeCompass() = g.compass.close()
+
+    /** Из компаса — в навигатор: там обход препятствий; компас выключаем, чтобы не говорили оба. */
+    fun compassToNavigator() {
+        val target = g.compass.state.value?.target ?: return
+        g.compass.close()
+        _state.update { it.copy(target = target) }
+        walk()
+    }
 
     // --- Навигатор ---
 
@@ -518,6 +557,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val TAG = "Navigation"
         private const val LOCATION_TIMEOUT_MS = 4_000L
+        private const val FAKE_ACCURACY_M = 5f
 
         fun kindTitle(kind: PlaceKind): Int = when (kind) {
             PlaceKind.HOTEL -> R.string.place_hotel

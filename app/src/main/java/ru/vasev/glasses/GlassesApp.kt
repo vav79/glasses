@@ -18,6 +18,7 @@ import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.location.DeviceLocation
+import ru.vasev.glasses.nav.CompassController
 import ru.vasev.glasses.nav.NavigatorSettings
 import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.places.PlaceStore
@@ -30,6 +31,7 @@ import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
 import ru.vasev.glasses.speech.HeadsetButtons
 import ru.vasev.glasses.speech.MicSettings
+import ru.vasev.glasses.speech.NavigatorVoice
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
 import ru.vasev.glasses.speech.RoutedSpeechSource
 import ru.vasev.glasses.speech.PhoneSpeakerOutput
@@ -57,6 +59,10 @@ class GlassesApp : Application() {
 
     /** Маршрут звука и гарнитура: микрофон для голосового «стоп» во время ответа. */
     lateinit var audioRouter: AudioRouter
+        private set
+
+    /** Говорит ли навигатор: наша озвучка ему уступает. */
+    lateinit var navigatorVoice: NavigatorVoice
         private set
 
     /** Кнопка гарнитуры, пока звучит ответ ассистента. */
@@ -109,6 +115,10 @@ class GlassesApp : Application() {
     lateinit var places: PlaceStore
         private set
 
+    /** «Компас»: подсказки голосом по GPS и компасу, работает при смене вкладки и с выключенным экраном. */
+    lateinit var compass: CompassController
+        private set
+
     /** Какой навигатор открывать: Авто / Яндекс / Google. */
     lateinit var navigator: NavigatorSettings
         private set
@@ -135,11 +145,13 @@ class GlassesApp : Application() {
         shots = ShotStore(this)
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)
-        audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this))
+        navigatorVoice = NavigatorVoice(this)
+        audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this), navigatorVoice)
         headsetButtons = HeadsetButtons(this)
         notes = NoteStore(this)
         location = DeviceLocation(this)
         places = PlaceStore(this)
+        compass = CompassController(this, audioOutput)
         navigator = NavigatorSettings(this)
         currency = CurrencySettings(this)
         rates = CbrRates(this, llm::isOnline)

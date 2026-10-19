@@ -554,4 +554,58 @@
         <item>to the car</item>
         <item>parking</item>
     </string-array>
+
+    <!-- Компас -->
+    <string name="nav_compass">Compass</string>
+    <string name="nav_compass_hint">Voice hints by GPS and compass, works offline</string>
+    <string name="compass_start">%1$s is %2$s, %3$s in a straight line, %4$s</string>
+    <string name="compass_direction">%1$s is %2$s, %3$s</string>
+    <string name="compass_distance">%1$s to go, %2$s</string>
+    <string name="compass_arrived">You have arrived. %1$s is right here.</string>
+    <string name="compass_stuck">The distance has not decreased for two minutes. There may be a river, a highway or a fence ahead — open the navigator to find a way around.</string>
+    <string name="compass_auto_stop">Compass turned off: no movement for half an hour.</string>
+    <string name="side_ahead">ahead</string>
+    <string name="side_ahead_right">ahead on the right</string>
+    <string name="side_right">on the right</string>
+    <string name="side_behind_right">behind on the right</string>
+    <string name="side_behind">behind you</string>
+    <string name="side_behind_left">behind on the left</string>
+    <string name="side_left">on the left</string>
+    <string name="side_ahead_left">ahead on the left</string>
+    <string name="cardinal_n">to the north</string>
+    <string name="cardinal_ne">to the north-east</string>
+    <string name="cardinal_e">to the east</string>
+    <string name="cardinal_se">to the south-east</string>
+    <string name="cardinal_s">to the south</string>
+    <string name="cardinal_sw">to the south-west</string>
+    <string name="cardinal_w">to the west</string>
+    <string name="cardinal_nw">to the north-west</string>
+    <string name="compass_offline_hint">Compass · works without internet</string>
+    <string name="compass_straight_minutes">straight line · ≈ %1$d min on foot</string>
+    <string name="compass_no_heading">Direction unknown: the arrow shows the target from north. Hold the phone or start walking.</string>
+    <string name="compass_open_navigator">Open navigator</string>
+    <string name="compass_continue">Continue</string>
+    <string name="compass_said">Said %1$s</string>
+    <string name="compass_heading_phone">direction: phone compass</string>
+    <string name="compass_heading_walking">direction: walking direction</string>
+    <string name="compass_heading_none">direction: unknown</string>
+    <string name="compass_done">Done</string>
+    <string name="compass_how_far">How far is it?</string>
+    <string name="compass_navigator">Navigator</string>
+    <string name="compass_north_short">N</string>
+    <string name="compass_forward">ahead</string>
+    <string name="compass_arrived_title">You have arrived</string>
+    <string name="compass_arrived_hint">%1$s is within 20 metres. Compass is off.</string>
+    <string name="compass_stop">Stop compass</string>
+    <string name="compass_channel">Compass</string>
+    <string name="compass_notification_title">Compass is on</string>
+    <string name="compass_notification_starting">Getting the position…</string>
+    <plurals name="compass_meters">
+        <item quantity="one">%d metre</item>
+        <item quantity="other">%d metres</item>
+    </plurals>
+    <plurals name="compass_about_minutes">
+        <item quantity="one">about %d minute</item>
+        <item quantity="other">about %d minutes</item>
+    </plurals>
 </resources>

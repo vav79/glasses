@@ -570,4 +570,62 @@
         <item>парковка</item>
         <item>car</item>
     </string-array>
+
+    <!-- Компас -->
+    <string name="nav_compass">Компас</string>
+    <string name="nav_compass_hint">Подсказки голосом по GPS и компасу, без интернета</string>
+    <string name="compass_start">%1$s %2$s, по прямой %3$s, %4$s</string>
+    <string name="compass_direction">%1$s %2$s, %3$s</string>
+    <string name="compass_distance">Осталось %1$s, %2$s</string>
+    <string name="compass_arrived">Вы на месте. %1$s рядом.</string>
+    <string name="compass_stuck">Расстояние не уменьшается уже две минуты. Возможно, впереди река, трасса или забор — откройте навигатор, он найдёт обход.</string>
+    <string name="compass_auto_stop">Компас выключен: полчаса без движения.</string>
+    <string name="side_ahead">впереди</string>
+    <string name="side_ahead_right">впереди справа</string>
+    <string name="side_right">справа</string>
+    <string name="side_behind_right">сзади справа</string>
+    <string name="side_behind">сзади</string>
+    <string name="side_behind_left">сзади слева</string>
+    <string name="side_left">слева</string>
+    <string name="side_ahead_left">впереди слева</string>
+    <string name="cardinal_n">на севере</string>
+    <string name="cardinal_ne">на северо-востоке</string>
+    <string name="cardinal_e">на востоке</string>
+    <string name="cardinal_se">на юго-востоке</string>
+    <string name="cardinal_s">на юге</string>
+    <string name="cardinal_sw">на юго-западе</string>
+    <string name="cardinal_w">на западе</string>
+    <string name="cardinal_nw">на северо-западе</string>
+    <string name="compass_offline_hint">Компас · работает без интернета</string>
+    <string name="compass_straight_minutes">по прямой · ≈ %1$d мин пешком</string>
+    <string name="compass_no_heading">Направление взгляда неизвестно: стрелка показывает цель от севера. Возьмите телефон в руку или начните идти.</string>
+    <string name="compass_open_navigator">Открыть навигатор</string>
+    <string name="compass_continue">Продолжить</string>
+    <string name="compass_said">Сказано в %1$s</string>
+    <string name="compass_heading_phone">взгляд: компас телефона</string>
+    <string name="compass_heading_walking">взгляд: по ходу движения</string>
+    <string name="compass_heading_none">взгляд: неизвестен</string>
+    <string name="compass_done">Готово</string>
+    <string name="compass_how_far">Сколько осталось?</string>
+    <string name="compass_navigator">Навигатор</string>
+    <string name="compass_north_short">С</string>
+    <string name="compass_forward">вперёд</string>
+    <string name="compass_arrived_title">Вы на месте</string>
+    <string name="compass_arrived_hint">%1$s — в пределах 20 метров. Компас выключен.</string>
+    <string name="compass_stop">Выключить компас</string>
+    <string name="compass_channel">Компас</string>
+    <string name="compass_notification_title">Компас включён</string>
+    <string name="compass_notification_starting">Определяю место…</string>
+    <plurals name="compass_meters">
+        <item quantity="one">%d метр</item>
+        <item quantity="few">%d метра</item>
+        <item quantity="many">%d метров</item>
+        <item quantity="other">%d метра</item>
+    </plurals>
+    <plurals name="compass_about_minutes">
+        <item quantity="one">около %d минуты</item>
+        <item quantity="few">около %d минут</item>
+        <item quantity="many">около %d минут</item>
+        <item quantity="other">около %d минуты</item>
+    </plurals>
 </resources>

@@ -95,6 +95,7 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
     val places by viewModel.places.collectAsStateWithLifecycle()
     val recent by viewModel.recent.collectAsStateWithLifecycle()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+    val compass by viewModel.compass.collectAsStateWithLifecycle()
 
     // Пока вкладка на экране — координаты свежие: расстояния в карточках меняются на ходу.
     LaunchedEffect(Unit) {
@@ -111,6 +112,10 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
     }
 
     Box(Modifier.fillMaxSize()) {
+        compass?.let { c ->
+            CompassScreen(viewModel, c, c.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics)
+            return@Box
+        }
         when {
             state.place != null -> PlaceScreen(viewModel, state, places, diagnostics, onMic)
             state.target != null -> TargetScreen(viewModel, state.target!!, state, places, diagnostics)
@@ -383,6 +388,17 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
         }
         if (transitFirst) BackgroundHint(stringResource(R.string.nav_transit_first))
 
+        val compassRow: @Composable () -> Unit = {
+            OptionRow(
+                icon = R.drawable.ic_sym_navigation,
+                title = stringResource(R.string.nav_compass),
+                subtitle = stringResource(R.string.nav_compass_hint),
+                onClick = viewModel::startCompass,
+                external = false,
+            )
+        }
+        // Близко (до 1,5 км по прямой) — «Компас» первым среди пеших вариантов.
+        val nearby = distance != null && Geo.compassSuitable(distance)
         val walk: @Composable () -> Unit = {
             OptionRow(
                 icon = R.drawable.ic_sym_directions_walk,
@@ -401,8 +417,10 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
         }
         if (transitFirst) {
             transit()
+            if (nearby) compassRow()
             walk()
         } else {
+            if (nearby) compassRow()
             walk()
             transit()
         }
@@ -419,7 +437,7 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
 }
 
 @Composable
-private fun OptionRow(@DrawableRes icon: Int, title: String, subtitle: String, onClick: () -> Unit) {
+private fun OptionRow(@DrawableRes icon: Int, title: String, subtitle: String, onClick: () -> Unit, external: Boolean = true) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -435,7 +453,7 @@ private fun OptionRow(@DrawableRes icon: Int, title: String, subtitle: String, o
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Hint(subtitle)
         }
-        Icon(painterResource(R.drawable.ic_sym_open_in_new), contentDescription = null, modifier = Modifier.size(20.dp))
+        if (external) Icon(painterResource(R.drawable.ic_sym_open_in_new), contentDescription = null, modifier = Modifier.size(20.dp))
     }
 }
 

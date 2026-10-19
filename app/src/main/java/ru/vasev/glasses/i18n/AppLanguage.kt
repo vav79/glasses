@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
+import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -105,6 +106,9 @@ object L {
     fun s(@StringRes id: Int, vararg args: Any): String = context().getString(id, *args)
 
     fun array(id: Int): List<String> = context().resources.getStringArray(id).toList()
+
+    /** Строка с числом в нужной форме («1 метр», «3 метра», «5 метров»); [count] — и выбор формы, и первый аргумент. */
+    fun q(@PluralsRes id: Int, count: Int): String = context().resources.getQuantityString(id, count, count)
 
     /** Контекст с языком приложения (кэшируется по языку). */
     fun context(language: AppLanguage = LanguageSettings.current.value): Context = synchronized(contexts) {

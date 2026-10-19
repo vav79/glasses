@@ -24,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
@@ -112,6 +114,14 @@ class MainActivity : AppCompatActivity() {
             pendingPhoneCamera = null
         }
 
+    /** Уведомление «Компаса» (Android 13+): спрашиваем при первом запуске компаса; отказ компасу не мешает. */
+    private var pendingNotifications: CompletableDeferred<Boolean>? = null
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            pendingNotifications?.complete(granted)
+            pendingNotifications = null
+        }
+
     /** Геопозиция для заметок «Запомни» — спрашивается при первой заметке. */
     private var pendingLocationPermission: CompletableDeferred<Boolean>? = null
     private val locationPermission =
@@ -153,6 +163,7 @@ class MainActivity : AppCompatActivity() {
         navigation.glassesPermissionRequester = ::requestGlassesCamera
         navigation.galleryPicker = ::pickPhoto
         navigation.cameraOwner = this
+        navigation.notificationPermissionRequester = ::requestNotifications
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
@@ -335,6 +346,8 @@ class MainActivity : AppCompatActivity() {
         navigation.glassesPermissionRequester = null
         navigation.galleryPicker = null
         navigation.cameraOwner = null
+        navigation.notificationPermissionRequester = null
+        pendingNotifications?.complete(false)
         pendingPhoneCamera?.complete(false)
         pendingLocationPermission?.complete(false)
         pendingCameraPermission?.complete(false)
@@ -353,6 +366,7 @@ class MainActivity : AppCompatActivity() {
      *  - снимки:    --es image_source glasses|phone|simulator
      *  - вкладка:    --es tab assistant|camera|translate|navigation|settings|development (журнал в настройках)
      *  - навигация: --es nav_to "Wat Arun" (поиск цели, как в поле «Куда?»)
+     *  - компас за столом: --es fake_location "55.7539,37.6208" (подменить место, каждый интент — новая точка)
  *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
      * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
@@ -406,6 +420,25 @@ class MainActivity : AppCompatActivity() {
             selectTab(AppTab.ASSISTANT)
             viewModel.debugAsk(question, intent.getBooleanExtra("with_frame", false))
         }
+        // Компас за столом: подменить место (каждый интент — новая точка).
+        intent.getStringExtra("fake_location")?.let { value ->
+            intent.removeExtra("fake_location")
+            val (lat, lon) = value.split(",").map { it.trim().toDouble() }
+            app.compass.fakeLocation = ru.vasev.glasses.nav.GeoPoint(lat, lon)
+        }
+        // Уступка навигатору: через [delay] мс 3 секунды «говорит навигатор» (usage NAVIGATION_GUIDANCE).
+        if (intent.hasExtra("fake_navigator_after_ms")) {
+            val delayMs = intent.getIntExtra("fake_navigator_after_ms", 0)
+            intent.removeExtra("fake_navigator_after_ms")
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(delayMs.toLong())
+                ru.vasev.glasses.speech.FakeNavigatorVoice.play()
+            }
+        }
+        intent.getStringExtra("compass_status")?.let {
+            intent.removeExtra("compass_status")
+            app.compass.sayStatus()
+        }
         intent.getStringExtra("nav_to")?.let { query ->
             intent.removeExtra("nav_to")
             selectTab(AppTab.NAVIGATION)
@@ -443,6 +476,16 @@ class MainActivity : AppCompatActivity() {
         pendingCameraPermission?.complete(false)
         pendingCameraPermission = deferred
         cameraPermission.launch(Permission.CAMERA)
+        return deferred.await()
+    }
+
+    private suspend fun requestNotifications(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return true
+        val deferred = CompletableDeferred<Boolean>()
+        pendingNotifications?.complete(false)
+        pendingNotifications = deferred
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         return deferred.await()
     }
 
