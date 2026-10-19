@@ -5,8 +5,12 @@ import ru.vasev.glasses.BuildConfig
 import ru.vasev.glasses.R
 import ru.vasev.glasses.i18n.L
 import android.util.Log
+import android.os.SystemClock
 import android.util.Size
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -21,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -87,7 +92,8 @@ class PhoneCamera(private val context: Context) {
             }
         }
         provider = cameraProvider
-        withContext(Dispatchers.Main) {
+        val startedAt = SystemClock.elapsedRealtime()
+        val camera = withContext(Dispatchers.Main) {
             try {
                 cameraProvider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, imageCapture)
             } catch (e: Exception) {
@@ -98,6 +104,9 @@ class PhoneCamera(private val context: Context) {
         bound = true
         Log.d(TAG, "phone camera on for one shot")
         try {
+            // Камера только что включилась: без этого снимок уходил до того, как автофокус и экспозиция установятся.
+            val focused = focusCenter(camera)
+            Log.d(TAG, "one shot focus=$focused after=${SystemClock.elapsedRealtime() - startedAt}ms")
             return capture()
         } finally {
             withContext(NonCancellable + Dispatchers.Main) {
@@ -109,6 +118,29 @@ class PhoneCamera(private val context: Context) {
                 }
             }
         }
+    }
+
+    /**
+     * Фокус и экспозиция по центру кадра; ждём не дольше [FOCUS_TIMEOUT_MS]. true — камера сообщила «сфокусировано»;
+     * false — не успела или не смогла (темно, не за что зацепиться): снимаем всё равно — лучше нечёткий кадр, чем никакого.
+     */
+    private suspend fun focusCenter(camera: Camera): Boolean {
+        val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+            .disableAutoCancel()
+            .build()
+        return withTimeoutOrNull(FOCUS_TIMEOUT_MS) {
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine<Boolean> { cont ->
+                    val future = camera.cameraControl.startFocusAndMetering(action)
+                    cont.invokeOnCancellation { future.cancel(false) }
+                    future.addListener({
+                        val ok = runCatching { future.get().isFocusSuccessful }.getOrDefault(false)
+                        if (cont.isActive) cont.resume(ok)
+                    }, mainExecutor)
+                }
+            }
+        } ?: false
     }
 
     fun unbind() {
@@ -150,5 +182,6 @@ class PhoneCamera(private val context: Context) {
 
     private companion object {
         const val TAG = "Image"
+        const val FOCUS_TIMEOUT_MS = 1_500L
     }
 }
