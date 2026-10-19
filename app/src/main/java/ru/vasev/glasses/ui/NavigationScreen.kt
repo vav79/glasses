@@ -70,6 +70,9 @@ import ru.vasev.glasses.nav.NavBusy
 import ru.vasev.glasses.nav.NavState
 import ru.vasev.glasses.nav.NavigationViewModel
 import ru.vasev.glasses.nav.Target
+import ru.vasev.glasses.nav.TransitState
+import ru.vasev.glasses.links.LinkOpener
+import androidx.compose.ui.platform.LocalContext
 import ru.vasev.glasses.places.Destination
 import ru.vasev.glasses.places.Place
 import ru.vasev.glasses.places.PlaceKind
@@ -430,7 +433,10 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
                 subtitle = stringResource(R.string.nav_transit_in_app, maps),
                 onClick = viewModel::transit,
             )
+            TransitTipsCard(viewModel, state.transit, diagnostics)
         }
+        // Пешком дольше 20 минут — советы по транспорту загружаются сами (если есть сеть и ключ).
+        LaunchedEffect(target, transitFirst) { if (transitFirst) viewModel.loadTransitTips(auto = true) }
         if (transitFirst) {
             transit()
             taxiRow()
@@ -780,4 +786,33 @@ private fun dateFormat(): DateTimeFormatter {
 private fun savedFormat(): DateTimeFormatter {
     val locale = LocalConfiguration.current.locales[0]
     return remember(locale) { DateTimeFormatter.ofPattern("d MMM, HH:mm", locale) }
+}
+
+/**
+ * Советы по транспорту: строки модели, её метка (как в чате; без веб-поиска — «без проверки в интернете»),
+ * источники поиска. Ещё не загружены — кнопка; разработчику видно, что ушло в модель (только районы).
+ */
+@Composable
+private fun TransitTipsCard(viewModel: NavigationViewModel, transit: TransitState?, diagnostics: Boolean) {
+    val context = LocalContext.current
+    val advice = transit?.advice
+    GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
+        when {
+            transit == null -> GlassButton(stringResource(R.string.transit_tips), onClick = { viewModel.loadTransitTips() }, icon = R.drawable.ic_sym_assistant)
+            transit.loading -> Text(stringResource(R.string.transit_loading), style = MaterialTheme.typography.bodyMedium)
+            advice != null -> {
+                advice.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                when {
+                    advice.noWebSearch -> Hint(stringResource(R.string.transit_no_check, advice.tag.title))
+                    viewModel.showTag(advice.tag) -> Hint(modelLabel(advice.tag))
+                }
+                if (advice.sources.isNotEmpty()) SourceLinks(advice.sources) { LinkOpener.openSource(context, it) }
+            }
+            else -> {
+                transit.error?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                GlassButton(stringResource(R.string.transit_retry), onClick = { viewModel.retryTransitTips() })
+            }
+        }
+        if (diagnostics) transit?.sent?.let { Hint(stringResource(R.string.transit_sent, it)) }
+    }
 }

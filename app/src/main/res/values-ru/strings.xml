@@ -652,4 +652,13 @@
     <string name="settings_taxi_language">Язык адреса для такси</string>
     <string name="settings_taxi_language_auto">Авто — по стране цели</string>
     <string name="settings_taxi_language_hint">Адреса моих мест переводятся заранее, пока есть интернет, и хранятся для офлайна.</string>
+
+    <!-- Советы по транспорту -->
+    <string name="transit_tips">Советы по транспорту</string>
+    <string name="transit_loading">Ищу транспорт, цены и часы работы…</string>
+    <string name="transit_no_check">%1$s · без проверки в интернете — цены и часы могли измениться</string>
+    <string name="transit_retry">Попробовать ещё раз</string>
+    <string name="transit_sent">в модель: %1$s</string>
+    <string name="transit_no_area">Не удалось определить город цели.</string>
+    <string name="transit_nothing">Модель не дала советов по транспорту.</string>
 </resources>

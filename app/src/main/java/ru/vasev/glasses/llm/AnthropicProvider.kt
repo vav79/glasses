@@ -2,6 +2,7 @@ package ru.vasev.glasses.llm
 
 import android.os.SystemClock
 import android.util.Base64
+import android.util.Log
 import com.anthropic.client.AnthropicClient
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.core.JsonValue
@@ -55,7 +56,32 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
             .build()
     }
 
-    override suspend fun complete(request: ChatRequest): ChatResult = withContext(Dispatchers.IO) {
+    override suspend fun complete(request: ChatRequest): ChatResult = withoutUnsupportedCountry(request) { completeOnce(it) }
+
+    /**
+     * Веб-поиск отвечает 400 «Country code XX is not supported» на страну в `user_location` (так с TH):
+     * повторяем один раз без страны, часовой пояс остаётся. Ошибка приходит до первого слова — повтор безопасен.
+     */
+    private suspend fun withoutUnsupportedCountry(request: ChatRequest, block: suspend (ChatRequest) -> ChatResult): ChatResult {
+        val search = request.webSearch
+        // Страну, которую поиск уже отверг, сразу не отправляем — без лишнего запроса с 400.
+        val fitted = if (search?.country != null && search.country in unsupportedCountries) request.copy(webSearch = search.copy(country = null)) else request
+        return try {
+            block(fitted)
+        } catch (e: ProviderException) {
+            val ws = fitted.webSearch
+            val country = ws?.country
+            if (country == null || e.message?.contains(UNSUPPORTED_COUNTRY) != true) throw e
+            unsupportedCountries += country
+            Log.w("LLM", "web search: country $country not supported, retrying without it")
+            block(fitted.copy(webSearch = ws.copy(country = null)))
+        }
+    }
+
+    /** Страны, которые веб-поиск не принимает в `user_location` (до перезапуска приложения). */
+    private val unsupportedCountries = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private suspend fun completeOnce(request: ChatRequest): ChatResult = withContext(Dispatchers.IO) {
         val params = params(request)
         val started = SystemClock.elapsedRealtime()
         val message = mapErrors { client.messages().create(params) }
@@ -88,6 +114,13 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
      * так требует API. Текст всех раундов идёт в [onText] одним потоком.
      */
     override suspend fun stream(
+        request: ChatRequest,
+        onText: (String) -> Unit,
+        onUsage: (Usage) -> Unit,
+        onEvent: () -> Unit,
+    ): ChatResult = withoutUnsupportedCountry(request) { streamOnce(it, onText, onUsage, onEvent) }
+
+    private suspend fun streamOnce(
         request: ChatRequest,
         onText: (String) -> Unit,
         onUsage: (Usage) -> Unit,
@@ -290,7 +323,11 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
         } catch (e: AnthropicServiceException) {
             val status = e.statusCode()
             val kind = if (status >= 500) ProviderException.Kind.SERVER else ProviderException.Kind.BAD_REQUEST
-            throw ProviderException(id, kind, status)
+            // Текст ошибки API (без ключа) — чтобы 400 можно было понять по логу; неподдержанная страна поиска — особый случай.
+            val message = e.message.orEmpty()
+            if (kind == ProviderException.Kind.BAD_REQUEST) Log.w("LLM", "anthropic $status: ${message.take(LOG_ERROR_MAX)}")
+            val unsupportedCountry = message.contains("Country code") && message.contains("not supported")
+            throw ProviderException(id, kind, status, detail = if (unsupportedCountry) UNSUPPORTED_COUNTRY else null)
         } catch (e: ProviderException) {
             throw e
         } catch (e: CancellationException) {
@@ -340,6 +377,8 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
         const val API_KEY_HEADER = "x-api-key"
         const val NO_KEY_PLACEHOLDER = "not-set"
         const val PHOTO_PLACEHOLDER = "[photo]"
+        const val UNSUPPORTED_COUNTRY = "web search country not supported"
+        const val LOG_ERROR_MAX = 400
 
         /** Сколько найденных страниц показать, если модель не сослалась ни на одну. */
         const val MAX_UNCITED_SOURCES = 3

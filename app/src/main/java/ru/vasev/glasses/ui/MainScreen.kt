@@ -505,7 +505,7 @@ private fun TextAction(label: String, onClick: () -> Unit) {
 
 /** Ссылки веб-поиска под ответом — свёрнутым чипом «Источники (N)»; раскрытые: заголовок и настоящий домен. */
 @Composable
-private fun SourceLinks(sources: List<WebSource>, onOpen: (String) -> Unit) {
+internal fun SourceLinks(sources: List<WebSource>, onOpen: (String) -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(

@@ -632,4 +632,13 @@
     <string name="settings_taxi_language">Taxi address language</string>
     <string name="settings_taxi_language_auto">Auto — by the destination country</string>
     <string name="settings_taxi_language_hint">Addresses of my places are translated in advance while there is internet and kept for offline use.</string>
+
+    <!-- Советы по транспорту -->
+    <string name="transit_tips">Public transport tips</string>
+    <string name="transit_loading">Looking up transport, fares and hours…</string>
+    <string name="transit_no_check">%1$s · not checked online — fares and hours may be out of date</string>
+    <string name="transit_retry">Try again</string>
+    <string name="transit_sent">sent to the model: %1$s</string>
+    <string name="transit_no_area">Could not tell the city of the destination.</string>
+    <string name="transit_nothing">The model gave no transport tips.</string>
 </resources>

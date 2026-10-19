@@ -117,8 +117,9 @@ class LlmService(
         onText: (String) -> Unit,
         tools: ToolSet? = null,
         webSearch: WebSearch? = null,
+        noWebSearchNote: String = NO_WEB_SEARCH_NOTE,
     ): StreamedAnswer {
-        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, tools, webSearch)
+        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, tools, webSearch, noWebSearchNote)
         var delivered = false
         val primary = try {
             attemptStream(request, fallback = false, cause = null, metrics) {
@@ -154,9 +155,10 @@ class LlmService(
         effort: Effort,
         tools: ToolSet? = null,
         webSearch: WebSearch? = null,
+        noWebSearchNote: String = NO_WEB_SEARCH_NOTE,
     ): Pair<ChatRequest, Boolean> {
         if (!isOnline()) throw LlmException(L.s(R.string.no_internet))
-        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch)
+        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch, noWebSearchNote = noWebSearchNote)
         if (request.photoInCurrentTurn && !request.model.vision) {
             // Выбрана модель без фото (DeepSeek V4-Pro), а запрос со снимком — берём модель того же провайдера с фото.
             ModelCatalog.visionFor(request.model)?.let { return fitWebSearch(request.copy(model = it)) to true }
@@ -343,11 +345,11 @@ class LlmService(
         return connectivity.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
-    private companion object {
-        const val TAG = "LLM"
-        const val FALLBACK_TIMEOUT_MS = 20_000L
-        const val STREAM_STALL_MS = 20_000L
-        const val STALL_CHECK_MS = 1_000L
+    companion object {
+        private const val TAG = "LLM"
+        private const val FALLBACK_TIMEOUT_MS = 20_000L
+        private const val STREAM_STALL_MS = 20_000L
+        private const val STALL_CHECK_MS = 1_000L
 
         /** Добавка к промпту для модели без веб-поиска. */
         const val NO_WEB_SEARCH_NOTE =

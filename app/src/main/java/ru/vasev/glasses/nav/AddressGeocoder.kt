@@ -14,7 +14,14 @@ import java.util.Locale
 import kotlin.coroutines.resume
 
 /** Адрес, найденный геокодером: строка адреса, координаты и где это (страна и город). */
-data class FoundAddress(val line: String, val point: GeoPoint, val country: String?, val locality: String?)
+data class FoundAddress(
+    val line: String,
+    val point: GeoPoint,
+    val country: String?,
+    val locality: String?,
+    /** Район (sub-locality или округ) — для советов по транспорту без точного адреса. */
+    val district: String? = null,
+)
 
 /** Итог геокодера: пустой ответ — «не нашёл»; сбой, нет сервиса или сети — «недоступен» (это разные подсказки). */
 sealed interface GeocodeResult {
@@ -99,7 +106,10 @@ class AddressGeocoder(private val context: Context, private val online: () -> Bo
         val line = (0..a.maxAddressLineIndex).mapNotNull { a.getAddressLine(it) }.joinToString(", ").ifBlank {
             listOfNotNull(a.featureName, a.thoroughfare, a.locality, a.countryName).distinct().joinToString(", ")
         }
-        return FoundAddress(line, GeoPoint(a.latitude, a.longitude), a.countryCode?.uppercase(), a.locality ?: a.subAdminArea ?: a.adminArea)
+        return FoundAddress(
+            line, GeoPoint(a.latitude, a.longitude), a.countryCode?.uppercase(), a.locality ?: a.subAdminArea ?: a.adminArea,
+            district = a.subLocality ?: a.subAdminArea?.takeIf { it != a.locality },
+        )
     }
 
     private companion object {

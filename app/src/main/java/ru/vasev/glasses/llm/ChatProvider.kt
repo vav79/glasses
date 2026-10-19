@@ -20,6 +20,8 @@ data class ChatRequest(
     val webSearch: WebSearch? = null,
     /** Поиск был запрошен, но у модели его нет: в промпт добавлено предупреждение, у ответа — метка «без поиска». */
     val webSearchMissing: Boolean = false,
+    /** Что сказать модели без поиска вместо общей приписки (у советов по транспорту — своя). */
+    val noWebSearchNote: String = LlmService.NO_WEB_SEARCH_NOTE,
 ) {
     /** Есть ли снимок в новой реплике (сценарий «Что я вижу»). */
     val photoInCurrentTurn: Boolean get() = (turns.lastOrNull() as? Turn.User)?.jpeg != null

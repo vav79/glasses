@@ -81,6 +81,14 @@ data class TaxiCard(
     val offline: Boolean = false,
 )
 
+/** Советы по транспорту в карточке цели; [sent] — что ушло в модель (видно разработчику). */
+data class TransitState(
+    val loading: Boolean = false,
+    val advice: TransitAdvice? = null,
+    val error: String? = null,
+    val sent: String? = null,
+)
+
 /** Что сейчас делается — для подписи и блокировки кнопок. */
 enum class NavBusy { LISTENING, SEARCHING, CAPTURING, RECOGNIZING, ASKING_AI, LOCATING }
 
@@ -109,6 +117,7 @@ data class NavState(
     /** Приложение, которое экран должен запустить (одноразово). */
     val launch: String? = null,
     val taxi: TaxiCard? = null,
+    val transit: TransitState? = null,
 )
 
 /**
@@ -311,12 +320,54 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
         openTarget(Target(destination.label, destination.point, destination.address, destination.placeId?.takeIf { store.byId(it) != null }))
 
     private fun openTarget(target: Target) {
-        _state.update { it.copy(target = target, results = emptyList(), notice = null, offerAiName = false) }
+        _state.update { it.copy(target = target, transit = null, results = emptyList(), notice = null, offerAiName = false) }
         viewModelScope.launch { store.addRecent(Destination(target.label, target.point, target.address, target.placeId)) }
         refreshLocation()
     }
 
     fun closeTarget() = _state.update { it.copy(target = null) }
+
+    // --- Советы по транспорту ---
+
+    private val transitTips = TransitTips(llm)
+
+    /**
+     * Советы по транспорту для цели. [auto] — карточка сама просит, когда пешком дольше 20 минут:
+     * только если есть сеть и ключ, иначе остаётся кнопка. В модель — «район, город, страна» начала и цели.
+     */
+    fun loadTransitTips(auto: Boolean = false) {
+        val target = _state.value.target ?: return
+        if (_state.value.transit?.let { it.loading || it.advice != null } == true) return
+        if (auto && (!aiReady.value || !llm.isOnline())) return
+        _state.update { it.copy(transit = TransitState(loading = true)) }
+        viewModelScope.launch {
+            val language = LanguageSettings.current.value
+            val to = area(target.point)
+            if (to == null) {
+                _state.update { it.copy(transit = TransitState(error = L.s(if (llm.isOnline()) R.string.transit_no_area else R.string.nav_offline_search))) }
+                return@launch
+            }
+            val from = _state.value.here?.let { area(it.point()) }
+            val sent = "${from?.describe() ?: "?"} → ${to.describe()}"
+            val advice = try {
+                transitTips.tips(from, to, language)
+            } catch (e: LlmException) {
+                _state.update { it.copy(transit = TransitState(error = e.message, sent = sent)) }
+                return@launch
+            }
+            _state.update { s ->
+                if (s.target != target) s else s.copy(transit = TransitState(advice = advice, error = if (advice == null) L.s(R.string.transit_nothing) else null, sent = sent))
+            }
+        }
+    }
+
+    fun retryTransitTips() {
+        _state.update { it.copy(transit = null) }
+        loadTransitTips()
+    }
+
+    private suspend fun area(point: GeoPoint): Area? =
+        geocoder.reverse(point, Locale.ENGLISH)?.let { a -> a.locality?.let { Area(it, a.district, a.country) } }
 
     // --- Такси ---
 
