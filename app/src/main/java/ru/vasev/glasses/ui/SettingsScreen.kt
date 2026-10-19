@@ -73,9 +73,10 @@ import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
+import ru.vasev.glasses.nav.NavigatorChoice
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val keys by viewModel.keys.collectAsStateWithLifecycle()
     val assistantModel by viewModel.assistantModel.collectAsStateWithLifecycle()
     val translationModel by viewModel.translationModel.collectAsStateWithLifecycle()
@@ -90,6 +91,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
     val lessTransparency by viewModel.lessTransparency.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
     val rates by viewModel.rates.collectAsStateWithLifecycle()
+    val navigator by viewModel.navigator.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
 
     // Вся колонка — источник размытия: при прокрутке разделы уходят под стеклянную панель вкладок.
@@ -124,6 +126,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 rates?.let { stringResource(R.string.settings_rates_cached, RATE_DATE.format(it.table.date), it.source) }
                     ?: stringResource(R.string.settings_rates_none),
             )
+        }
+
+        Section(stringResource(R.string.settings_navigation)) {
+            NavigatorPicker(navigator, viewModel::setNavigator)
+            Hint(stringResource(R.string.settings_navigator_hint))
         }
 
         // Роли — сами стеклянные карточки, без общей подложки.
@@ -191,6 +198,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 checked = journalTexts,
                 onChange = viewModel::setJournalTexts,
             )
+        }
+
+        // Бывшая вкладка «Разработка»: вкладок не больше четырёх.
+        Section(stringResource(R.string.settings_developer)) {
+            Hint(stringResource(R.string.settings_developer_hint))
+            GlassButton(stringResource(R.string.dev_journal_title), onClick = onOpenDeveloper, icon = R.drawable.ic_sym_code, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -383,6 +396,35 @@ private fun Status(text: String, isError: Boolean) {
         contentPadding = PaddingValues(12.dp),
     ) {
         Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** Навигатор: Авто / Яндекс / Google. */
+@Composable
+private fun NavigatorPicker(selected: NavigatorChoice, onSelect: (NavigatorChoice) -> Unit) {
+    val choices = NavigatorChoice.entries
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == selected,
+                onClick = { if (choice != selected) onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
+                icon = {},
+            ) {
+                Text(
+                    stringResource(
+                        when (choice) {
+                            NavigatorChoice.AUTO -> R.string.navigator_auto
+                            NavigatorChoice.YANDEX -> R.string.maps_yandex_short
+                            NavigatorChoice.GOOGLE -> R.string.maps_google_short
+                        },
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
+                )
+            }
+        }
     }
 }
 

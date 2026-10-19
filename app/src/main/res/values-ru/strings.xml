@@ -183,7 +183,6 @@
     <string name="key_err_no_master">Ключ шифрования не найден.</string>
 
     <!-- Роли и первый запуск -->
-    <string name="tab_dev">Разработка</string>
     <string name="onboarding_language_title">Выберите язык</string>
     <string name="onboarding_language_hint">На этом языке ассистент будет слушать и отвечать. Потом его можно сменить в настройках.</string>
     <string name="language_system_current">Системный (%1$s)</string>
@@ -197,7 +196,7 @@
     <string name="role_researcher">Исследователь</string>
     <string name="role_researcher_desc">Ассистент с камерой: спрашивайте о том, что видите.</string>
     <string name="role_developer">Разработчик</string>
-    <string name="role_developer_desc">Всё то же + вкладка «Разработка»: журнал запросов, модели и логи.</string>
+    <string name="role_developer_desc">Всё то же + сразу расширенные настройки: модели, запасная модель и журнал запросов.</string>
     <string name="role_selected">выбрано</string>
     <string name="settings_role">Роль</string>
     <string name="settings_role_hint">Меняет порядок вкладок и набор настроек. При смене ничего не теряется.</string>
@@ -426,4 +425,149 @@
     <string name="remember_question">Запомни: %1$s</string>
     <string name="remember_question_photo">Запомни снимок</string>
     <string name="note_no_text">Снимок без текста</string>
+
+    <!-- Навигация -->
+    <string name="tab_navigation">Навигация</string>
+    <string name="place_hotel">Отель</string>
+    <string name="place_home">Дом</string>
+    <string name="place_car">Машина</string>
+    <string name="place_custom">Моё место</string>
+    <string name="nav_where_to">Куда?</string>
+    <string name="nav_my_places">Мои места</string>
+    <string name="nav_recent">Недавние</string>
+    <string name="nav_say_destination">Сказать, куда идти</string>
+    <string name="nav_photo_address">Фото адреса</string>
+    <string name="nav_photo_address_hint">Визитка, бронь или табличка. Текст распознаётся на телефоне.</string>
+    <string name="nav_photo_take">Сфотографировать</string>
+    <string name="nav_photo_gallery">Выбрать из галереи</string>
+    <string name="nav_find_with_ai">Найти через ИИ</string>
+    <string name="nav_find_with_ai_other">Не то? Найти через ИИ</string>
+    <string name="nav_recognize_with_ai">Распознать через ИИ</string>
+    <string name="nav_ai_photo_hint">Снимок уйдёт модели ассистента, только когда вы нажмёте кнопку.</string>
+    <string name="nav_ai_no_key">Введите ключ модели ассистента в настройках.</string>
+    <string name="nav_check_on_map">Проверить на карте</string>
+    <string name="nav_place_empty">Не сохранено. Нажмите, чтобы сохранить.</string>
+    <string name="nav_walk_minutes">≈ %1$d мин пешком</string>
+    <string name="nav_add_place">Своё место</string>
+    <string name="nav_back">Назад</string>
+    <string name="nav_straight_walk">по прямой · пешком ≈ %1$s</string>
+    <string name="nav_straight_line">по прямой</string>
+    <string name="nav_transit_first">Пешком больше 20 минут — сначала транспорт</string>
+    <string name="nav_walk">Пешком</string>
+    <string name="nav_walk_in_app">Маршрут в %1$s</string>
+    <string name="nav_transit">Транспорт</string>
+    <string name="nav_transit_in_app">Маршрут на транспорте в %1$s</string>
+    <string name="nav_edit_place">Изменить место</string>
+    <string name="nav_save_to_places">Сохранить в мои места</string>
+    <string name="nav_delete_place">Удалить место</string>
+    <string name="nav_delete_place_confirm">Удалить это место вместе с фото входа?</string>
+    <string name="nav_place_name">Название места</string>
+    <string name="nav_entrance_photo">Фото входа</string>
+    <string name="nav_saved_label">Сохранено</string>
+    <string name="nav_saved_by_address">по адресу</string>
+    <string name="nav_saved_by_gps">по GPS</string>
+    <string name="nav_saved_by_gps_accuracy">по GPS ±%1$d м</string>
+    <string name="nav_address_label">Адрес</string>
+    <string name="nav_no_entrance_photo">Фото входа нет.</string>
+    <string name="nav_place_new_hint">Стоите у входа? Сохраните место здесь: координаты GPS, фото входа и время. Или введите адрес из брони ниже.</string>
+    <string name="nav_save_here">Сохранить здесь</string>
+    <string name="nav_save_here_again">Сохранить здесь заново</string>
+    <string name="nav_save_here_hint">Координаты — по GPS, фото входа — с выбранной камеры (очки или телефон).</string>
+    <string name="nav_retake_photo">Новое фото входа</string>
+    <string name="nav_take_photo">Сфотографировать вход</string>
+    <string name="nav_place_by_address">По адресу</string>
+    <string name="nav_address_field">Адрес (текстом или фото)</string>
+    <string name="nav_go_here">Веди сюда</string>
+    <string name="nav_confirm_title">Адрес с фото</string>
+    <string name="nav_confirm_by_name">Найдено по названию</string>
+    <string name="nav_confirm_from_ai_name">Адрес назвала модель</string>
+    <string name="nav_confirm_from_ai_photo">Распознала модель</string>
+    <string name="nav_confirm_from_device">Распознано на телефоне</string>
+    <string name="nav_confirm_geocoder">Нашёл геокодер</string>
+    <string name="nav_confirm_check">Проверьте точку на карте, прежде чем идти: адрес мог распознаться или найтись неточно.</string>
+    <string name="nav_confirm_ok">Адрес верный</string>
+    <string name="nav_confirm_fix">Исправить</string>
+    <string name="nav_location_needed">Разрешите доступ к геопозиции — чтобы видеть расстояния и сохранять места.</string>
+    <string name="nav_allow_location">Разрешить геопозицию</string>
+    <string name="nav_weak_gps">Слабый сигнал GPS (±%1$d м) — расстояние может быть неточным.</string>
+    <string name="nav_gps_accuracy">GPS ±%1$d м</string>
+    <string name="nav_gps_waiting">Жду GPS…</string>
+    <string name="nav_no_fix">Не удалось определить место. Выйдите на открытое место или попробуйте ещё раз.</string>
+    <string name="nav_m">%1$s м</string>
+    <string name="nav_km">%1$s км</string>
+    <string name="nav_minutes">%1$d мин</string>
+    <string name="nav_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="nav_busy_listening">Слушаю…</string>
+    <string name="nav_busy_searching">Ищу адрес…</string>
+    <string name="nav_busy_capturing">Снимаю…</string>
+    <string name="nav_busy_recognizing">Читаю текст на снимке…</string>
+    <string name="nav_busy_ai">Спрашиваю ИИ…</string>
+    <string name="nav_busy_locating">Определяю место…</string>
+    <string name="nav_place_not_saved">«%1$s» — место ещё не сохранено. Сохраните его в «Моих местах».</string>
+    <string name="nav_not_found">Геокодер ничего не нашёл. Уточните адрес или найдите место по названию через ИИ.</string>
+    <string name="nav_geocoder_unavailable">Поиск адресов на этом телефоне сейчас недоступен. Мои места работают.</string>
+    <string name="nav_offline_search">Нет интернета: адреса не ищутся. Мои места и недавние цели работают.</string>
+    <string name="nav_ai_not_sure">Модель не уверена, какое это место. Добавьте город или улицу.</string>
+    <string name="nav_ai_no_address">Модель не нашла адреса на снимке.</string>
+    <string name="nav_ai_address_not_found">Модель назвала адрес «%1$s», но геокодер его не нашёл. Исправьте текст и поищите снова.</string>
+    <string name="nav_photo_not_read">На телефоне текст не распознан (русский, тайский и арабский встроенное распознавание не читает). Попробуйте «Распознать через ИИ».</string>
+    <string name="nav_photo_not_found">Текст распознан, но адрес не найден. Исправьте его в поле или попробуйте «Распознать через ИИ».</string>
+    <string name="nav_photo_failed">Не удалось сделать снимок.</string>
+    <string name="nav_offline_title">Нет интернета</string>
+    <string name="nav_offline_organic">Google Карты без сети не строят пешие маршруты. Organic Maps работает со скачанной картой.</string>
+    <string name="nav_offline_no_organic">Google Карты без сети не строят пешие маршруты. Чтобы ходить без интернета, установите Organic Maps и заранее скачайте карту.</string>
+    <string name="maps_google">Google Картах</string>
+    <string name="maps_yandex">Яндекс Картах</string>
+    <string name="maps_organic">Organic Maps</string>
+    <string name="maps_other">приложении карт</string>
+    <string name="maps_google_short">Google</string>
+    <string name="maps_yandex_short">Яндекс</string>
+    <string name="navigator_auto">Авто</string>
+    <string name="settings_navigation">Навигация</string>
+    <string name="settings_navigator_hint">Авто: в России — Яндекс Карты, за границей — Google Карты. Если выбранного приложения нет, откроется другое.</string>
+    <string name="settings_developer">Для разработчика</string>
+    <string name="settings_developer_hint">Журнал запросов к моделям: задержка, токены и стоимость каждого запроса.</string>
+    <string name="dev_close">Закрыть журнал</string>
+    <string-array name="nav_query_prefixes">
+        <item>как добраться до</item>
+        <item>как добраться в</item>
+        <item>как добраться к</item>
+        <item>как доехать до</item>
+        <item>как пройти к</item>
+        <item>как пройти в</item>
+        <item>как пройти до</item>
+        <item>веди в</item>
+        <item>веди до</item>
+        <item>веди к</item>
+        <item>отведи в</item>
+        <item>маршрут до</item>
+        <item>маршрут в</item>
+        <item>проложи маршрут до</item>
+    </string-array>
+    <string-array name="nav_alias_hotel">
+        <item>отель</item>
+        <item>отеля</item>
+        <item>мой отель</item>
+        <item>гостиница</item>
+        <item>гостиницы</item>
+        <item>в отель</item>
+        <item>в гостиницу</item>
+        <item>hotel</item>
+    </string-array>
+    <string-array name="nav_alias_home">
+        <item>дом</item>
+        <item>домой</item>
+        <item>дома</item>
+        <item>мой дом</item>
+        <item>home</item>
+    </string-array>
+    <string-array name="nav_alias_car">
+        <item>машина</item>
+        <item>машины</item>
+        <item>машине</item>
+        <item>к машине</item>
+        <item>моя машина</item>
+        <item>парковка</item>
+        <item>car</item>
+    </string-array>
 </resources>

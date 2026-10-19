@@ -1,5 +1,6 @@
 package ru.vasev.glasses.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,7 @@ import ru.vasev.glasses.R
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
 import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.GlassIconButton
 import ru.vasev.glasses.ui.glass.glassAccent
 import ru.vasev.glasses.ui.glass.glassContentSource
 import ru.vasev.glasses.llm.JournalEntry
@@ -48,9 +50,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** Вкладка «Разработка»: пока один пункт — журнал запросов к моделям с экспортом в JSONL. */
+/**
+ * «Для разработчика» (Настройки, бывшая вкладка «Разработка»): пока один пункт — журнал запросов к моделям
+ * с экспортом в JSONL. «Назад» и кнопка закрытия возвращают в настройки.
+ */
 @Composable
-fun DevScreen(entries: StateFlow<List<JournalEntry>>, onExport: () -> Unit, onClear: () -> Unit) {
+fun DevScreen(entries: StateFlow<List<JournalEntry>>, onExport: () -> Unit, onClear: () -> Unit, onClose: () -> Unit) {
+    BackHandler(onBack = onClose)
     val list by entries.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     val total = list.sumOf { it.costUsd ?: 0.0 }
@@ -59,13 +65,16 @@ fun DevScreen(entries: StateFlow<List<JournalEntry>>, onExport: () -> Unit, onCl
         Modifier.fillMaxSize().padding(top = LocalTabBarInset.current).padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            stringResource(R.string.dev_journal_title),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 4.dp).semantics { heading() },
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.dev_journal_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { heading() },
+            )
+            GlassIconButton(R.drawable.ic_sym_close, stringResource(R.string.dev_close), onClick = onClose, size = 48.dp)
+        }
         GlassCard(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.dev_journal_summary, list.size, usd(total)), style = MaterialTheme.typography.titleMedium)
             Text(

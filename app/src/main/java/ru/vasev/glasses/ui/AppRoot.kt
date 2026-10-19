@@ -46,7 +46,7 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     ASSISTANT(R.string.tab_assistant, R.drawable.ic_sym_assistant),
     CAMERA(R.string.tab_camera, R.drawable.ic_sym_photo_camera),
     TRANSLATE(R.string.tab_translate, R.drawable.ic_sym_g_translate),
-    DEVELOPMENT(R.string.tab_dev, R.drawable.ic_sym_code),
+    NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
 }
 
 /**
@@ -73,7 +73,7 @@ fun AppRoot(
     assistant: @Composable () -> Unit,
     camera: @Composable () -> Unit,
     translation: @Composable () -> Unit,
-    development: @Composable () -> Unit,
+    navigation: @Composable () -> Unit,
     settings: @Composable () -> Unit,
 ) {
     // В режиме перевода фон застывает: телефон держат перед собеседником, лишняя анимация ни к чему.
@@ -90,7 +90,7 @@ fun AppRoot(
                             AppTab.ASSISTANT -> assistant()
                             AppTab.CAMERA -> camera()
                             AppTab.TRANSLATE -> translation()
-                            AppTab.DEVELOPMENT -> development()
+                            AppTab.NAVIGATION -> navigation()
                         }
                     }
                 }

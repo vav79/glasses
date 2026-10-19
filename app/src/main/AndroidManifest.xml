@@ -27,6 +27,10 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!-- Навигация: какие приложения карт установлены (Авто → Яндекс в России, иначе Google; без сети — Organic Maps). -->
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="ru.yandex.yandexmaps" />
+        <package android:name="app.organicmaps" />
     </queries>
 
     <application

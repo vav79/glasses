@@ -18,7 +18,9 @@ import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.location.DeviceLocation
+import ru.vasev.glasses.nav.NavigatorSettings
 import ru.vasev.glasses.notes.NoteStore
+import ru.vasev.glasses.places.PlaceStore
 import ru.vasev.glasses.profile.ProfileSettings
 import ru.vasev.glasses.rates.CbrRates
 import ru.vasev.glasses.rates.CurrencySettings
@@ -73,7 +75,7 @@ class GlassesApp : Application() {
     lateinit var profile: ProfileSettings
         private set
 
-    /** Журнал запросов к моделям (вкладка «Разработка»). */
+    /** Журнал запросов к моделям (Настройки → «Для разработчика»). */
     lateinit var journal: RequestJournal
         private set
 
@@ -103,6 +105,14 @@ class GlassesApp : Application() {
     lateinit var location: DeviceLocation
         private set
 
+    /** Мои места и недавние цели — только на телефоне. */
+    lateinit var places: PlaceStore
+        private set
+
+    /** Какой навигатор открывать: Авто / Яндекс / Google. */
+    lateinit var navigator: NavigatorSettings
+        private set
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -129,6 +139,8 @@ class GlassesApp : Application() {
         headsetButtons = HeadsetButtons(this)
         notes = NoteStore(this)
         location = DeviceLocation(this)
+        places = PlaceStore(this)
+        navigator = NavigatorSettings(this)
         currency = CurrencySettings(this)
         rates = CbrRates(this, llm::isOnline)
         // Кеш курсов обновляется, пока есть сеть: за границей интернет бывает не всегда, а курс нужен у ценника.

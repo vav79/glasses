@@ -23,6 +23,7 @@ import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ModelSpec
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
+import ru.vasev.glasses.nav.NavigatorChoice
 import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.security.ApiKeyException
 import ru.vasev.glasses.security.ApiKeyInfo
@@ -96,6 +97,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val rates: StateFlow<Rates?> = (app as GlassesApp).rates.cached
 
     fun setCurrency(code: String) = currencySettings.set(code)
+
+    private val navigatorSettings = (app as GlassesApp).navigator
+    val navigator: StateFlow<NavigatorChoice> = navigatorSettings.choice
+
+    fun setNavigator(choice: NavigatorChoice) = navigatorSettings.setChoice(choice)
 
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)

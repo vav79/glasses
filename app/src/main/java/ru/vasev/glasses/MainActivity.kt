@@ -36,6 +36,7 @@ import ru.vasev.glasses.llm.DebugFaults
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
+import ru.vasev.glasses.nav.NavigationViewModel
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
@@ -50,6 +51,8 @@ import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.CameraScreen
 import ru.vasev.glasses.ui.AssistantOverlays
 import ru.vasev.glasses.ui.MainViewModel
+import ru.vasev.glasses.ui.NavigationScreen
+import ru.vasev.glasses.ui.openMapsLink
 import ru.vasev.glasses.ui.SettingsScreen
 import ru.vasev.glasses.ui.SettingsViewModel
 import ru.vasev.glasses.ui.TranslationScreen
@@ -60,11 +63,15 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val translation: TranslationViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
+    private val navigation: NavigationViewModel by viewModels()
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
 
     /** Настройки открыты поверх вкладки (шестерёнка). */
     private var settingsOpen by mutableStateOf(false)
+
+    /** Внутри настроек открыт раздел «Для разработчика» (журнал запросов). */
+    private var developerOpen by mutableStateOf(false)
 
     /** Есть ли доступ к камере телефона; перепроверяется при каждом возврате в приложение (могли отозвать в настройках). */
     private var cameraGranted by mutableStateOf(false)
@@ -96,6 +103,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    /** Камера телефона для снимка по кнопке (фото входа, фото адреса в «Навигации»). */
+    private var pendingPhoneCamera: CompletableDeferred<Boolean>? = null
+    private val phoneCameraForShot =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            cameraGranted = granted
+            pendingPhoneCamera?.complete(granted)
+            pendingPhoneCamera = null
+        }
+
     /** Геопозиция для заметок «Запомни» — спрашивается при первой заметке. */
     private var pendingLocationPermission: CompletableDeferred<Boolean>? = null
     private val locationPermission =
@@ -123,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         tab = savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name } }
             ?: profile.role.value.startTab
         settingsOpen = savedInstanceState?.getBoolean(STATE_SETTINGS) ?: false
+        developerOpen = settingsOpen && savedInstanceState?.getBoolean(STATE_DEVELOPER) == true
         enableEdgeToEdge()
         // До первого кадра Compose система показывает фон окна: пусть он будет цвета нашего градиента, а не чёрный/белый.
         val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -131,6 +148,11 @@ class MainActivity : AppCompatActivity() {
         viewModel.galleryPicker = ::pickPhoto
         viewModel.cameraOwner = this
         viewModel.locationPermissionRequester = ::requestLocation
+        navigation.locationPermissionRequester = ::requestLocation
+        navigation.cameraPermissionRequester = ::requestPhoneCamera
+        navigation.glassesPermissionRequester = ::requestGlassesCamera
+        navigation.galleryPicker = ::pickPhoto
+        navigation.cameraOwner = this
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
@@ -167,7 +189,10 @@ class MainActivity : AppCompatActivity() {
                     onTabChange = ::selectTab,
                     denserGlass = lessTransparency,
                     settingsOpen = settingsOpen,
-                    onToggleSettings = { settingsOpen = !settingsOpen },
+                    onToggleSettings = {
+                        settingsOpen = !settingsOpen
+                        developerOpen = false
+                    },
                     assistant = {
                         MainScreen(
                             viewModel = viewModel,
@@ -200,11 +225,21 @@ class MainActivity : AppCompatActivity() {
                             onOpenSettings = { settingsOpen = true },
                         )
                     },
-                    development = {
-                        val journal = (application as GlassesApp).journal
-                        DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear)
+                    navigation = {
+                        NavigationScreen(
+                            viewModel = navigation,
+                            onMic = { withMic(navigation::listenQuery) },
+                            onOpenLink = { openMapsLink(this, it) },
+                        )
                     },
-                    settings = { SettingsScreen(settings) },
+                    settings = {
+                        if (developerOpen) {
+                            val journal = (application as GlassesApp).journal
+                            DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear, onClose = { developerOpen = false })
+                        } else {
+                            SettingsScreen(settings, onOpenDeveloper = { developerOpen = true })
+                        }
+                    },
                 )
             }
         }
@@ -228,6 +263,7 @@ class MainActivity : AppCompatActivity() {
     /** Вкладки независимы: при переключении всё, что звучит или слушает на другой вкладке, останавливается. */
     private fun selectTab(newTab: AppTab) {
         settingsOpen = false
+        developerOpen = false
         if (newTab == tab) return
         // «Ассистент» и «Камера» — один разговор: между ними ответ не прерывается.
         val sameConversation = tab in CONVERSATION_TABS && newTab in CONVERSATION_TABS
@@ -235,7 +271,7 @@ class MainActivity : AppCompatActivity() {
             when (tab) {
                 AppTab.ASSISTANT, AppTab.CAMERA -> viewModel.stop()
                 AppTab.TRANSLATE -> translation.stop()
-                AppTab.DEVELOPMENT -> Unit
+                AppTab.NAVIGATION -> navigation.cancel()
             }
         }
         tab = newTab
@@ -274,6 +310,7 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_TAB, tab.name)
         outState.putBoolean(STATE_SETTINGS, settingsOpen)
+        outState.putBoolean(STATE_DEVELOPER, developerOpen)
     }
 
     /** Язык приложения сменился без пересоздания (configChanges): строки вне экрана и язык общения — на новый. */
@@ -293,6 +330,12 @@ class MainActivity : AppCompatActivity() {
         viewModel.galleryPicker = null
         viewModel.cameraOwner = null
         viewModel.locationPermissionRequester = null
+        navigation.locationPermissionRequester = null
+        navigation.cameraPermissionRequester = null
+        navigation.glassesPermissionRequester = null
+        navigation.galleryPicker = null
+        navigation.cameraOwner = null
+        pendingPhoneCamera?.complete(false)
         pendingLocationPermission?.complete(false)
         pendingCameraPermission?.complete(false)
         pendingPhoto?.complete(null)
@@ -308,7 +351,8 @@ class MainActivity : AppCompatActivity() {
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
      *  - снимки:    --es image_source glasses|phone|simulator
-     *  - вкладка:    --es tab assistant|camera|translate|development|settings
+     *  - вкладка:    --es tab assistant|camera|translate|navigation|settings|development (журнал в настройках)
+     *  - навигация: --es nav_to "Wat Arun" (поиск цели, как в поле «Куда?»)
  *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
      * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
@@ -323,7 +367,14 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra("tab")?.let { name ->
             intent.removeExtra("tab")
             // Скриншоты и проверки: вкладка или «settings» — настройки поверх.
-            if (name == "settings") settingsOpen = true else AppTab.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let(::selectTab)
+            when (name) {
+                "settings" -> settingsOpen = true
+                "development" -> {
+                    settingsOpen = true
+                    developerOpen = true
+                }
+                else -> AppTab.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let(::selectTab)
+            }
         }
         intent.getStringExtra("image_source")?.let { name ->
             intent.removeExtra("image_source")
@@ -354,6 +405,12 @@ class MainActivity : AppCompatActivity() {
             intent.removeExtra("question")
             selectTab(AppTab.ASSISTANT)
             viewModel.debugAsk(question, intent.getBooleanExtra("with_frame", false))
+        }
+        intent.getStringExtra("nav_to")?.let { query ->
+            intent.removeExtra("nav_to")
+            selectTab(AppTab.NAVIGATION)
+            navigation.setQuery(query)
+            navigation.search()
         }
         if (intent.getBooleanExtra("translate_view", false)) {
             intent.removeExtra("translate_view")
@@ -389,6 +446,15 @@ class MainActivity : AppCompatActivity() {
         return deferred.await()
     }
 
+    private suspend fun requestPhoneCamera(): Boolean {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) return true
+        val deferred = CompletableDeferred<Boolean>()
+        pendingPhoneCamera?.complete(false)
+        pendingPhoneCamera = deferred
+        phoneCameraForShot.launch(Manifest.permission.CAMERA)
+        return deferred.await()
+    }
+
     private suspend fun requestLocation(): Boolean {
         val deferred = CompletableDeferred<Boolean>()
         pendingLocationPermission?.complete(false)
@@ -420,6 +486,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val STATE_TAB = "tab"
         const val STATE_SETTINGS = "settings_open"
+        const val STATE_DEVELOPER = "developer_open"
         val CONVERSATION_TABS = setOf(AppTab.ASSISTANT, AppTab.CAMERA)
     }
 }

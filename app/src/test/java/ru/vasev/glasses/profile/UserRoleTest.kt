@@ -16,10 +16,10 @@ class UserRoleTest {
     }
 
     @Test
-    fun `everyone has assistant, translation and settings - only developer has development`() {
+    fun `every role has the same four tabs, at most four - development lives in settings`() {
         for (role in UserRole.entries) {
-            assertTrue(role.tabs.containsAll(listOf(AppTab.ASSISTANT, AppTab.CAMERA, AppTab.TRANSLATE)))
-            assertEquals(role == UserRole.DEVELOPER, AppTab.DEVELOPMENT in role.tabs)
+            assertEquals(AppTab.entries.toSet(), role.tabs.toSet())
+            assertTrue(role.tabs.size <= 4)
             assertEquals(role == UserRole.DEVELOPER, role.advancedAlwaysVisible)
         }
     }
@@ -27,8 +27,9 @@ class UserRoleTest {
     @Test
     fun `switching role keeps the open tab when it exists`() {
         assertEquals(AppTab.CAMERA, UserRole.TRAVELER.keep(AppTab.CAMERA))
-        assertEquals(AppTab.TRANSLATE, UserRole.TRAVELER.keep(AppTab.DEVELOPMENT))
-        assertEquals(AppTab.DEVELOPMENT, UserRole.DEVELOPER.keep(AppTab.DEVELOPMENT))
+        assertEquals(AppTab.NAVIGATION, UserRole.DEVELOPER.keep(AppTab.NAVIGATION))
+        // Путешественнику навигация — второй вкладкой, сразу после перевода.
+        assertEquals(AppTab.NAVIGATION, UserRole.TRAVELER.tabs[1])
     }
 
     @Test

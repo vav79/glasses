@@ -187,7 +187,6 @@
     <string name="key_err_no_master">Encryption key not found.</string>
 
     <!-- Роли и первый запуск -->
-    <string name="tab_dev">Development</string>
     <string name="onboarding_language_title">Choose a language</string>
     <string name="onboarding_language_hint">The assistant will listen and answer in this language. You can change it later in Settings.</string>
     <string name="language_system_current">System (%1$s)</string>
@@ -201,7 +200,7 @@
     <string name="role_researcher">Researcher</string>
     <string name="role_researcher_desc">Assistant with the camera: ask about what you see.</string>
     <string name="role_developer">Developer</string>
-    <string name="role_developer_desc">Everything above plus the Development tab: request journal, models and logs.</string>
+    <string name="role_developer_desc">Everything above plus advanced settings at once: models, fallback and the request journal.</string>
     <string name="role_selected">selected</string>
     <string name="settings_role">Role</string>
     <string name="settings_role_hint">Changes the tab order and which settings are shown. Switching loses nothing.</string>
@@ -425,4 +424,134 @@
     <string name="remember_question">Remember: %1$s</string>
     <string name="remember_question_photo">Remember this photo</string>
     <string name="note_no_text">Photo without text</string>
+
+    <!-- Навигация -->
+    <string name="tab_navigation">Navigation</string>
+    <string name="place_hotel">Hotel</string>
+    <string name="place_home">Home</string>
+    <string name="place_car">Car</string>
+    <string name="place_custom">My place</string>
+    <string name="nav_where_to">Where to?</string>
+    <string name="nav_my_places">My places</string>
+    <string name="nav_recent">Recent</string>
+    <string name="nav_say_destination">Say where to go</string>
+    <string name="nav_photo_address">Photo of an address</string>
+    <string name="nav_photo_address_hint">A business card, a booking confirmation or a sign. The text is read on the phone.</string>
+    <string name="nav_photo_take">Take a photo</string>
+    <string name="nav_photo_gallery">Choose from gallery</string>
+    <string name="nav_find_with_ai">Find with AI</string>
+    <string name="nav_find_with_ai_other">Not it? Find with AI</string>
+    <string name="nav_recognize_with_ai">Recognize with AI</string>
+    <string name="nav_ai_photo_hint">The photo goes to the assistant model only when you tap the button.</string>
+    <string name="nav_ai_no_key">Add the assistant model key in Settings.</string>
+    <string name="nav_check_on_map">Check on map</string>
+    <string name="nav_place_empty">Not saved. Tap to save.</string>
+    <string name="nav_walk_minutes">≈ %1$d min on foot</string>
+    <string name="nav_add_place">Add a place</string>
+    <string name="nav_back">Back</string>
+    <string name="nav_straight_walk">straight line · on foot ≈ %1$s</string>
+    <string name="nav_straight_line">straight line</string>
+    <string name="nav_transit_first">More than 20 minutes on foot — public transport first</string>
+    <string name="nav_walk">On foot</string>
+    <string name="nav_walk_in_app">Route in %1$s</string>
+    <string name="nav_transit">Public transport</string>
+    <string name="nav_transit_in_app">Transit route in %1$s</string>
+    <string name="nav_edit_place">Edit place</string>
+    <string name="nav_save_to_places">Save to my places</string>
+    <string name="nav_delete_place">Delete place</string>
+    <string name="nav_delete_place_confirm">Delete this place and its entrance photo?</string>
+    <string name="nav_place_name">Place name</string>
+    <string name="nav_entrance_photo">Entrance photo</string>
+    <string name="nav_saved_label">Saved</string>
+    <string name="nav_saved_by_address">by address</string>
+    <string name="nav_saved_by_gps">by GPS</string>
+    <string name="nav_saved_by_gps_accuracy">by GPS ±%1$d m</string>
+    <string name="nav_address_label">Address</string>
+    <string name="nav_no_entrance_photo">No entrance photo.</string>
+    <string name="nav_place_new_hint">Standing at the entrance? Save the place here: GPS position, entrance photo and time. Or enter the address from your booking below.</string>
+    <string name="nav_save_here">Save here</string>
+    <string name="nav_save_here_again">Save here again</string>
+    <string name="nav_save_here_hint">Position from GPS, entrance photo from the selected camera (glasses or phone).</string>
+    <string name="nav_retake_photo">New entrance photo</string>
+    <string name="nav_take_photo">Take entrance photo</string>
+    <string name="nav_place_by_address">By address</string>
+    <string name="nav_address_field">Address (text or photo)</string>
+    <string name="nav_go_here">Take me here</string>
+    <string name="nav_confirm_title">Address from a photo</string>
+    <string name="nav_confirm_by_name">Found by name</string>
+    <string name="nav_confirm_from_ai_name">The model named the address</string>
+    <string name="nav_confirm_from_ai_photo">The model read the photo</string>
+    <string name="nav_confirm_from_device">Read on the phone</string>
+    <string name="nav_confirm_geocoder">The geocoder found</string>
+    <string name="nav_confirm_check">Check the point on the map before you go: the address may be read or found inaccurately.</string>
+    <string name="nav_confirm_ok">Address is correct</string>
+    <string name="nav_confirm_fix">Fix</string>
+    <string name="nav_location_needed">Allow location access to see distances and save places.</string>
+    <string name="nav_allow_location">Allow location</string>
+    <string name="nav_weak_gps">Weak GPS signal (±%1$d m) — distance may be inaccurate.</string>
+    <string name="nav_gps_accuracy">GPS ±%1$d m</string>
+    <string name="nav_gps_waiting">Waiting for GPS…</string>
+    <string name="nav_no_fix">Could not get the position. Step outside or try again.</string>
+    <string name="nav_m">%1$s m</string>
+    <string name="nav_km">%1$s km</string>
+    <string name="nav_minutes">%1$d min</string>
+    <string name="nav_hours_minutes">%1$d h %2$d min</string>
+    <string name="nav_busy_listening">Listening…</string>
+    <string name="nav_busy_searching">Searching for the address…</string>
+    <string name="nav_busy_capturing">Taking a photo…</string>
+    <string name="nav_busy_recognizing">Reading the text on the photo…</string>
+    <string name="nav_busy_ai">Asking the AI…</string>
+    <string name="nav_busy_locating">Getting the position…</string>
+    <string name="nav_place_not_saved">%1$s is not saved yet — save it in My places.</string>
+    <string name="nav_not_found">The geocoder found nothing. Try the full address or find the place by name with AI.</string>
+    <string name="nav_geocoder_unavailable">Address search is unavailable on this phone right now. My places still work.</string>
+    <string name="nav_offline_search">No internet: addresses can\'t be searched. My places and recent destinations still work.</string>
+    <string name="nav_ai_not_sure">The model is not sure which place it is. Add the city or street.</string>
+    <string name="nav_ai_no_address">The model found no address on the photo.</string>
+    <string name="nav_ai_address_not_found">The model named the address “%1$s”, but the geocoder could not find it. Correct the text and search again.</string>
+    <string name="nav_photo_not_read">The text was not read on the phone (Russian, Thai and Arabic are not supported on the device). Try Recognize with AI.</string>
+    <string name="nav_photo_not_found">The text was read, but the address was not found. Correct it in the field or try Recognize with AI.</string>
+    <string name="nav_photo_failed">Could not take a photo.</string>
+    <string name="nav_offline_title">No internet</string>
+    <string name="nav_offline_organic">Google Maps can\'t build walking routes offline. Organic Maps works with a downloaded map.</string>
+    <string name="nav_offline_no_organic">Google Maps can\'t build walking routes offline. Install Organic Maps and download the map in advance to walk offline.</string>
+    <string name="maps_google">Google Maps</string>
+    <string name="maps_yandex">Yandex Maps</string>
+    <string name="maps_organic">Organic Maps</string>
+    <string name="maps_other">a maps app</string>
+    <string name="maps_google_short">Google</string>
+    <string name="maps_yandex_short">Yandex</string>
+    <string name="navigator_auto">Auto</string>
+    <string name="settings_navigation">Navigation</string>
+    <string name="settings_navigator_hint">Auto: Yandex Maps in Russia, Google Maps abroad. If the chosen app is not installed, another one opens.</string>
+    <string name="settings_developer">For developers</string>
+    <string name="settings_developer_hint">Model request journal: latency, tokens and cost of each request.</string>
+    <string name="dev_close">Close journal</string>
+    <string-array name="nav_query_prefixes">
+        <item>how do i get to</item>
+        <item>how to get to</item>
+        <item>take me to</item>
+        <item>directions to</item>
+        <item>navigate to</item>
+        <item>route to</item>
+        <item>go to</item>
+    </string-array>
+    <string-array name="nav_alias_hotel">
+        <item>hotel</item>
+        <item>the hotel</item>
+        <item>my hotel</item>
+        <item>to the hotel</item>
+    </string-array>
+    <string-array name="nav_alias_home">
+        <item>home</item>
+        <item>my home</item>
+        <item>house</item>
+    </string-array>
+    <string-array name="nav_alias_car">
+        <item>car</item>
+        <item>my car</item>
+        <item>the car</item>
+        <item>to the car</item>
+        <item>parking</item>
+    </string-array>
 </resources>

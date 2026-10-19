@@ -25,3 +25,14 @@ private fun start(context: Context, intent: Intent, noAppMessage: Int) {
         Toast.makeText(context, noAppMessage, Toast.LENGTH_SHORT).show()
     }
 }
+
+/** Маршрут или точка в приложении карт; нужного приложения нет — любое, что понимает ссылку. */
+fun openMapsLink(context: Context, link: ru.vasev.glasses.nav.MapsLink) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(link.packageName?.let { intent.setPackage(it) } ?: intent)
+    } catch (e: ActivityNotFoundException) {
+        if (link.packageName != null) start(context, intent.setPackage(null), R.string.no_maps_app)
+        else Toast.makeText(context, R.string.no_maps_app, Toast.LENGTH_SHORT).show()
+    }
+}
