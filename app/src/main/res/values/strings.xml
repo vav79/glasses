@@ -512,6 +512,12 @@
     <string name="nav_photo_not_read">The text was not read on the phone (Russian, Thai and Arabic are not supported on the device). Try Recognize with AI.</string>
     <string name="nav_photo_not_found">The text was read, but the address was not found. Correct it in the field or try Recognize with AI.</string>
     <string name="nav_photo_failed">Could not take a photo.</string>
+    <string name="nav_viewfinder_entrance">Point the camera at the entrance</string>
+    <string name="nav_viewfinder_address">Point the camera at the address</string>
+    <string name="nav_viewfinder_shoot">Take photo</string>
+    <string name="nav_viewfinder_skip">No photo</string>
+    <string name="nav_clear_all">Clear places and history</string>
+    <string name="nav_clear_all_confirm">Delete all saved places (hotel, home, car, your own), their photos and address translations, recent destinations and the route start? This cannot be undone.</string>
     <string name="nav_offline_title">No internet</string>
     <string name="nav_offline_organic">Google Maps can\'t build walking routes offline. Organic Maps works with a downloaded map.</string>
     <string name="nav_offline_no_organic">Google Maps can\'t build walking routes offline. Install Organic Maps and download the map in advance to walk offline.</string>

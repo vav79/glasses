@@ -4,10 +4,12 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,7 +120,19 @@ data class NavState(
     val launch: String? = null,
     val taxi: TaxiCard? = null,
     val transit: TransitState? = null,
+    /** Открыт видоискатель камеры телефона: снимок — по затвору. */
+    val viewfinder: ViewfinderRequest? = null,
 )
+
+/** Видоискатель: что снимаем (подсказка) и можно ли обойтись без фото («Сохранить здесь»). */
+data class ViewfinderRequest(@StringRes val hint: Int, val allowSkip: Boolean, val shooting: Boolean = false)
+
+/** Итог снимка: кадр, без фото (нет кадра или «Без фото») или отмена («Назад» в видоискателе). */
+private sealed interface Shot {
+    class Taken(val jpeg: ByteArray) : Shot
+    data object None : Shot
+    data object Cancelled : Shot
+}
 
 /**
  * Вкладка «Навигация»: мои места, цель («Куда?» голосом или текстом, фото адреса), карточка цели и переход
@@ -153,6 +167,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
     var glassesPermissionRequester: (suspend () -> Boolean)? = null
     var galleryPicker: (suspend () -> Uri?)? = null
     var cameraOwner: LifecycleOwner? = null
+    val phoneCamera get() = g.phoneCamera
 
     private var job: Job? = null
 
@@ -256,7 +271,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Фото адреса (визитка, бронь, табличка): снять или выбрать из галереи. Распознаём на телефоне. */
     fun addressFromPhoto(fromGallery: Boolean) = launchTask(NavBusy.CAPTURING) {
-        val jpeg = (if (fromGallery) pickFromGallery() else takePhoto()) ?: return@launchTask
+        val jpeg = (if (fromGallery) pickFromGallery() else takePhoto(R.string.nav_viewfinder_address)) ?: return@launchTask
         _state.update { it.copy(addressPhoto = jpeg, busy = NavBusy.RECOGNIZING, results = emptyList(), notice = null, offerAiName = false) }
         val text = ocr.read(jpeg)
         if (text == null) {
@@ -447,7 +462,8 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
         // Только debug: подменённое место (компас за столом).
         val fix = g.compass.fakeLocation?.let { DeviceLocation.Fix(it.latitude, it.longitude, FAKE_ACCURACY_M) }
             ?: location.current() ?: return say(L.s(R.string.nav_no_fix))
-        val photo = takePhoto(quiet = true)
+        // Голосом — телефон в кармане: снимок сразу, без видоискателя.
+        val photo = (shoot(hint = null, quiet = true) as? Shot.Taken)?.jpeg
         val address = geocoder.reverse(fix.point(), appLocale())
         val old = store.single(kind)
         val saved = store.save(
@@ -702,7 +718,11 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
             return@launchTask
         }
         _state.update { it.copy(here = fix, busy = NavBusy.CAPTURING) }
-        val photo = takePhoto(quiet = true)
+        val photo = when (val shot = shoot(R.string.nav_viewfinder_entrance, quiet = true, allowSkip = true)) {
+            is Shot.Taken -> shot.jpeg
+            Shot.None -> null
+            Shot.Cancelled -> return@launchTask
+        }
         // Адрес точки — для подписи и советов по транспорту (город); без сети — без адреса.
         val address = geocoder.reverse(fix.point(), appLocale())
         val saved = store.save(
@@ -729,7 +749,7 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
     /** Новое фото входа для сохранённого места. */
     fun retakePlacePhoto() = launchTask(NavBusy.CAPTURING) {
         val id = _state.value.place?.placeId ?: return@launchTask
-        val photo = takePhoto() ?: return@launchTask
+        val photo = takePhoto(R.string.nav_viewfinder_entrance) ?: return@launchTask
         store.setPhoto(id, photo)
     }
 
@@ -769,30 +789,90 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Снимки ---
 
+    private suspend fun takePhoto(@StringRes hint: Int): ByteArray? = (shoot(hint) as? Shot.Taken)?.jpeg
+
     /**
      * Снимок из выбранного источника: очки, если подключены, иначе камера телефона (кнопку нажали на телефоне —
-     * он в руке). [quiet] — без сообщений (фото входа необязательно): почти чёрный кадр не прикрепляется.
+     * он в руке) — через видоискатель с подсказкой [hint]; null — сразу, без видоискателя (голосовая команда).
+     * [quiet] — без сообщений (фото входа необязательно): почти чёрный кадр вслепую не прикрепляется.
      */
-    private suspend fun takePhoto(quiet: Boolean = false): ByteArray? = try {
+    private suspend fun shoot(@StringRes hint: Int?, quiet: Boolean = false, allowSkip: Boolean = false): Shot = try {
         val glasses = g.glasses
         val source = g.imageSources.source.value
         val fromGlasses = (source == ImageSource.GLASSES || source == ImageSource.SIMULATOR) && glasses.status.value.ready
-        if (fromGlasses) {
-            glasses.captureJpeg(glassesPermissionRequester ?: { false })
-        } else if (cameraPermissionRequester?.invoke() == true) {
-            (cameraOwner?.let { g.phoneCamera.captureWithoutPreview(it) } ?: g.phoneCamera.capture()).takeUnless {
-                quiet && ImagePrep.isDark(it)
+        when {
+            fromGlasses -> Shot.Taken(glasses.captureJpeg(glassesPermissionRequester ?: { false }))
+            cameraPermissionRequester?.invoke() != true -> {
+                if (!quiet) _state.update { it.copy(notice = L.s(R.string.camera_permission_denied)) }
+                Shot.None
             }
-        } else {
-            if (!quiet) _state.update { it.copy(notice = L.s(R.string.camera_permission_denied)) }
-            null
+            hint != null -> viewfinder(ViewfinderRequest(hint, allowSkip))
+            else -> (cameraOwner?.let { g.phoneCamera.captureWithoutPreview(it) } ?: g.phoneCamera.capture())
+                .takeUnless { quiet && ImagePrep.isDark(it) }?.let(Shot::Taken) ?: Shot.None
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         Log.w(TAG, "photo failed: ${e.javaClass.simpleName}")
         if (!quiet) _state.update { it.copy(notice = L.s(R.string.nav_photo_failed)) }
-        null
+        Shot.None
+    }
+
+    private var pendingShot: CompletableDeferred<Shot>? = null
+
+    /** Открыть видоискатель и ждать затвора, «Без фото» или «Назад». */
+    private suspend fun viewfinder(request: ViewfinderRequest): Shot {
+        val result = CompletableDeferred<Shot>()
+        pendingShot = result
+        _state.update { it.copy(viewfinder = request) }
+        return try {
+            result.await()
+        } finally {
+            pendingShot = null
+            _state.update { it.copy(viewfinder = null) }
+        }
+    }
+
+    /** Затвор видоискателя: кадр видно на экране, поэтому тёмный не отбрасываем. */
+    fun viewfinderShoot() {
+        val request = _state.value.viewfinder ?: return
+        if (request.shooting) return
+        _state.update { it.copy(viewfinder = request.copy(shooting = true)) }
+        viewModelScope.launch {
+            val shot = try {
+                Shot.Taken(g.phoneCamera.capture())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "viewfinder photo failed: ${e.javaClass.simpleName}")
+                _state.update { it.copy(notice = L.s(R.string.nav_photo_failed)) }
+                Shot.None
+            }
+            pendingShot?.complete(shot)
+        }
+    }
+
+    fun viewfinderSkip() {
+        pendingShot?.complete(Shot.None)
+    }
+
+    fun viewfinderBack() {
+        pendingShot?.complete(Shot.Cancelled)
+    }
+
+    // --- Очистка ---
+
+    /** «Очистить места и историю»: места с фото и переводами, недавние, начало маршрута, советы, открытая цель, компас. */
+    fun clearAll() {
+        job?.cancel()
+        g.compass.close()
+        transitTips.clear()
+        routeStart = null
+        _state.update { NavState(here = it.here, locationGranted = it.locationGranted) }
+        viewModelScope.launch {
+            store.clear()
+            Log.d(TAG, "places and history cleared")
+        }
     }
 
     private suspend fun pickFromGallery(): ByteArray? {

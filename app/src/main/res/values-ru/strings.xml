@@ -513,6 +513,12 @@
     <string name="nav_photo_not_read">На телефоне текст не распознан (русский, тайский и арабский встроенное распознавание не читает). Попробуйте «Распознать через ИИ».</string>
     <string name="nav_photo_not_found">Текст распознан, но адрес не найден. Исправьте его в поле или попробуйте «Распознать через ИИ».</string>
     <string name="nav_photo_failed">Не удалось сделать снимок.</string>
+    <string name="nav_viewfinder_entrance">Наведите камеру на вход</string>
+    <string name="nav_viewfinder_address">Наведите камеру на адрес</string>
+    <string name="nav_viewfinder_shoot">Снять</string>
+    <string name="nav_viewfinder_skip">Без фото</string>
+    <string name="nav_clear_all">Очистить места и историю</string>
+    <string name="nav_clear_all_confirm">Удалить все сохранённые места (отель, дом, машина, свои), их фото и переводы адресов, недавние цели и начало маршрута? Отменить нельзя.</string>
     <string name="nav_offline_title">Нет интернета</string>
     <string name="nav_offline_organic">Google Карты без сети не строят пешие маршруты. Organic Maps работает со скачанной картой.</string>
     <string name="nav_offline_no_organic">Google Карты без сети не строят пешие маршруты. Чтобы ходить без интернета, установите Organic Maps и заранее скачайте карту.</string>

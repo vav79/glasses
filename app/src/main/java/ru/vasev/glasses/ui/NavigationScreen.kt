@@ -17,10 +17,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +47,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -71,6 +76,7 @@ import ru.vasev.glasses.nav.NavState
 import ru.vasev.glasses.nav.NavigationViewModel
 import ru.vasev.glasses.nav.Target
 import ru.vasev.glasses.nav.TransitState
+import ru.vasev.glasses.nav.ViewfinderRequest
 import ru.vasev.glasses.links.LinkOpener
 import androidx.compose.ui.platform.LocalContext
 import ru.vasev.glasses.places.Destination
@@ -125,13 +131,15 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
             CompassScreen(viewModel, c, c.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics)
             return@Box
         }
+        // Подтверждение адреса заменяет экран под ним (а не лежит поверх) — фон везде один стеклянный.
         when {
+            state.confirm != null -> ConfirmScreen(viewModel, state.confirm!!, state.here)
             state.place != null -> PlaceScreen(viewModel, state, places, diagnostics, onMic)
             state.target != null -> TargetScreen(viewModel, state.target!!, state, places, diagnostics)
             else -> Home(viewModel, state, places, recent, diagnostics, onMic)
         }
-        state.confirm?.let { ConfirmScreen(viewModel, it, state.here) }
         state.taxi?.let { card -> TaxiScreen(viewModel, card, card.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics) }
+        state.viewfinder?.let { NavViewfinder(viewModel, it) }
         state.offlineWalk?.let {
             AlertDialog(
                 onDismissRequest = viewModel::dismissOfflineWalk,
@@ -206,8 +214,90 @@ private fun Home(
                 )
             }
         }
+
+        if (places.isNotEmpty() || recent.isNotEmpty()) {
+            var confirmClear by remember { mutableStateOf(false) }
+            GlassButton(
+                stringResource(R.string.nav_clear_all),
+                onClick = { confirmClear = true },
+                icon = R.drawable.ic_sym_delete,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (confirmClear) {
+                AlertDialog(
+                    onDismissRequest = { confirmClear = false },
+                    title = { Text(stringResource(R.string.nav_clear_all)) },
+                    text = { Text(stringResource(R.string.nav_clear_all_confirm)) },
+                    confirmButton = {
+                        TextButton(onClick = { confirmClear = false; viewModel.clearAll() }) {
+                            Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) } },
+                )
+            }
+        }
     }
 }
+
+/** Видоискатель камеры телефона для фото входа или адреса: снимок — по затвору, камера работает, пока он на экране. */
+@Composable
+private fun NavViewfinder(viewModel: NavigationViewModel, request: ViewfinderRequest) {
+    BackHandler(onBack = viewModel::viewfinderBack)
+    val c = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        PhoneViewfinderFull(viewModel.phoneCamera)
+        // Затемнение сверху и снизу: кнопки и подсказка читаются на любом кадре.
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(LocalTabBarInset.current + 96.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent))))
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(220.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))))
+        Row(
+            Modifier.fillMaxWidth().padding(top = LocalTabBarInset.current).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GlassIconButton(
+                R.drawable.ic_sym_arrow_back,
+                stringResource(R.string.nav_back),
+                onClick = viewModel::viewfinderBack,
+                size = 48.dp,
+                modifier = Modifier.background(c.surface.copy(alpha = CONTROL_ALPHA), CircleShape),
+            )
+            Text(
+                stringResource(request.hint),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f).padding(start = 12.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (request.allowSkip) {
+                GlassButton(
+                    stringResource(R.string.nav_viewfinder_skip),
+                    onClick = viewModel::viewfinderSkip,
+                    enabled = !request.shooting,
+                    modifier = Modifier.background(c.surface.copy(alpha = CONTROL_ALPHA), GlassShapes.pill),
+                )
+            }
+            GlassIconButton(
+                R.drawable.ic_sym_photo_camera,
+                stringResource(R.string.nav_viewfinder_shoot),
+                onClick = viewModel::viewfinderShoot,
+                size = 72.dp,
+                enabled = !request.shooting,
+                kind = GlassButtonKind.PRIMARY,
+                modifier = Modifier.background(c.primaryContainer.copy(alpha = CONTROL_ALPHA), CircleShape),
+            )
+        }
+    }
+}
+
+/** Подложка кнопок на кадре камеры: стекло рассчитано на градиент, а не на снимок любой яркости. */
+private const val CONTROL_ALPHA = 0.85f
 
 /** Поле «Куда?» с голосом и фото, состояние поиска, подсказки и кнопки «через ИИ», найденные адреса. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -493,11 +583,12 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
     val photo by produceState<Bitmap?>(null, place?.id, place?.hasPhoto, place?.savedAt) { value = place?.let { viewModel.placePhoto(it, PHOTO_SIDE) } }
     val busy = state.busy != null
 
-    // Непрозрачная подложка, как у «Заметок»: под местом не должна просвечивать вкладка.
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    // Экран места заменяет главную вкладки (а не лежит поверх) — фон тот же стеклянный.
+    Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
+                .glassContentSource()
                 .verticalScroll(rememberScrollState())
                 .padding(top = LocalTabBarInset.current)
                 .padding(horizontal = 16.dp)
@@ -617,10 +708,11 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
 @Composable
 private fun ConfirmScreen(viewModel: NavigationViewModel, confirm: AddressConfirm, here: DeviceLocation.Fix?) {
     BackHandler(onBack = viewModel::dismissConfirm)
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
+                .glassContentSource()
                 .verticalScroll(rememberScrollState())
                 .padding(top = LocalTabBarInset.current)
                 .padding(horizontal = 16.dp)

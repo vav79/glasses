@@ -91,6 +91,15 @@ class PlaceStore(context: Context) {
         }
     }
 
+    /** «Очистить места и историю»: все места с фото и переводами адресов, недавние цели. */
+    suspend fun clear() = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            dir.listFiles()?.forEach { it.delete() }
+            _places.value = emptyList()
+            _recent.value = emptyList()
+        }
+    }
+
     /** Цель — в начало «Недавних»; та же точка (ближе [SAME_POINT_M]) не повторяется. */
     suspend fun addRecent(destination: Destination) = withContext(Dispatchers.IO) {
         synchronized(lock) {

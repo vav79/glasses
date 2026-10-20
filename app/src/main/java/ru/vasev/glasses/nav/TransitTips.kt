@@ -37,6 +37,8 @@ class TransitTips(private val llm: LlmService) {
 
     fun cached(from: Area?, to: Area, language: AppLanguage): TransitAdvice? = cache[key(from, to, language)]
 
+    fun clear() = cache.clear()
+
     /** Бросает [ru.vasev.glasses.llm.LlmException] (нет сети, нет ключа…). null — модель ничего полезного не сказала. */
     suspend fun tips(from: Area?, to: Area, language: AppLanguage): TransitAdvice? {
         val key = key(from, to, language)

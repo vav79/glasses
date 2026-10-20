@@ -304,7 +304,7 @@ private fun Placeholder(text: String, action: @Composable () -> Unit) {
 
 /** Видоискатель на всю карточку: камера работает, только пока он на экране. */
 @Composable
-private fun PhoneViewfinderFull(camera: PhoneCamera) {
+internal fun PhoneViewfinderFull(camera: PhoneCamera) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
