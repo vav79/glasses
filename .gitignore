@@ -10,3 +10,6 @@ build/
 .DS_Store
 .externalNativeBuild
 .cxx
+
+# Граф кода graphify (пересобирается локально)
+graphify-out/
