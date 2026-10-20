@@ -71,12 +71,20 @@ import ru.vasev.glasses.nav.Geo
 import ru.vasev.glasses.nav.GeoPoint
 import ru.vasev.glasses.nav.MapsApp
 import ru.vasev.glasses.nav.MapsLink
+import ru.vasev.glasses.llm.ModelTag
+import ru.vasev.glasses.nav.AddressSearchViewModel
 import ru.vasev.glasses.nav.NavBusy
-import ru.vasev.glasses.nav.NavState
-import ru.vasev.glasses.nav.NavigationViewModel
+import ru.vasev.glasses.nav.NavSession
+import ru.vasev.glasses.nav.PhotoCapture
+import ru.vasev.glasses.nav.PlaceEdit
+import ru.vasev.glasses.nav.PlacesViewModel
 import ru.vasev.glasses.nav.Target
+import ru.vasev.glasses.nav.TargetViewModel
+import ru.vasev.glasses.nav.TaxiViewModel
 import ru.vasev.glasses.nav.TransitState
 import ru.vasev.glasses.nav.ViewfinderRequest
+import ru.vasev.glasses.nav.kindTitle
+import ru.vasev.glasses.nav.placeLabel
 import ru.vasev.glasses.links.LinkOpener
 import androidx.compose.ui.platform.LocalContext
 import ru.vasev.glasses.places.Destination
@@ -94,63 +102,83 @@ import ru.vasev.glasses.ui.glass.glassContentSource
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/** ViewModel экранов «Навигации» и их общее состояние ([NavSession]: что открыто, где я, подсказка, текущее действие). */
+class NavViewModels(
+    val session: NavSession,
+    val search: AddressSearchViewModel,
+    val target: TargetViewModel,
+    val taxi: TaxiViewModel,
+    val places: PlacesViewModel,
+)
+
 /**
  * Вкладка «Навигация»: «Куда?» (текст, голос, фото адреса), мои места, недавние цели; поверх — карточка цели,
  * экран моего места и подтверждение адреса. [onMic] — слушать «Куда?» (с разрешением на микрофон).
  */
 @Composable
-fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLink: (MapsLink) -> Unit, onLaunchApp: (String) -> Unit) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val places by viewModel.places.collectAsStateWithLifecycle()
-    val recent by viewModel.recent.collectAsStateWithLifecycle()
-    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    val compass by viewModel.compass.collectAsStateWithLifecycle()
+fun NavigationScreen(vms: NavViewModels, onMic: () -> Unit, onOpenLink: (MapsLink) -> Unit, onLaunchApp: (String) -> Unit) {
+    val session = vms.session
+    val search by vms.search.state.collectAsStateWithLifecycle()
+    val target by session.target.collectAsStateWithLifecycle()
+    val edit by session.place.collectAsStateWithLifecycle()
+    val launch by session.launch.collectAsStateWithLifecycle()
+    val open by session.open.collectAsStateWithLifecycle()
+    val places by vms.places.places.collectAsStateWithLifecycle()
+    val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
+    val compass by vms.target.compass.collectAsStateWithLifecycle()
+    val taxiCard by vms.taxi.card.collectAsStateWithLifecycle()
+    val viewfinder by session.photos.viewfinder.collectAsStateWithLifecycle()
+    val offlineWalk by vms.target.offlineWalk.collectAsStateWithLifecycle()
 
     // Пока вкладка на экране — координаты свежие: расстояния в карточках меняются на ходу.
     LaunchedEffect(Unit) {
         while (true) {
-            viewModel.refreshLocation()
+            session.refreshLocation()
             delay(LOCATION_REFRESH_MS)
         }
     }
-    LaunchedEffect(state.launch) {
-        state.launch?.let {
+    LaunchedEffect(launch) {
+        launch?.let {
             onLaunchApp(it)
-            viewModel.launched()
+            session.launched()
         }
     }
-    LaunchedEffect(state.open) {
-        state.open?.let {
+    LaunchedEffect(open) {
+        open?.let {
             onOpenLink(it)
-            viewModel.linkOpened()
+            session.linkOpened()
         }
     }
 
     Box(Modifier.fillMaxSize()) {
         compass?.let { c ->
-            CompassScreen(viewModel, c, c.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics)
+            CompassScreen(vms.target, c, c.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics)
             return@Box
         }
         // Подтверждение адреса заменяет экран под ним (а не лежит поверх) — фон везде один стеклянный.
+        val confirm = search.confirm
+        val placeEdit = edit
+        val shownTarget = target
         when {
-            state.confirm != null -> ConfirmScreen(viewModel, state.confirm!!, state.here)
-            state.place != null -> PlaceScreen(viewModel, state, places, diagnostics, onMic)
-            state.target != null -> TargetScreen(viewModel, state.target!!, state, places, diagnostics)
-            else -> Home(viewModel, state, places, recent, diagnostics, onMic)
+            confirm != null -> ConfirmScreen(vms, confirm)
+            placeEdit != null -> PlaceScreen(vms, placeEdit, places, diagnostics, onMic)
+            shownTarget != null -> TargetScreen(vms, shownTarget, places, diagnostics)
+            else -> Home(vms, places, diagnostics, onMic)
         }
-        state.taxi?.let { card -> TaxiScreen(viewModel, card, card.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics) }
-        state.viewfinder?.let { NavViewfinder(viewModel, it) }
-        state.offlineWalk?.let {
+        taxiCard?.let { card -> TaxiScreen(vms.taxi, card, card.target.placeId?.let { id -> places.firstOrNull { it.id == id } }, diagnostics) }
+        viewfinder?.let { NavViewfinder(session.photos, it) }
+        offlineWalk?.let {
+            val organic = vms.target.organicInstalled
             AlertDialog(
-                onDismissRequest = viewModel::dismissOfflineWalk,
+                onDismissRequest = vms.target::dismissOfflineWalk,
                 title = { Text(stringResource(R.string.nav_offline_title)) },
                 text = {
-                    Text(stringResource(if (viewModel.organicInstalled) R.string.nav_offline_organic else R.string.nav_offline_no_organic))
+                    Text(stringResource(if (organic) R.string.nav_offline_organic else R.string.nav_offline_no_organic))
                 },
                 confirmButton = {
-                    if (viewModel.organicInstalled) TextButton(onClick = viewModel::walkWithOrganic) { Text(stringResource(R.string.maps_organic)) }
+                    if (organic) TextButton(onClick = vms.target::walkWithOrganic) { Text(stringResource(R.string.maps_organic)) }
                 },
-                dismissButton = { TextButton(onClick = viewModel::dismissOfflineWalk) { Text(stringResource(R.string.cancel)) } },
+                dismissButton = { TextButton(onClick = vms.target::dismissOfflineWalk) { Text(stringResource(R.string.cancel)) } },
             )
         }
     }
@@ -158,13 +186,14 @@ fun NavigationScreen(viewModel: NavigationViewModel, onMic: () -> Unit, onOpenLi
 
 @Composable
 private fun Home(
-    viewModel: NavigationViewModel,
-    state: NavState,
+    vms: NavViewModels,
     places: List<Place>,
-    recent: List<Destination>,
     diagnostics: Boolean,
     onMic: () -> Unit,
 ) {
+    val viewModel = vms.places
+    val recent by viewModel.recent.collectAsStateWithLifecycle()
+    val here by vms.session.here.collectAsStateWithLifecycle()
     Column(
         Modifier
             .fillMaxSize()
@@ -175,8 +204,8 @@ private fun Home(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        LocationStatus(state, diagnostics, viewModel::requestLocation)
-        AddressSearch(viewModel, state, onMic, label = stringResource(R.string.nav_where_to))
+        LocationStatus(vms.session, diagnostics)
+        AddressSearch(vms, onMic, label = stringResource(R.string.nav_where_to))
 
         BackgroundTitle(stringResource(R.string.nav_my_places))
         val fixed = listOf(PlaceKind.HOTEL, PlaceKind.HOME, PlaceKind.CAR)
@@ -186,7 +215,7 @@ private fun Home(
         tiles.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { (kind, place) ->
-                    PlaceTile(viewModel, kind, place, state.here, Modifier.weight(1f)) {
+                    PlaceTile(kind, place, here, Modifier.weight(1f)) {
                         if (place != null) viewModel.openPlaceTarget(place) else viewModel.newPlace(kind)
                     }
                 }
@@ -207,7 +236,7 @@ private fun Home(
                     icon = R.drawable.ic_sym_history,
                     title = destination.label,
                     subtitle = listOfNotNull(
-                        state.here?.let { distanceLabel(Geo.distanceM(it.point(), destination.point)) },
+                        here?.let { distanceLabel(Geo.distanceM(it.point(), destination.point)) },
                         dateFormat().format(destination.usedAt.atZone(ZoneId.systemDefault())),
                     ).joinToString(" · "),
                     onClick = { viewModel.openRecent(destination) },
@@ -242,7 +271,7 @@ private fun Home(
 
 /** Видоискатель камеры телефона для фото входа или адреса: снимок — по затвору, камера работает, пока он на экране. */
 @Composable
-private fun NavViewfinder(viewModel: NavigationViewModel, request: ViewfinderRequest) {
+private fun NavViewfinder(viewModel: PhotoCapture, request: ViewfinderRequest) {
     BackHandler(onBack = viewModel::viewfinderBack)
     val c = MaterialTheme.colorScheme
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -302,8 +331,13 @@ private const val CONTROL_ALPHA = 0.85f
 /** Поле «Куда?» с голосом и фото, состояние поиска, подсказки и кнопки «через ИИ», найденные адреса. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddressSearch(viewModel: NavigationViewModel, state: NavState, onMic: () -> Unit, label: String) {
-    val aiReady by viewModel.aiReady.collectAsStateWithLifecycle()
+private fun AddressSearch(vms: NavViewModels, onMic: () -> Unit, label: String) {
+    val viewModel = vms.search
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val aiReady by vms.session.aiReady.collectAsStateWithLifecycle()
+    val busy by vms.session.busy.collectAsStateWithLifecycle()
+    val notice by vms.session.notice.collectAsStateWithLifecycle()
+    val here by vms.session.here.collectAsStateWithLifecycle()
     var choosePhoto by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = state.query,
@@ -326,25 +360,25 @@ private fun AddressSearch(viewModel: NavigationViewModel, state: NavState, onMic
         keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
         shape = GlassShapes.pill,
     )
-    state.busy?.let { busy ->
+    busy?.let { task ->
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(busyLabel(busy)), style = MaterialTheme.typography.bodyMedium, color = glassBackgroundText(), modifier = Modifier.weight(1f))
+            Text(stringResource(busyLabel(task)), style = MaterialTheme.typography.bodyMedium, color = glassBackgroundText(), modifier = Modifier.weight(1f))
             GlassButton(stringResource(R.string.cancel), onClick = viewModel::cancel)
         }
     }
     state.results.forEach { found ->
-        ResultRow(found, state.here, onPick = { viewModel.pickResult(found) }, onMap = { viewModel.checkOnMap(found.point, found.line) })
+        ResultRow(found, here, onPick = { viewModel.pickResult(found) }, onMap = { viewModel.checkOnMap(found.point, found.line) })
     }
-    if (state.notice != null || state.offerAiName || state.addressPhoto != null) {
+    if (notice != null || state.offerAiName || state.addressPhoto != null) {
         GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
-            state.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.offerAiName) {
                     GlassButton(
                         stringResource(if (state.results.isEmpty()) R.string.nav_find_with_ai else R.string.nav_find_with_ai_other),
                         onClick = viewModel::findByNameWithAi,
                         icon = R.drawable.ic_sym_assistant,
-                        enabled = aiReady && state.busy == null,
+                        enabled = aiReady && busy == null,
                     )
                 }
                 if (state.addressPhoto != null) {
@@ -352,7 +386,7 @@ private fun AddressSearch(viewModel: NavigationViewModel, state: NavState, onMic
                         stringResource(R.string.nav_recognize_with_ai),
                         onClick = viewModel::recognizePhotoWithAi,
                         icon = R.drawable.ic_sym_assistant,
-                        enabled = aiReady && state.busy == null,
+                        enabled = aiReady && busy == null,
                     )
                 }
             }
@@ -398,9 +432,9 @@ private fun ResultRow(found: FoundAddress, here: DeviceLocation.Fix?, onPick: ()
 
 /** Плитка моего места: сохранённое — расстояние и время; не сохранённое — пунктир и подсказка. */
 @Composable
-private fun PlaceTile(viewModel: NavigationViewModel, kind: PlaceKind, place: Place?, here: DeviceLocation.Fix?, modifier: Modifier, onClick: () -> Unit) {
+private fun PlaceTile(kind: PlaceKind, place: Place?, here: DeviceLocation.Fix?, modifier: Modifier, onClick: () -> Unit) {
     val c = MaterialTheme.colorScheme
-    val title = place?.let(viewModel::placeLabel) ?: stringResource(NavigationViewModel.kindTitle(kind))
+    val title = place?.let(::placeLabel) ?: stringResource(kindTitle(kind))
     val base = modifier.defaultMinSize(minHeight = 112.dp)
     Column(
         (if (place != null) base.glass(GlassShapes.card) else base.clip(GlassShapes.card).border(1.dp, c.outline, GlassShapes.card))
@@ -445,9 +479,12 @@ private fun AddPlaceTile(modifier: Modifier, onClick: () -> Unit) {
 
 /** Карточка цели: расстояние, время пешком и варианты. Пешком дольше 20 минут — транспорт первым. */
 @Composable
-private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: NavState, places: List<Place>, diagnostics: Boolean) {
+private fun TargetScreen(vms: NavViewModels, target: Target, places: List<Place>, diagnostics: Boolean) {
+    val viewModel = vms.target
+    val here by vms.session.here.collectAsStateWithLifecycle()
+    val transitState by viewModel.transit.collectAsStateWithLifecycle()
     BackHandler(onBack = viewModel::closeTarget)
-    val distance = state.here?.let { Geo.distanceM(it.point(), target.point) }
+    val distance = here?.let { Geo.distanceM(it.point(), target.point) }
     val transitFirst = distance != null && Geo.transitFirst(distance)
     val maps = stringResource(mapsTitle(viewModel.currentMapsApp()))
     val place = target.placeId?.let { id -> places.firstOrNull { it.id == id } }
@@ -461,7 +498,7 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        LocationStatus(state, diagnostics, viewModel::requestLocation)
+        LocationStatus(vms.session, diagnostics)
         GlassCard(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GlassIconButton(R.drawable.ic_sym_arrow_back, stringResource(R.string.nav_back), onClick = viewModel::closeTarget, size = 48.dp)
@@ -523,7 +560,7 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
                 subtitle = stringResource(R.string.nav_transit_in_app, maps),
                 onClick = viewModel::transit,
             )
-            TransitTipsCard(viewModel, state.transit, diagnostics)
+            TransitTipsCard(viewModel, transitState, diagnostics, vms.session::showTag)
         }
         // Пешком дольше 20 минут, но в пределах города — советы по транспорту загружаются сами (если есть сеть и ключ);
         // дальше (другой город, страна) — только по кнопке: это уже не городской транспорт, а запрос стоит денег.
@@ -575,13 +612,13 @@ private fun OptionRow(@DrawableRes icon: Int, title: String, subtitle: String, o
 
 /** Моё место: фото входа, когда и как сохранено, адрес; сохранить здесь, по адресу или по фото адреса. */
 @Composable
-private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places: List<Place>, diagnostics: Boolean, onMic: () -> Unit) {
+private fun PlaceScreen(vms: NavViewModels, edit: PlaceEdit, places: List<Place>, diagnostics: Boolean, onMic: () -> Unit) {
+    val viewModel = vms.places
     BackHandler(onBack = viewModel::closePlace)
-    val edit = state.place ?: return
     val place = edit.placeId?.let { id -> places.firstOrNull { it.id == id } }
     var confirmDelete by remember { mutableStateOf(false) }
     val photo by produceState<Bitmap?>(null, place?.id, place?.hasPhoto, place?.savedAt) { value = place?.let { viewModel.placePhoto(it, PHOTO_SIDE) } }
-    val busy = state.busy != null
+    val busy = vms.session.busy.collectAsStateWithLifecycle().value != null
 
     // Экран места заменяет главную вкладки (а не лежит поверх) — фон тот же стеклянный.
     Box(Modifier.fillMaxSize()) {
@@ -599,7 +636,7 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
             Row(verticalAlignment = Alignment.CenterVertically) {
                 GlassIconButton(R.drawable.ic_sym_arrow_back, stringResource(R.string.nav_back), onClick = viewModel::closePlace, size = 48.dp)
                 Text(
-                    place?.let(viewModel::placeLabel) ?: stringResource(NavigationViewModel.kindTitle(edit.kind)),
+                    place?.let(::placeLabel) ?: stringResource(kindTitle(edit.kind)),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f).padding(start = 10.dp).semantics { heading() },
@@ -676,26 +713,19 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
             }
 
             BackgroundTitle(stringResource(R.string.nav_place_by_address))
-            AddressSearch(viewModel, state, onMic, label = stringResource(R.string.nav_address_field))
+            AddressSearch(vms, onMic, label = stringResource(R.string.nav_address_field))
 
             if (place != null) {
                 GlassButton(
                     stringResource(R.string.nav_go_here),
-                    onClick = {
-                        viewModel.closePlace()
-                        viewModel.openPlaceTarget(place)
-                    },
+                    onClick = { viewModel.goToPlace(place) },
                     icon = R.drawable.ic_sym_navigation,
                     kind = GlassButtonKind.PRIMARY,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 GlassButton(
                     stringResource(R.string.nav_address_for_driver),
-                    onClick = {
-                        viewModel.closePlace()
-                        viewModel.openPlaceTarget(place)
-                        viewModel.openTaxi()
-                    },
+                    onClick = { viewModel.taxiForPlace(place) },
                     icon = R.drawable.ic_sym_local_taxi,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -706,7 +736,9 @@ private fun PlaceScreen(viewModel: NavigationViewModel, state: NavState, places:
 
 /** Подтверждение адреса: что назвала модель или распознал телефон, что нашёл геокодер, и «Проверить на карте». */
 @Composable
-private fun ConfirmScreen(viewModel: NavigationViewModel, confirm: AddressConfirm, here: DeviceLocation.Fix?) {
+private fun ConfirmScreen(vms: NavViewModels, confirm: AddressConfirm) {
+    val viewModel = vms.search
+    val here by vms.session.here.collectAsStateWithLifecycle()
     BackHandler(onBack = viewModel::dismissConfirm)
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -740,7 +772,7 @@ private fun ConfirmScreen(viewModel: NavigationViewModel, confirm: AddressConfir
                         ),
                     )
                     Text(text, style = MaterialTheme.typography.bodyLarge)
-                    confirm.tag?.takeIf(viewModel::showTag)?.let { Hint(modelLabel(it)) }
+                    confirm.tag?.takeIf(vms.session::showTag)?.let { Hint(modelLabel(it)) }
                 }
                 Label(stringResource(R.string.nav_confirm_geocoder))
                 Text(confirm.found.line, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -765,18 +797,21 @@ private fun ConfirmScreen(viewModel: NavigationViewModel, confirm: AddressConfir
 
 /** Нет разрешения — кнопка; слабый GPS — предупреждение; точность и прочее служебное — только разработчику. */
 @Composable
-private fun LocationStatus(state: NavState, diagnostics: Boolean, onRequest: () -> Unit) {
+private fun LocationStatus(session: NavSession, diagnostics: Boolean) {
     val c = MaterialTheme.colorScheme
+    val granted by session.locationGranted.collectAsStateWithLifecycle()
+    val here by session.here.collectAsStateWithLifecycle()
+    val accuracy = here?.accuracyM
     when {
-        !state.locationGranted -> GlassCard(Modifier.fillMaxWidth(), tint = c.secondaryContainer, text = c.onSecondaryContainer) {
+        !granted -> GlassCard(Modifier.fillMaxWidth(), tint = c.secondaryContainer, text = c.onSecondaryContainer) {
             Text(stringResource(R.string.nav_location_needed), style = MaterialTheme.typography.bodyMedium)
-            GlassButton(stringResource(R.string.nav_allow_location), onClick = onRequest, kind = GlassButtonKind.PRIMARY)
+            GlassButton(stringResource(R.string.nav_allow_location), onClick = session::requestLocation, kind = GlassButtonKind.PRIMARY)
         }
-        state.here?.accuracyM?.let { it > WEAK_GPS_M } == true -> GlassCard(Modifier.fillMaxWidth(), tint = c.errorContainer, text = c.onErrorContainer) {
-            Text(stringResource(R.string.nav_weak_gps, state.here.accuracyM!!.toInt()), style = MaterialTheme.typography.bodyMedium)
+        accuracy != null && accuracy > WEAK_GPS_M -> GlassCard(Modifier.fillMaxWidth(), tint = c.errorContainer, text = c.onErrorContainer) {
+            Text(stringResource(R.string.nav_weak_gps, accuracy.toInt()), style = MaterialTheme.typography.bodyMedium)
         }
         diagnostics -> BackgroundHint(
-            state.here?.accuracyM?.let { stringResource(R.string.nav_gps_accuracy, it.toInt()) } ?: stringResource(R.string.nav_gps_waiting),
+            accuracy?.let { stringResource(R.string.nav_gps_accuracy, it.toInt()) } ?: stringResource(R.string.nav_gps_waiting),
         )
     }
 }
@@ -888,7 +923,7 @@ private fun savedFormat(): DateTimeFormatter {
  * источники поиска. Ещё не загружены — кнопка; разработчику видно, что ушло в модель (только районы).
  */
 @Composable
-private fun TransitTipsCard(viewModel: NavigationViewModel, transit: TransitState?, diagnostics: Boolean) {
+private fun TransitTipsCard(viewModel: TargetViewModel, transit: TransitState?, diagnostics: Boolean, showTag: (ModelTag) -> Boolean) {
     val context = LocalContext.current
     val advice = transit?.advice
     GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
@@ -899,7 +934,7 @@ private fun TransitTipsCard(viewModel: NavigationViewModel, transit: TransitStat
                 advice.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 when {
                     advice.noWebSearch -> Hint(stringResource(R.string.transit_no_check, advice.tag.title))
-                    viewModel.showTag(advice.tag) -> Hint(modelLabel(advice.tag))
+                    showTag(advice.tag) -> Hint(modelLabel(advice.tag))
                 }
                 if (advice.sources.isNotEmpty()) SourceLinks(advice.sources) { LinkOpener.openSource(context, it) }
             }

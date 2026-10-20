@@ -35,7 +35,7 @@ import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.vasev.glasses.R
-import ru.vasev.glasses.nav.NavigationViewModel
+import ru.vasev.glasses.nav.TaxiViewModel
 import ru.vasev.glasses.nav.TaxiAddresses
 import ru.vasev.glasses.nav.TaxiApp
 import ru.vasev.glasses.nav.TaxiCard
@@ -49,7 +49,7 @@ import ru.vasev.glasses.ui.glass.GlassIconButton
  * и установленные приложения такси. Непрозрачный, как полноэкранный перевод: читают в машине и на солнце.
  */
 @Composable
-fun TaxiScreen(viewModel: NavigationViewModel, card: TaxiCard, place: Place?, diagnostics: Boolean) {
+fun TaxiScreen(viewModel: TaxiViewModel, card: TaxiCard, place: Place?, diagnostics: Boolean) {
     BackHandler(onBack = viewModel::closeTaxi)
     val c = MaterialTheme.colorScheme
     val photo by produceState<Bitmap?>(null, place?.id, place?.hasPhoto) { value = place?.let { viewModel.placePhoto(it, 1024) } }

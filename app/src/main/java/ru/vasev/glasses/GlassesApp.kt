@@ -20,6 +20,8 @@ import ru.vasev.glasses.llm.RequestJournal
 import ru.vasev.glasses.location.DeviceLocation
 import ru.vasev.glasses.nav.AddressGeocoder
 import ru.vasev.glasses.nav.CompassController
+import ru.vasev.glasses.nav.NavSession
+import ru.vasev.glasses.nav.NavVoiceCommands
 import ru.vasev.glasses.nav.NavigatorSettings
 import ru.vasev.glasses.nav.TaxiAddresses
 import ru.vasev.glasses.notes.NoteStore
@@ -130,6 +132,14 @@ class GlassesApp : Application() {
     lateinit var navigator: NavigatorSettings
         private set
 
+    /** «Навигация»: что открыто (цель, такси, моё место), где я, общие действия экранов вкладки и голосовых команд. */
+    lateinit var navSession: NavSession
+        private set
+
+    /** Голосовые команды навигации с любой вкладки — ответ голосом. */
+    lateinit var navVoice: NavVoiceCommands
+        private set
+
     /** «Стиль общения»: стиль ассистента, обращение и пол в переводе, скорость речи. */
     lateinit var style: StyleSettings
         private set
@@ -166,6 +176,8 @@ class GlassesApp : Application() {
         compass = CompassController(this, audioOutput)
         navigator = NavigatorSettings(this)
         taxiAddresses = TaxiAddresses(places, AddressGeocoder(this, llm::isOnline), llm, navigator)
+        navSession = NavSession(this)
+        navVoice = NavVoiceCommands(this, navSession)
         currency = CurrencySettings(this)
         rates = CbrRates(this, llm::isOnline)
         // Кеш курсов обновляется, пока есть сеть: за границей интернет бывает не всегда, а курс нужен у ценника.

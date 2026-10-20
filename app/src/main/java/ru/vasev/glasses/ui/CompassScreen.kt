@@ -47,7 +47,7 @@ import ru.vasev.glasses.nav.CompassController
 import ru.vasev.glasses.nav.CompassState
 import ru.vasev.glasses.nav.Geo
 import ru.vasev.glasses.nav.HeadingKind
-import ru.vasev.glasses.nav.NavigationViewModel
+import ru.vasev.glasses.nav.TargetViewModel
 import ru.vasev.glasses.places.Place
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
@@ -65,7 +65,7 @@ import java.util.Date
  * расстояние по прямой, время и что сказано голосом. Закрытие — «Назад» или крестик: компас выключается.
  */
 @Composable
-fun CompassScreen(viewModel: NavigationViewModel, state: CompassState, place: Place?, diagnostics: Boolean) {
+fun CompassScreen(viewModel: TargetViewModel, state: CompassState, place: Place?, diagnostics: Boolean) {
     BackHandler(onBack = viewModel::closeCompass)
     val c = MaterialTheme.colorScheme
     val photo by produceState<Bitmap?>(null, place?.id, place?.hasPhoto) { value = place?.let { viewModel.placePhoto(it, 512) } }

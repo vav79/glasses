@@ -38,7 +38,12 @@ import ru.vasev.glasses.llm.DebugFaults
 import ru.vasev.glasses.llm.ModelCatalog
 import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
-import ru.vasev.glasses.nav.NavigationViewModel
+import ru.vasev.glasses.nav.AddressSearchViewModel
+import ru.vasev.glasses.nav.NavHooks
+import ru.vasev.glasses.nav.PlacesViewModel
+import ru.vasev.glasses.nav.TargetViewModel
+import ru.vasev.glasses.nav.TaxiViewModel
+import ru.vasev.glasses.ui.NavViewModels
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
@@ -69,7 +74,11 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val translation: TranslationViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
-    private val navigation: NavigationViewModel by viewModels()
+    private val addressSearch: AddressSearchViewModel by viewModels()
+    private val navTarget: TargetViewModel by viewModels()
+    private val taxi: TaxiViewModel by viewModels()
+    private val places: PlacesViewModel by viewModels()
+    private val navSession get() = (application as GlassesApp).navSession
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
 
@@ -162,18 +171,23 @@ class MainActivity : AppCompatActivity() {
         viewModel.galleryPicker = ::pickPhoto
         viewModel.cameraOwner = this
         viewModel.locationPermissionRequester = ::requestLocation
-        navigation.locationPermissionRequester = ::requestLocation
-        navigation.cameraPermissionRequester = ::requestPhoneCamera
-        navigation.glassesPermissionRequester = ::requestGlassesCamera
-        navigation.galleryPicker = ::pickPhoto
-        navigation.cameraOwner = this
-        navigation.notificationPermissionRequester = ::requestNotifications
-        viewModel.navVocabulary = navigation::vocabulary
-        viewModel.navCommandHandler = navigation::handleVoice
+        navSession.attach(
+            NavHooks(
+                owner = this,
+                requestLocation = ::requestLocation,
+                requestPhoneCamera = ::requestPhoneCamera,
+                requestGlassesCamera = ::requestGlassesCamera,
+                requestNotifications = ::requestNotifications,
+                pickPhoto = ::pickPhoto,
+            ),
+        )
+        val navVoice = (application as GlassesApp).navVoice
+        viewModel.navVocabulary = navVoice::vocabulary
+        viewModel.navCommandHandler = navVoice::handle
         // Вкладка «Навигация» — когда ход ассистента закончен, следующим кадром: иначе размытие (Haze) получает
         // обновление уже убранного с экрана элемента и падает.
         viewModel.navCommandDone = { command ->
-            if (navigation.showsTab(command)) window.decorView.post { selectTab(AppTab.NAVIGATION, stopOthers = false) }
+            if (navVoice.showsTab(command)) window.decorView.post { selectTab(AppTab.NAVIGATION, stopOthers = false) }
         }
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
@@ -249,8 +263,8 @@ class MainActivity : AppCompatActivity() {
                     },
                     navigation = {
                         NavigationScreen(
-                            viewModel = navigation,
-                            onMic = { withMic(navigation::listenQuery) },
+                            vms = NavViewModels(navSession, addressSearch, navTarget, taxi, places),
+                            onMic = { withMic(addressSearch::listenQuery) },
                             onOpenLink = { openMapsLink(this, it) },
                             onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
                         )
@@ -298,7 +312,7 @@ class MainActivity : AppCompatActivity() {
             when (tab) {
                 AppTab.ASSISTANT, AppTab.CAMERA -> viewModel.stop()
                 AppTab.TRANSLATE -> translation.stop()
-                AppTab.NAVIGATION -> navigation.cancel()
+                AppTab.NAVIGATION -> navSession.cancel()
             }
         }
         tab = newTab
@@ -357,12 +371,9 @@ class MainActivity : AppCompatActivity() {
         viewModel.galleryPicker = null
         viewModel.cameraOwner = null
         viewModel.locationPermissionRequester = null
-        navigation.locationPermissionRequester = null
-        navigation.cameraPermissionRequester = null
-        navigation.glassesPermissionRequester = null
-        navigation.galleryPicker = null
-        navigation.cameraOwner = null
-        navigation.notificationPermissionRequester = null
+        navSession.detach(this)
+        // Открытая цель и экраны «Навигации» живут до закрытия приложения, как и состояние остальных вкладок.
+        if (isFinishing) navSession.closeScreens()
         viewModel.navCommandHandler = null
         viewModel.navCommandDone = null
         viewModel.navVocabulary = null
@@ -476,8 +487,8 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra("nav_to")?.let { query ->
             intent.removeExtra("nav_to")
             selectTab(AppTab.NAVIGATION)
-            navigation.setQuery(query)
-            navigation.search()
+            addressSearch.setQuery(query)
+            addressSearch.search()
         }
         if (intent.getBooleanExtra("translate_view", false)) {
             intent.removeExtra("translate_view")
