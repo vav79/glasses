@@ -21,6 +21,8 @@ data class FoundAddress(
     val locality: String?,
     /** Район (sub-locality или округ) — для советов по транспорту без точного адреса. */
     val district: String? = null,
+    /** Название места («Эрмитаж»), если геокодер его знает; номер дома или улица — не название. */
+    val name: String? = null,
 )
 
 /** Итог геокодера: пустой ответ — «не нашёл»; сбой, нет сервиса или сети — «недоступен» (это разные подсказки). */
@@ -109,6 +111,7 @@ class AddressGeocoder(private val context: Context, private val online: () -> Bo
         return FoundAddress(
             line, GeoPoint(a.latitude, a.longitude), a.countryCode?.uppercase(), a.locality ?: a.subAdminArea ?: a.adminArea,
             district = a.subLocality ?: a.subAdminArea?.takeIf { it != a.locality },
+            name = a.featureName?.takeIf { f -> f.any(Char::isLetter) && f != a.thoroughfare && f != a.locality && f != a.countryName && f != a.adminArea },
         )
     }
 

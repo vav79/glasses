@@ -31,8 +31,23 @@ class NavigatorSettings(context: Context) {
         _taxiLanguage.value = language
     }
 
+    /** Начало текущего маршрута — где я был, когда выбрал цель. */
+    var routeStart: GeoPoint?
+        get() {
+            val lat = prefs.getString(KEY_START_LAT, null)?.toDoubleOrNull() ?: return null
+            val lon = prefs.getString(KEY_START_LON, null)?.toDoubleOrNull() ?: return null
+            return GeoPoint(lat, lon)
+        }
+        set(value) {
+            val edit = prefs.edit()
+            if (value == null) edit.remove(KEY_START_LAT).remove(KEY_START_LON) else edit.putString(KEY_START_LAT, value.latitude.toString()).putString(KEY_START_LON, value.longitude.toString())
+            edit.apply()
+        }
+
     private companion object {
         const val KEY_NAVIGATOR = "navigator"
         const val KEY_TAXI_LANGUAGE = "taxi_language"
+        const val KEY_START_LAT = "route_start_lat"
+        const val KEY_START_LON = "route_start_lon"
     }
 }

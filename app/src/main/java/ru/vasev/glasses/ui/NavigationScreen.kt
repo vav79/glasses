@@ -435,8 +435,10 @@ private fun TargetScreen(viewModel: NavigationViewModel, target: Target, state: 
             )
             TransitTipsCard(viewModel, state.transit, diagnostics)
         }
-        // Пешком дольше 20 минут — советы по транспорту загружаются сами (если есть сеть и ключ).
-        LaunchedEffect(target, transitFirst) { if (transitFirst) viewModel.loadTransitTips(auto = true) }
+        // Пешком дольше 20 минут, но в пределах города — советы по транспорту загружаются сами (если есть сеть и ключ);
+        // дальше (другой город, страна) — только по кнопке: это уже не городской транспорт, а запрос стоит денег.
+        val autoTips = transitFirst && distance != null && distance <= AUTO_TIPS_MAX_M
+        LaunchedEffect(target, autoTips) { if (autoTips) viewModel.loadTransitTips(auto = true) }
         if (transitFirst) {
             transit()
             taxiRow()
@@ -773,6 +775,7 @@ private fun DeviceLocation.Fix.point() = GeoPoint(latitude, longitude)
 private const val LOCATION_REFRESH_MS = 10_000L
 private const val WEAK_GPS_M = 50f
 private const val WALK_LABEL_MAX_M = 20_000.0
+private const val AUTO_TIPS_MAX_M = 50_000.0
 private const val PHOTO_SIDE = 1024
 private const val PHOTO_RATIO = 4f / 3f
 

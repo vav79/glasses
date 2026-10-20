@@ -164,6 +164,13 @@ class MainActivity : AppCompatActivity() {
         navigation.galleryPicker = ::pickPhoto
         navigation.cameraOwner = this
         navigation.notificationPermissionRequester = ::requestNotifications
+        viewModel.navVocabulary = navigation::vocabulary
+        viewModel.navCommandHandler = navigation::handleVoice
+        // Вкладка «Навигация» — когда ход ассистента закончен, следующим кадром: иначе размытие (Haze) получает
+        // обновление уже убранного с экрана элемента и падает.
+        viewModel.navCommandDone = { command ->
+            if (navigation.showsTab(command)) window.decorView.post { selectTab(AppTab.NAVIGATION, stopOthers = false) }
+        }
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
@@ -273,10 +280,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Вкладки независимы: при переключении всё, что звучит или слушает на другой вкладке, останавливается. */
-    private fun selectTab(newTab: AppTab) {
+    private fun selectTab(newTab: AppTab, stopOthers: Boolean = true) {
         settingsOpen = false
         developerOpen = false
         if (newTab == tab) return
+        if (!stopOthers) {
+            tab = newTab
+            return
+        }
         // «Ассистент» и «Камера» — один разговор: между ними ответ не прерывается.
         val sameConversation = tab in CONVERSATION_TABS && newTab in CONVERSATION_TABS
         if (!sameConversation) {
@@ -348,6 +359,9 @@ class MainActivity : AppCompatActivity() {
         navigation.galleryPicker = null
         navigation.cameraOwner = null
         navigation.notificationPermissionRequester = null
+        viewModel.navCommandHandler = null
+        viewModel.navCommandDone = null
+        viewModel.navVocabulary = null
         pendingNotifications?.complete(false)
         pendingPhoneCamera?.complete(false)
         pendingLocationPermission?.complete(false)
@@ -391,6 +405,12 @@ class MainActivity : AppCompatActivity() {
                 else -> AppTab.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }?.let(::selectTab)
             }
         }
+        // Компас за столом: подменить место (каждый интент — новая точка) — до вопроса, чтобы команды его видели.
+        intent.getStringExtra("fake_location")?.let { value ->
+            intent.removeExtra("fake_location")
+            val (lat, lon) = value.split(",").map { it.trim().toDouble() }
+            app.compass.fakeLocation = ru.vasev.glasses.nav.GeoPoint(lat, lon)
+        }
         intent.getStringExtra("image_source")?.let { name ->
             intent.removeExtra("image_source")
             val source = when (name) {
@@ -420,12 +440,6 @@ class MainActivity : AppCompatActivity() {
             intent.removeExtra("question")
             selectTab(AppTab.ASSISTANT)
             viewModel.debugAsk(question, intent.getBooleanExtra("with_frame", false))
-        }
-        // Компас за столом: подменить место (каждый интент — новая точка).
-        intent.getStringExtra("fake_location")?.let { value ->
-            intent.removeExtra("fake_location")
-            val (lat, lon) = value.split(",").map { it.trim().toDouble() }
-            app.compass.fakeLocation = ru.vasev.glasses.nav.GeoPoint(lat, lon)
         }
         // Уступка навигатору: через [delay] мс 3 секунды «говорит навигатор» (usage NAVIGATION_GUIDANCE).
         if (intent.hasExtra("fake_navigator_after_ms")) {

@@ -641,4 +641,73 @@
     <string name="transit_sent">sent to the model: %1$s</string>
     <string name="transit_no_area">Could not tell the city of the destination.</string>
     <string name="transit_nothing">The model gave no transport tips.</string>
+
+    <!-- Голосовые команды навигации -->
+    <string name="nav_route_start">Start of the route</string>
+    <string name="nav_say_target">%1$s is %2$s away in a straight line</string>
+    <string name="nav_say_walk">, %1$s on foot.</string>
+    <string name="nav_say_options">Public transport and taxi are on the phone screen.</string>
+    <string name="nav_say_far_check">If this is not the place you meant, check it on the screen.</string>
+    <string name="nav_say_target_no_fix">%1$s is selected, but I can\'t tell where you are right now.</string>
+    <string name="nav_say_not_saved">%1$s is not saved yet. Say \"remember, this is my hotel\" at the entrance.</string>
+    <string name="nav_say_return_none">Neither the hotel nor home is saved.</string>
+    <string name="nav_say_start_none">The start of the route is not remembered.</string>
+    <string name="nav_say_taxi">Showing the address for the taxi driver on the screen.</string>
+    <string name="nav_say_no_target">No destination is selected.</string>
+    <string name="nav_say_not_found">Could not find \"%1$s\". Check the address on the screen.</string>
+    <string name="nav_say_remembered">Remembered %1$s: the place, the time and an entrance photo.</string>
+    <string name="nav_say_remembered_no_photo">Remembered %1$s: the place and the time, no photo.</string>
+    <string-array name="nav_cmd_go_prefixes">
+        <item>take me</item>
+        <item>take me to</item>
+        <item>navigate to</item>
+        <item>directions to</item>
+        <item>how do i get to</item>
+        <item>how to get to</item>
+        <item>route to</item>
+    </string-array>
+    <string-array name="nav_cmd_return">
+        <item>how do i get back</item>
+        <item>take me back</item>
+        <item>how to get back</item>
+    </string-array>
+    <string-array name="nav_cmd_back_to_start">
+        <item>back to the start</item>
+        <item>back to the start of the route</item>
+        <item>take me back to the start</item>
+    </string-array>
+    <string-array name="nav_cmd_taxi">
+        <item>show the address to the driver</item>
+        <item>show the address to the taxi driver</item>
+        <item>address for the taxi</item>
+        <item>taxi address</item>
+    </string-array>
+    <string-array name="nav_cmd_how_far">
+        <item>how far is it</item>
+        <item>how far</item>
+        <item>how much further</item>
+        <item>how far to go</item>
+    </string-array>
+    <string-array name="nav_cmd_where_car">
+        <item>where is my car</item>
+        <item>where\'s my car</item>
+        <item>where is the car</item>
+        <item>find my car</item>
+    </string-array>
+    <string-array name="nav_remember_hotel">
+        <item>this is my hotel</item>
+        <item>my hotel</item>
+        <item>my hotel is here</item>
+        <item>the hotel is here</item>
+    </string-array>
+    <string-array name="nav_remember_home">
+        <item>this is my home</item>
+        <item>my home is here</item>
+    </string-array>
+    <string-array name="nav_remember_car">
+        <item>my car is here</item>
+        <item>the car is here</item>
+        <item>where i parked</item>
+        <item>i parked here</item>
+    </string-array>
 </resources>

@@ -67,6 +67,9 @@ import ru.vasev.glasses.links.LinkScanner
 import ru.vasev.glasses.links.LinkTexts
 import ru.vasev.glasses.llm.WebSource
 import ru.vasev.glasses.location.DeviceLocation
+import ru.vasev.glasses.nav.NavCommand
+import ru.vasev.glasses.nav.NavCommands
+import ru.vasev.glasses.nav.NavVocabulary
 import ru.vasev.glasses.notes.Note
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
@@ -237,6 +240,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Владелец жизненного цикла для разового снимка камерой телефона без видоискателя (Activity). */
     var cameraOwner: LifecycleOwner? = null
+
+    /** Голосовые команды навигации: исполнитель и словарь задаёт Activity (там вкладка «Навигация»). */
+    var navCommandHandler: (suspend (NavCommand) -> Unit)? = null
+    var navVocabulary: (() -> NavVocabulary)? = null
+    var navCommandDone: ((NavCommand) -> Unit)? = null
 
     /** Лента последних снимков «Камеры». */
     private val shotStore = (app as GlassesApp).shots
@@ -487,6 +495,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     setPhase(Phase.SPEAKING)
                     audio.speak(L.s(R.string.say_new_conversation), language.locale, AudioChannel.ME)
                     setPhase(Phase.IDLE)
+                    return@launch
+                }
+
+                // Команды навигации («веди в отель», «как вернуться», «запомни, это мой отель»…) — до модели.
+                val navCommand = navCommandHandler?.let { NavCommands.parse(question, navVocabulary?.invoke() ?: return@let null) }
+                if (navCommand != null) {
+                    setPhase(Phase.SPEAKING)
+                    navCommandHandler?.invoke(navCommand)
+                    _state.update { it.copy(pendingQuestion = "") }
+                    setPhase(Phase.IDLE)
+                    // Вкладка — только после хода: смена вкладки в одном кадре с изменением фазы роняла размытие (Haze).
+                    navCommandDone?.invoke(navCommand)
                     return@launch
                 }
 

@@ -303,21 +303,9 @@ private fun Chat(
         }
     }
 
-    if (rowCount == 0) {
-        // Пустой чат — короткая подсказка мелким шрифтом, без карточки.
-        Box(modifier.padding(bottom = CONTROLS_SPACE), contentAlignment = Alignment.Center) {
-            Text(
-                stringResource(R.string.assistant_empty_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = glassBackgroundText(),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        }
-        return
-    }
-
     val firstRemembered = state.chat.indexOfFirst { it.remembered }
+    // Список есть всегда, и в пустом чате тоже: он — источник размытия для панелей, а убранный источник
+    // роняет Haze («LayoutCoordinate operations are only valid when isAttached»), например после «Новый разговор».
     LazyColumn(
         modifier = modifier.glassContentSource(),
         state = listState,
@@ -325,6 +313,20 @@ private fun Chat(
         contentPadding = PaddingValues(top = 4.dp, bottom = CONTROLS_SPACE),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (rowCount == 0) {
+            // Пустой чат — короткая подсказка мелким шрифтом, без карточки, посередине.
+            item(key = "empty") {
+                Box(Modifier.fillParentMaxSize().padding(bottom = CONTROLS_SPACE), contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.assistant_empty_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = glassBackgroundText(),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
+        }
         itemsIndexed(state.chat, key = { _, item -> item.id }) { index, item ->
             if (index == firstRemembered && firstRemembered > 0) {
                 ForgottenDivider()

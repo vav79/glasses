@@ -320,12 +320,156 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
         openTarget(Target(destination.label, destination.point, destination.address, destination.placeId?.takeIf { store.byId(it) != null }))
 
     private fun openTarget(target: Target) {
+        // Начало маршрута — где я, когда выбрал цель (кроме самого «назад к началу»).
+        if (target.label != L.s(R.string.nav_route_start)) _state.value.here?.let { routeStart = it.point() }
         _state.update { it.copy(target = target, transit = null, results = emptyList(), notice = null, offerAiName = false) }
         viewModelScope.launch { store.addRecent(Destination(target.label, target.point, target.address, target.placeId)) }
         refreshLocation()
     }
 
     fun closeTarget() = _state.update { it.copy(target = null) }
+
+    // --- Голосовые команды (с любой вкладки) ---
+
+    /** Где я был, когда выбрал цель, — для «назад к началу маршрута»; хранится, переживает выгрузку процесса. */
+    private var routeStart: GeoPoint?
+        get() = g.navigator.routeStart
+        set(value) { g.navigator.routeStart = value }
+
+    fun vocabulary() = NavVocabulary(
+        goPrefixes = L.array(R.array.nav_cmd_go_prefixes),
+        returnPhrases = L.array(R.array.nav_cmd_return),
+        backToStartPhrases = L.array(R.array.nav_cmd_back_to_start),
+        taxiPhrases = L.array(R.array.nav_cmd_taxi),
+        howFarPhrases = L.array(R.array.nav_cmd_how_far),
+        whereCarPhrases = L.array(R.array.nav_cmd_where_car),
+        rememberTriggers = L.array(R.array.remember_triggers),
+        rememberPlace = mapOf(
+            PlaceKind.HOTEL to L.array(R.array.nav_remember_hotel),
+            PlaceKind.HOME to L.array(R.array.nav_remember_home),
+            PlaceKind.CAR to L.array(R.array.nav_remember_car),
+        ),
+    )
+
+    /**
+     * Команда голосом: выполнить и ответить голосом (с очками на экран не смотрят). true — показать вкладку
+     * «Навигация» (цель, такси); «сколько осталось» и «запомни место» — без переключения.
+     */
+    fun showsTab(command: NavCommand): Boolean = command !is NavCommand.HowFar && command !is NavCommand.RememberPlace
+
+    suspend fun handleVoice(command: NavCommand) {
+        Log.d(TAG, "voice command ${command.javaClass.simpleName}")
+        when (command) {
+            is NavCommand.GoTo -> voiceGoTo(command.query)
+            is NavCommand.GoToPlace -> voiceGoToPlace(command.kind)
+            NavCommand.Return -> {
+                val place = store.single(PlaceKind.HOTEL) ?: store.single(PlaceKind.HOME)
+                if (place == null) say(L.s(R.string.nav_say_return_none)) else voiceTarget(Target(placeLabel(place), place.point, place.address, place.id))
+            }
+            NavCommand.BackToStart -> {
+                val start = routeStart
+                if (start == null) say(L.s(R.string.nav_say_start_none)) else voiceTarget(Target(L.s(R.string.nav_route_start), start, null), keepStart = true)
+            }
+            NavCommand.ShowTaxi -> {
+                val hotel = store.single(PlaceKind.HOTEL)
+                val target = _state.value.target ?: g.compass.state.value?.target
+                    ?: hotel?.let { Target(placeLabel(it), it.point, it.address, it.id) }
+                if (target == null) {
+                    say(L.s(R.string.nav_say_no_target))
+                } else {
+                    _state.update { it.copy(target = target) }
+                    openTaxi()
+                    say(L.s(R.string.nav_say_taxi))
+                }
+            }
+            NavCommand.HowFar -> when {
+                g.compass.state.value?.running == true -> g.compass.sayStatus()
+                _state.value.target != null -> voiceDistance(_state.value.target!!)
+                else -> say(L.s(R.string.nav_say_no_target))
+            }
+            is NavCommand.RememberPlace -> voiceRemember(command.kind)
+        }
+    }
+
+    private suspend fun voiceGoTo(query: String) {
+        val aliases = placeAliases()
+        NavQuery.matchPlace(query, places.value, aliases)?.let { return voiceTarget(Target(placeLabel(it), it.point, it.address, it.id)) }
+        NavQuery.kindOf(query, aliases)?.let { return voiceGoToPlace(it) }
+        _state.update { it.copy(query = query, place = null, purpose = AddressPurpose.Destination) }
+        val here = freshHere()
+        when (val result = geocoder.search(query, here, appLocale())) {
+            is GeocodeResult.Found -> {
+                // Голосом список не выбрать: берём ближайший из найденных («Эрмитаж» — не во Франции), название — от геокодера.
+                val found = here?.let { h -> result.addresses.minBy { Geo.distanceM(h, it.point) } } ?: result.addresses.first()
+                voiceTarget(Target(found.name ?: query, found.point, found.line))
+            }
+            GeocodeResult.NotFound -> {
+                _state.update { it.copy(notice = L.s(R.string.nav_not_found), offerAiName = true) }
+                say(L.s(R.string.nav_say_not_found, query))
+            }
+            GeocodeResult.Unavailable -> say(L.s(if (llm.isOnline()) R.string.nav_geocoder_unavailable else R.string.nav_offline_search))
+        }
+    }
+
+    private suspend fun voiceGoToPlace(kind: PlaceKind) {
+        val place = store.single(kind)
+        if (place == null) say(L.s(R.string.nav_say_not_saved, L.s(kindTitle(kind)))) else voiceTarget(Target(placeLabel(place), place.point, place.address, place.id))
+    }
+
+    /** Цель выбрана голосом: близко — сразу «Компас» (он говорит сам), далеко — расстояние и варианты на экране. */
+    private suspend fun voiceTarget(target: Target, keepStart: Boolean = false) {
+        val here = freshHere()
+        if (!keepStart) routeStart = here
+        openTarget(target)
+        if (here != null && Geo.compassSuitable(Geo.distanceM(here, target.point))) {
+            startCompass()
+        } else {
+            voiceDistance(target)
+        }
+    }
+
+    private suspend fun voiceDistance(target: Target) {
+        val here = freshHere() ?: return say(L.s(R.string.nav_say_target_no_fix, target.label))
+        val d = Geo.distanceM(here, target.point)
+        val text = Geo.distanceText(d, appLocale())
+        val distance = if (text.km) L.s(R.string.nav_km, text.value) else L.q(R.plurals.compass_meters, CompassMath.spokenMeters(d))
+        val minutes = Geo.walkMinutes(d)
+        val walk = if (minutes <= SPOKEN_WALK_MAX_MIN) L.s(R.string.nav_say_walk, L.q(R.plurals.compass_about_minutes, minutes)) else "."
+        val options = if (Geo.transitFirst(d)) L.s(R.string.nav_say_options) else ""
+        // Очень далеко — скорее всего, геокодер нашёл не то место (голосом список не выбрать).
+        val check = if (d > FAR_CHECK_M && target.placeId == null) L.s(R.string.nav_say_far_check) else ""
+        say(listOf(L.s(R.string.nav_say_target, target.label, distance) + walk, options, check).filter(String::isNotBlank).joinToString(" "))
+    }
+
+    /** «Запомни, это мой отель»: место здесь, время и фото входа — как «Сохранить здесь», без экрана. */
+    private suspend fun voiceRemember(kind: PlaceKind) {
+        if (!location.granted && locationPermissionRequester?.invoke() != true) return say(L.s(R.string.nav_location_needed))
+        // Только debug: подменённое место (компас за столом).
+        val fix = g.compass.fakeLocation?.let { DeviceLocation.Fix(it.latitude, it.longitude, FAKE_ACCURACY_M) }
+            ?: location.current() ?: return say(L.s(R.string.nav_no_fix))
+        val photo = takePhoto(quiet = true)
+        val address = geocoder.reverse(fix.point(), appLocale())
+        val old = store.single(kind)
+        val saved = store.save(
+            Place("", kind, old?.name.orEmpty(), fix.point(), fix.accuracyM, Instant.now(), address = address?.line, country = address?.country, locality = address?.locality),
+            jpeg = photo,
+        )
+        g.taxiAddresses.refreshLater(saved.id)
+        Log.d(TAG, "voice remember kind=$kind photo=${saved.hasPhoto}")
+        val title = L.s(kindTitle(kind))
+        say(L.s(if (saved.hasPhoto) R.string.nav_say_remembered else R.string.nav_say_remembered_no_photo, title))
+    }
+
+    private suspend fun freshHere(): GeoPoint? {
+        g.compass.fakeLocation?.let { return it }
+        if (!location.granted) return _state.value.here?.point()
+        return location.current(LOCATION_TIMEOUT_MS)?.also { fix -> _state.update { it.copy(here = fix) } }?.point()
+    }
+
+    private suspend fun say(text: String) {
+        Log.d(TAG, "say: $text")
+        runCatching { g.audioOutput.speak(text, LanguageSettings.current.value.locale, AudioChannel.ME) }
+    }
 
     // --- Советы по транспорту ---
 
@@ -691,6 +835,9 @@ class NavigationViewModel(app: Application) : AndroidViewModel(app) {
         private const val TAG = "Navigation"
         private const val LOCATION_TIMEOUT_MS = 4_000L
         private const val FAKE_ACCURACY_M = 5f
+        /** Дольше — время пешком вслух не говорим (это не пеший путь). */
+        private const val SPOKEN_WALK_MAX_MIN = 60
+        private const val FAR_CHECK_M = 300_000.0
 
         fun kindTitle(kind: PlaceKind): Int = when (kind) {
             PlaceKind.HOTEL -> R.string.place_hotel

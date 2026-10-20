@@ -661,4 +661,90 @@
     <string name="transit_sent">в модель: %1$s</string>
     <string name="transit_no_area">Не удалось определить город цели.</string>
     <string name="transit_nothing">Модель не дала советов по транспорту.</string>
+
+    <!-- Голосовые команды навигации -->
+    <string name="nav_route_start">Начало маршрута</string>
+    <string name="nav_say_target">%1$s — по прямой %2$s</string>
+    <string name="nav_say_walk">, пешком %1$s.</string>
+    <string name="nav_say_options">Транспорт и такси — на экране телефона.</string>
+    <string name="nav_say_far_check">Если это не то место, уточните на экране.</string>
+    <string name="nav_say_target_no_fix">%1$s — цель выбрана, но где вы сейчас, определить не удалось.</string>
+    <string name="nav_say_not_saved">%1$s — место ещё не сохранено. Скажите у входа «Запомни, это мой отель».</string>
+    <string name="nav_say_return_none">Ни отель, ни дом не сохранены.</string>
+    <string name="nav_say_start_none">Начало маршрута не запомнено.</string>
+    <string name="nav_say_taxi">Показываю адрес для таксиста на экране.</string>
+    <string name="nav_say_no_target">Цель не выбрана.</string>
+    <string name="nav_say_not_found">Не нашёл «%1$s». Уточните адрес на экране.</string>
+    <string name="nav_say_remembered">Запомнил: %1$s — место, время и фото входа.</string>
+    <string name="nav_say_remembered_no_photo">Запомнил: %1$s — место и время, без фото.</string>
+    <string-array name="nav_cmd_go_prefixes">
+        <item>веди</item>
+        <item>веди в</item>
+        <item>веди до</item>
+        <item>веди к</item>
+        <item>отведи в</item>
+        <item>как добраться до</item>
+        <item>как добраться в</item>
+        <item>как добраться к</item>
+        <item>как пройти к</item>
+        <item>как пройти в</item>
+        <item>как пройти до</item>
+        <item>проложи маршрут до</item>
+        <item>маршрут до</item>
+    </string-array>
+    <string-array name="nav_cmd_return">
+        <item>как вернуться</item>
+        <item>как вернуться назад</item>
+        <item>как мне вернуться</item>
+        <item>веди обратно</item>
+        <item>отведи обратно</item>
+    </string-array>
+    <string-array name="nav_cmd_back_to_start">
+        <item>назад к началу маршрута</item>
+        <item>вернуться к началу маршрута</item>
+        <item>веди к началу маршрута</item>
+        <item>к началу маршрута</item>
+    </string-array>
+    <string-array name="nav_cmd_taxi">
+        <item>покажи адрес таксисту</item>
+        <item>покажи адрес водителю</item>
+        <item>адрес для таксиста</item>
+        <item>адрес таксисту</item>
+    </string-array>
+    <string-array name="nav_cmd_how_far">
+        <item>сколько осталось</item>
+        <item>сколько ещё осталось</item>
+        <item>сколько ещё идти</item>
+        <item>далеко ещё</item>
+        <item>ещё далеко</item>
+    </string-array>
+    <string-array name="nav_cmd_where_car">
+        <item>где машина</item>
+        <item>где моя машина</item>
+        <item>где я припарковался</item>
+        <item>веди к машине</item>
+    </string-array>
+    <string-array name="nav_remember_hotel">
+        <item>это мой отель</item>
+        <item>мой отель</item>
+        <item>мой отель здесь</item>
+        <item>здесь мой отель</item>
+        <item>отель здесь</item>
+        <item>это моя гостиница</item>
+    </string-array>
+    <string-array name="nav_remember_home">
+        <item>это мой дом</item>
+        <item>здесь мой дом</item>
+        <item>мой дом здесь</item>
+    </string-array>
+    <string-array name="nav_remember_car">
+        <item>здесь машина</item>
+        <item>машина здесь</item>
+        <item>здесь моя машина</item>
+        <item>моя машина здесь</item>
+        <item>где машина</item>
+        <item>где я припарковался</item>
+        <item>я припарковался здесь</item>
+        <item>я припарковался</item>
+    </string-array>
 </resources>
