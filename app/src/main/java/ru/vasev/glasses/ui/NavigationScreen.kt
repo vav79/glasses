@@ -773,7 +773,7 @@ private fun mapsTitle(app: MapsApp): Int = when (app) {
 private fun DeviceLocation.Fix.point() = GeoPoint(latitude, longitude)
 
 private const val LOCATION_REFRESH_MS = 10_000L
-private const val WEAK_GPS_M = 50f
+private const val WEAK_GPS_M = 100f
 private const val WALK_LABEL_MAX_M = 20_000.0
 private const val AUTO_TIPS_MAX_M = 50_000.0
 private const val PHOTO_SIDE = 1024

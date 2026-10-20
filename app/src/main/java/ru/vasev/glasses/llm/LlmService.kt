@@ -84,8 +84,8 @@ class LlmService(
 
     fun model(role: Role) = settings.model(role)
 
-    suspend fun complete(role: Role, system: String, turns: List<Turn>, maxTokens: Long, effort: Effort): Answer {
-        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort)
+    suspend fun complete(role: Role, system: String, turns: List<Turn>, maxTokens: Long, effort: Effort, cache: Boolean = true): Answer {
+        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, cache = cache)
         val primary = try {
             attempt(request, fallback = false)
         } catch (e: ProviderException) {
@@ -118,8 +118,9 @@ class LlmService(
         tools: ToolSet? = null,
         webSearch: WebSearch? = null,
         noWebSearchNote: String = NO_WEB_SEARCH_NOTE,
+        cache: Boolean = true,
     ): StreamedAnswer {
-        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, tools, webSearch, noWebSearchNote)
+        val (request, autoVision) = prepare(role, system, turns, maxTokens, effort, tools, webSearch, noWebSearchNote, cache)
         var delivered = false
         val primary = try {
             attemptStream(request, fallback = false, cause = null, metrics) {
@@ -156,9 +157,10 @@ class LlmService(
         tools: ToolSet? = null,
         webSearch: WebSearch? = null,
         noWebSearchNote: String = NO_WEB_SEARCH_NOTE,
+        cache: Boolean = true,
     ): Pair<ChatRequest, Boolean> {
         if (!isOnline()) throw LlmException(L.s(R.string.no_internet))
-        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch, noWebSearchNote = noWebSearchNote)
+        val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch, noWebSearchNote = noWebSearchNote, cache = cache)
         if (request.photoInCurrentTurn && !request.model.vision) {
             // Выбрана модель без фото (DeepSeek V4-Pro), а запрос со снимком — берём модель того же провайдера с фото.
             ModelCatalog.visionFor(request.model)?.let { return fitWebSearch(request.copy(model = it)) to true }

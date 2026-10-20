@@ -58,6 +58,8 @@ class TransitTips(private val llm: LlmService) {
             webSearch = WebSearch(maxUses = MAX_SEARCHES, country = to.country, timezone = null),
             // Без поиска — общие советы без чисел; что не проверено, подписывает экран, модели говорить об этом не нужно.
             noWebSearchNote = NO_SEARCH_NOTE,
+            // Разовый запрос (повтор за день — из кэша в памяти): запись в кэш промпта стоила бы ~18 тыс. токенов.
+            cache = false,
         )
         llm.finishTurn(streamed, metrics, interrupted = false)
         val lines = bullets(streamed.answer.text.orEmpty())

@@ -22,7 +22,7 @@ class AddressAi(private val llm: LlmService) {
 
     /** Адрес со снимка (визитка, бронь, табличка); null — модель адреса не нашла. Бросает [ru.vasev.glasses.llm.LlmException]. */
     suspend fun fromPhoto(jpeg: ByteArray): AiAddress? {
-        val answer = llm.complete(Role.ASSISTANT, PHOTO_PROMPT, listOf(Turn.User(PHOTO_QUESTION, jpeg)), MAX_TOKENS, Effort.NONE)
+        val answer = llm.complete(Role.ASSISTANT, PHOTO_PROMPT, listOf(Turn.User(PHOTO_QUESTION, jpeg)), MAX_TOKENS, Effort.NONE, cache = false)
         return clean(answer.text)?.let { AiAddress(it, answer.tag) }
     }
 
@@ -46,6 +46,7 @@ class AddressAi(private val llm: LlmService) {
             onFallback = {},
             onText = {},
             webSearch = WebSearch(maxUses = 2, country = null, timezone = null),
+            cache = false,
         )
         llm.finishTurn(streamed, metrics, interrupted = false)
         return clean(streamed.answer.text)?.let { AiAddress(it, streamed.answer.tag) }

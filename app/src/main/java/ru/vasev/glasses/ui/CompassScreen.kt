@@ -225,4 +225,4 @@ private fun Chip(text: String) {
     )
 }
 
-private const val WEAK_GPS_M = 50f
+private const val WEAK_GPS_M = 100f

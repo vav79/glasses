@@ -297,7 +297,7 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
                     .build(),
             )
         }
-        if (request.role == Role.ASSISTANT) {
+        if (request.role == Role.ASSISTANT && request.cache) {
             // Автоматический кэш: точка кэширования сама сдвигается к концу растущей истории.
             builder.cacheControl(CacheControlEphemeral.builder().build())
         }

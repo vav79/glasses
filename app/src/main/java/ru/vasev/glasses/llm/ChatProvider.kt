@@ -22,6 +22,8 @@ data class ChatRequest(
     val webSearchMissing: Boolean = false,
     /** Что сказать модели без поиска вместо общей приписки (у советов по транспорту — своя). */
     val noWebSearchNote: String = LlmService.NO_WEB_SEARCH_NOTE,
+    /** Авто-кэш промпта (ассистент у Claude); false — разовый запрос: его не повторят, а запись в кэш дороже обычного входа. */
+    val cache: Boolean = true,
 ) {
     /** Есть ли снимок в новой реплике (сценарий «Что я вижу»). */
     val photoInCurrentTurn: Boolean get() = (turns.lastOrNull() as? Turn.User)?.jpeg != null
