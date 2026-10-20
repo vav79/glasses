@@ -52,17 +52,18 @@ class PhotoCapture(private val g: GlassesApp, private val session: NavSession) {
      * [quiet] — без сообщений (фото входа необязательно): почти чёрный кадр вслепую не прикрепляется.
      */
     suspend fun shoot(@StringRes hint: Int?, quiet: Boolean = false, allowSkip: Boolean = false): Shot = try {
-        val hooks = session.hooks
+        // [NavSession.hooks] читаем в момент использования и не держим: пока открыт видоискатель, Activity может
+        // пересоздаться (поворот), и ссылка на прежнюю в этой корутине держала бы её до затвора.
         val glasses = g.glasses
         val source = g.imageSources.source.value
         val fromGlasses = (source == ImageSource.GLASSES || source == ImageSource.SIMULATOR) && glasses.status.value.ready
         when {
-            fromGlasses -> Shot.Taken(glasses.captureJpeg(hooks?.requestGlassesCamera ?: { false }))
-            hooks?.requestPhoneCamera?.invoke() != true ->
+            fromGlasses -> Shot.Taken(glasses.captureJpeg { session.hooks?.requestGlassesCamera?.invoke() == true })
+            session.hooks?.requestPhoneCamera?.invoke() != true ->
                 if (quiet) Shot.None else Shot.Failed(L.s(R.string.camera_permission_denied))
             hint != null -> viewfinder(ViewfinderRequest(hint, allowSkip))
-            else -> g.phoneCamera.captureWithoutPreview(hooks.owner)
-                .takeUnless { quiet && ImagePrep.isDark(it) }?.let(Shot::Taken) ?: Shot.None
+            else -> session.hooks?.owner?.let { g.phoneCamera.captureWithoutPreview(it) }
+                ?.takeUnless { quiet && ImagePrep.isDark(it) }?.let(Shot::Taken) ?: Shot.None
         }
     } catch (e: CancellationException) {
         throw e

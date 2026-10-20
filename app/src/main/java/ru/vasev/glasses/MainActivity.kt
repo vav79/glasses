@@ -92,7 +92,11 @@ class MainActivity : AppCompatActivity() {
     private var cameraGranted by mutableStateOf(false)
 
     private var pendingMicAction: (() -> Unit)? = null
-    private var pendingCameraPermission: CompletableDeferred<Boolean>? = null
+    // Ждущие ответа системы запросы — в [PendingRequests]: переживают пересоздание Activity (поворот).
+    private val requests: PendingRequests by viewModels()
+    private var pendingCameraPermission: CompletableDeferred<Boolean>?
+        get() = requests.glassesCamera
+        set(value) { requests.glassesCamera = value }
 
     private val runtimePermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
@@ -119,7 +123,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     /** Камера телефона для снимка по кнопке (фото входа, фото адреса в «Навигации»). */
-    private var pendingPhoneCamera: CompletableDeferred<Boolean>? = null
+    private var pendingPhoneCamera: CompletableDeferred<Boolean>?
+        get() = requests.phoneCamera
+        set(value) { requests.phoneCamera = value }
     private val phoneCameraForShot =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             cameraGranted = granted
@@ -128,7 +134,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     /** Уведомление «Компаса» (Android 13+): спрашиваем при первом запуске компаса; отказ компасу не мешает. */
-    private var pendingNotifications: CompletableDeferred<Boolean>? = null
+    private var pendingNotifications: CompletableDeferred<Boolean>?
+        get() = requests.notifications
+        set(value) { requests.notifications = value }
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             pendingNotifications?.complete(granted)
@@ -136,7 +144,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     /** Геопозиция для заметок «Запомни» — спрашивается при первой заметке. */
-    private var pendingLocationPermission: CompletableDeferred<Boolean>? = null
+    private var pendingLocationPermission: CompletableDeferred<Boolean>?
+        get() = requests.location
+        set(value) { requests.location = value }
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
             pendingLocationPermission?.complete(granted.values.any { it })
@@ -144,7 +154,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     /** Системный выбор фото: приложение получает только выбранный снимок, без доступа ко всей галерее. */
-    private var pendingPhoto: CompletableDeferred<Uri?>? = null
+    private var pendingPhoto: CompletableDeferred<Uri?>?
+        get() = requests.photo
+        set(value) { requests.photo = value }
     private val photoPicker =
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             pendingPhoto?.complete(uri)
@@ -377,11 +389,8 @@ class MainActivity : AppCompatActivity() {
         viewModel.navCommandHandler = null
         viewModel.navCommandDone = null
         viewModel.navVocabulary = null
-        pendingNotifications?.complete(false)
-        pendingPhoneCamera?.complete(false)
-        pendingLocationPermission?.complete(false)
-        pendingCameraPermission?.complete(false)
-        pendingPhoto?.complete(null)
+        // Поворот: открытый системный диалог или галерея ответит новой Activity — запросы не отменяем.
+        if (!isChangingConfigurations) requests.cancelAll()
         super.onDestroy()
     }
 
