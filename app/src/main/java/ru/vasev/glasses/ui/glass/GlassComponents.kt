@@ -20,7 +20,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -61,21 +60,23 @@ fun GlassButton(
     textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
 ) {
     val (tint, content) = colorsFor(kind)
+    // Неактивность — цветом текста и иконки, а не прозрачностью слоя: смена alpha слоя (неактивна → активна)
+    // оставляла кнопку без стекла — подложка и обводка пропадали до следующей перерисовки.
+    val shown = if (enabled) content else content.copy(alpha = content.alpha * DISABLED_ALPHA)
     Row(
         modifier
             .defaultMinSize(minHeight = minHeight)
             .glass(GlassShapes.pill, tint, content, blur = blur)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) {
-            Icon(painterResource(icon), contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
+            Icon(painterResource(icon), contentDescription = null, tint = shown, modifier = Modifier.size(20.dp))
             Spacer(Modifier.size(8.dp))
         }
-        Text(text, color = content, style = textStyle, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        Text(text, color = shown, style = textStyle, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
     }
 }
 
@@ -92,15 +93,17 @@ fun GlassIconButton(
     kind: GlassButtonKind = GlassButtonKind.NORMAL,
 ) {
     val (tint, content) = colorsFor(kind)
+    // Неактивность — цветом текста и иконки, а не прозрачностью слоя: смена alpha слоя (неактивна → активна)
+    // оставляла кнопку без стекла — подложка и обводка пропадали до следующей перерисовки.
+    val shown = if (enabled) content else content.copy(alpha = content.alpha * DISABLED_ALPHA)
     Box(
         modifier
             .size(size)
             .glass(GlassShapes.pill, tint, content, blur = blur)
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description, onClick = onClick)
-            .alpha(if (enabled) 1f else DISABLED_ALPHA),
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(icon), contentDescription = description, tint = content, modifier = Modifier.size(size * 0.46f))
+        Icon(painterResource(icon), contentDescription = description, tint = shown, modifier = Modifier.size(size * 0.46f))
     }
 }
 

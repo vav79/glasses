@@ -4,10 +4,21 @@ import android.os.Build
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import ru.vasev.glasses.profile.SpeechPace
 import java.util.Locale
 
 /** Куда звучит речь: [ME] — мне (гарнитура, позже — очки), [PARTNER] — собеседнику (динамик телефона). */
-enum class AudioChannel { ME, PARTNER }
+enum class AudioChannel {
+    ME,
+    PARTNER,
+    ;
+
+    /** Скорость речи: мне — из «Стиля общения» ([override] — пробный ответ в шторке до «Сохранить»), собеседнику — всегда обычная. */
+    fun rate(pace: SpeechPace, override: Float? = null): Float = when (this) {
+        ME -> override ?: pace.rate
+        PARTNER -> SpeechPace.NORMAL.rate
+    }
+}
 
 /** Вывод синтезированной речи по каналам. */
 interface AudioOutput {
@@ -15,7 +26,7 @@ interface AudioOutput {
      * Возвращается после окончания озвучки (onDone у TTS). [onStart] — момент начала звука.
      * Пока фраза звучит, музыка других приложений приглушена.
      */
-    suspend fun speak(text: String, locale: Locale, channel: AudioChannel, onStart: () -> Unit = {})
+    suspend fun speak(text: String, locale: Locale, channel: AudioChannel, rate: Float? = null, onStart: () -> Unit = {})
 
     /** Держать музыку приглушённой между фразами одного ответа — до [releaseFocus]. */
     fun holdFocus()
@@ -37,13 +48,15 @@ class PhoneSpeakerOutput(
     private val router: AudioRouter,
     private val focus: AudioFocus,
     private val navigator: NavigatorVoice,
+    private val pace: () -> SpeechPace,
 ) : AudioOutput {
 
     /**
      * Мы уступаем навигатору: перед фразой ждём, пока он договорит; заговорил посреди нашей фразы — замолкаем
      * и повторяем её, когда он закончит (один раз, иначе при длинной подсказке фраза потерялась бы совсем).
      */
-    override suspend fun speak(text: String, locale: Locale, channel: AudioChannel, onStart: () -> Unit) {
+    override suspend fun speak(text: String, locale: Locale, channel: AudioChannel, rate: Float?, onStart: () -> Unit) {
+        val speechRate = channel.rate(pace(), rate)
         var started = false
         val once = {
             if (!started) {
@@ -60,7 +73,7 @@ class PhoneSpeakerOutput(
                     speaker.stop()
                 }
                 try {
-                    speakOnce(text, locale, channel, once)
+                    speakOnce(text, locale, channel, speechRate, once)
                 } finally {
                     watcher.cancel()
                 }
@@ -70,7 +83,7 @@ class PhoneSpeakerOutput(
         }
     }
 
-    private suspend fun speakOnce(text: String, locale: Locale, channel: AudioChannel, onStart: () -> Unit) {
+    private suspend fun speakOnce(text: String, locale: Locale, channel: AudioChannel, rate: Float, onStart: () -> Unit) {
         // Пока жив SCO-канал микрофона гарнитуры, телефон «в звонке»: звук ушёл бы в гарнитуру с громкостью звонка.
         // Исключение — голосовое «стоп» во время ответа: микрофон держится намеренно (AudioRouter.holdMic).
         router.releaseMic()
@@ -82,7 +95,7 @@ class PhoneSpeakerOutput(
                 val builtin = router.builtinSpeaker()
                 if (builtin != null) {
                     router.log("out PARTNER", "phone speaker requested (headset connected); ${router.state()}")
-                    speaker.speakTo(text, locale, builtin, onStart) { routed ->
+                    speaker.speakTo(text, locale, builtin, rate, onStart) { routed ->
                         router.log("out PARTNER", "playing on: ${router.describe(routed)}")
                     }
                     return
@@ -90,7 +103,7 @@ class PhoneSpeakerOutput(
             }
             val expected = if (headset?.output != null) "headset \"${headset.name}\"" else "phone speaker"
             router.log("out $channel", "$expected, system route: ${currentRoute()}; ${router.state()}")
-            speaker.speak(text, locale, onStart)
+            speaker.speak(text, locale, rate, onStart)
         } finally {
             focus.release()
         }

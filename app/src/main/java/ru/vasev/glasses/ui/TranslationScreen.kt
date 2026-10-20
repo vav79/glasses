@@ -57,6 +57,10 @@ import ru.vasev.glasses.ui.glass.GlassShapes
 import ru.vasev.glasses.ui.glass.glass
 import ru.vasev.glasses.ui.glass.glassBackgroundText
 import ru.vasev.glasses.ui.glass.glassContentSource
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.vasev.glasses.profile.SpeakerGender
+import ru.vasev.glasses.translate.TranslationPrompt
 
 @Composable
 fun TranslationScreen(
@@ -72,6 +76,14 @@ fun TranslationScreen(
     val busy = state.phase != TranslatePhase.IDLE
     /** Перевод на весь экран крупным текстом (текст, подпись). */
     var large by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val styleViewModel: StyleViewModel = viewModel()
+    val style by styleViewModel.saved.collectAsStateWithLifecycle()
+    val genderHintShown by styleViewModel.genderHintShown.collectAsStateWithLifecycle()
+    var styleOpen by rememberSaveable { mutableStateOf(false) }
+    if (styleOpen) {
+        StyleScreen(styleViewModel) { styleOpen = false }
+        return
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -110,6 +122,24 @@ fun TranslationScreen(
                         icon = R.drawable.ic_sym_download,
                         kind = GlassButtonKind.NORMAL,
                     )
+                }
+            }
+
+            // Язык с родом или вежливыми частицами, а мой пол не указан — один раз подсказать «Стиль общения».
+            if (state.language in TranslationPrompt.GENDERED && style.gender == SpeakerGender.UNSET && !genderHintShown) {
+                GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
+                    Text(stringResource(R.string.translate_gender_hint), style = MaterialTheme.typography.bodyMedium)
+                    Row(Modifier.align(Alignment.End), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GlassButton(stringResource(R.string.close), onClick = styleViewModel::markGenderHintShown)
+                        GlassButton(
+                            stringResource(R.string.translate_gender_hint_open),
+                            onClick = {
+                                styleViewModel.markGenderHintShown()
+                                styleOpen = true
+                            },
+                            kind = GlassButtonKind.PRIMARY,
+                        )
+                    }
                 }
             }
 

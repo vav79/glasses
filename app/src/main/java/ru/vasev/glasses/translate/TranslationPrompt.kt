@@ -3,6 +3,8 @@ package ru.vasev.glasses.translate
 import androidx.annotation.StringRes
 import ru.vasev.glasses.R
 import ru.vasev.glasses.i18n.AppLanguage
+import ru.vasev.glasses.profile.Formality
+import ru.vasev.glasses.profile.SpeakerGender
 import java.util.Locale
 
 /**
@@ -64,8 +66,16 @@ object TranslationPrompt {
     /**
      * [who] сказал [phrase]; [my] — мой язык, [partner] — язык собеседника;
      * [history] — все предыдущие реплики, в промпт попадут последние [CONTEXT_SIZE].
+     * [voice] — обращение к собеседнику и мой пол из «Стиля общения»: только для моих фраз собеседнику.
      */
-    fun build(partner: PartnerLanguage, my: PartnerLanguage, who: Who, phrase: String, history: List<Line>): String = buildString {
+    fun build(
+        partner: PartnerLanguage,
+        my: PartnerLanguage,
+        who: Who,
+        phrase: String,
+        history: List<Line>,
+        voice: SpeakerVoice? = null,
+    ): String = buildString {
         val context = history.takeLast(CONTEXT_SIZE)
         if (context.isNotEmpty()) {
             appendLine("Earlier lines of the conversation — for context only, do not translate them:")
@@ -78,7 +88,42 @@ object TranslationPrompt {
             appendLine()
         }
         val (from, to) = if (who == Who.PARTNER) partner to my else my to partner
+        if (who == Who.ME && voice != null) voiceRules(voice).forEach(::appendLine)
         appendLine("Translate from ${from.englishName} into ${to.englishName}:")
         append(phrase.trim())
     }
+
+    /** Строки про обращение и пол говорящего — для моих фраз собеседнику. */
+    fun voiceRules(voice: SpeakerVoice): List<String> = listOf(
+        when (voice.formality) {
+            Formality.POLITE -> "Address the listener politely and formally (Spanish usted, French vous, German Sie, Italian Lei; the formal you in any language)."
+            Formality.CASUAL -> "Address the listener informally, as a friend (Spanish tú, French tu, German du, Italian tu; the informal you in any language)."
+        },
+        when (voice.gender) {
+            SpeakerGender.MALE ->
+                "The speaker is a man: use masculine forms for the speaker (Spanish cansado, French fatigué). " +
+                    "In Thai, refer to the speaker as ผม and end sentences and questions with ครับ."
+            SpeakerGender.FEMALE ->
+                "The speaker is a woman: use feminine forms for the speaker (Spanish cansada, French fatiguée). " +
+                    "In Thai, refer to the speaker as ฉัน, end statements with ค่ะ and questions with คะ."
+            SpeakerGender.UNSET ->
+                "The speaker's gender is unknown, even if the source sentence uses a gendered form. Do not use adjectives or " +
+                    "participles that agree with the speaker's gender; rephrase with a noun or a verb instead, keeping the meaning " +
+                    "(Spanish: Tengo cansancio or Necesito descansar, not an adjective with -o or -a). " +
+                    "In Thai, do not add the polite particles ครับ, ค่ะ or คะ and leave out the first-person pronoun, as Thai allows."
+        },
+    )
+
+    /** Языки, где мой пол меняет перевод (род, вежливые частицы): подсказка «укажите пол» в «Переводе». */
+    val GENDERED: Set<PartnerLanguage> = setOf(
+        PartnerLanguage.THAI,
+        PartnerLanguage.SPANISH,
+        PartnerLanguage.FRENCH,
+        PartnerLanguage.ARABIC,
+        PartnerLanguage.ITALIAN,
+        PartnerLanguage.RUSSIAN,
+    )
 }
+
+/** Обращение к собеседнику и мой пол — из «Стиля общения». */
+data class SpeakerVoice(val formality: Formality, val gender: SpeakerGender)

@@ -75,6 +75,11 @@ import ru.vasev.glasses.llm.ProviderId
 import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.nav.CountryLanguage
 import ru.vasev.glasses.nav.NavigatorChoice
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
@@ -95,6 +100,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val navigator by viewModel.navigator.collectAsStateWithLifecycle()
     val taxiLanguage by viewModel.taxiLanguage.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.refresh() }
+    val styleViewModel: StyleViewModel = viewModel()
+    val style by styleViewModel.saved.collectAsStateWithLifecycle()
+    var styleOpen by rememberSaveable { mutableStateOf(false) }
+    // «Стиль общения» — вместо содержимого настроек, на том же стеклянном фоне.
+    if (styleOpen) {
+        StyleScreen(styleViewModel) { styleOpen = false }
+        return
+    }
 
     // Вся колонка — источник размытия: при прокрутке разделы уходят под стеклянную панель вкладок.
     Column(
@@ -110,6 +123,21 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
         Section(stringResource(R.string.settings_app_language)) {
             LanguagePicker(language, viewModel::setLanguage)
             Hint(stringResource(R.string.settings_app_language_hint))
+        }
+
+        Section(stringResource(R.string.settings_style_title)) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(role = SemanticsRole.Button) { styleOpen = true },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(styleSummary(style), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Icon(painterResource(R.drawable.ic_sym_chevron_right), contentDescription = null)
+            }
+            Hint(stringResource(R.string.settings_style_hint))
         }
 
         Section(stringResource(R.string.settings_appearance)) {

@@ -67,10 +67,10 @@ class Speaker(context: Context) {
     }
 
     /**
-     * Говорит [text] голосом для [locale] и возвращается, когда речь закончилась (onDone) или была остановлена.
+     * Говорит [text] голосом для [locale] с темпом [rate] (1.0 — обычный) и возвращается, когда речь закончилась (onDone) или была остановлена.
      * [onStart] вызывается в момент начала звука.
      */
-    suspend fun speak(text: String, locale: Locale, onStart: () -> Unit = {}) {
+    suspend fun speak(text: String, locale: Locale, rate: Float = 1.0f, onStart: () -> Unit = {}) {
         if (!ready.await()) throw SpeechException(L.s(R.string.tts_unavailable))
         val lang = tts.setLanguage(locale)
         if (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED) {
@@ -80,6 +80,7 @@ class Speaker(context: Context) {
             pendingStart = onStart
             pending = { if (cont.isActive) cont.resume(Unit) }
             cont.invokeOnCancellation { tts.stop() }
+            tts.setSpeechRate(rate)
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
         }
     }
@@ -94,6 +95,7 @@ class Speaker(context: Context) {
         text: String,
         locale: Locale,
         device: AudioDeviceInfo,
+        rate: Float = 1.0f,
         onStart: () -> Unit = {},
         onRouted: (AudioDeviceInfo?) -> Unit = {},
     ) {
@@ -107,6 +109,7 @@ class Speaker(context: Context) {
         suspendCancellableCoroutine { cont ->
             pending = { if (cont.isActive) cont.resume(Unit) }
             cont.invokeOnCancellation { tts.stop() }
+            tts.setSpeechRate(rate)
             tts.synthesizeToFile(text, null, file, UUID.randomUUID().toString())
         }
         // 2. Воспроизведение на выбранное устройство.

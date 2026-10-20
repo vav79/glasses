@@ -716,4 +716,47 @@
         <item>where i parked</item>
         <item>i parked here</item>
     </string-array>
+
+    <!-- Стиль общения -->
+    <string name="settings_style_title">Communication style</string>
+    <string name="settings_style_hint">How the assistant answers, how translation addresses your partner, speech speed.</string>
+    <string name="style_summary_custom">%1$s + own</string>
+    <string name="style_brief">Brief</string>
+    <string name="style_detailed">Detailed</string>
+    <string name="style_friendly">Friendly</string>
+    <string name="style_business">Business</string>
+    <string name="style_guide">Tour guide</string>
+    <string name="style_simple">Simple</string>
+    <string name="style_section_assistant">Assistant</string>
+    <string name="style_custom_label">Your own prompt</string>
+    <string name="style_custom_placeholder">For example: call me Alex, no jokes, mention prices in euros</string>
+    <string name="style_custom_counter">%1$d / %2$d</string>
+    <string name="style_custom_note">Your wishes change only the tone and the level of detail. The app\'s service rules stay in force.</string>
+    <string name="style_section_translation">Translation</string>
+    <string name="style_formality_title">Addressing the partner</string>
+    <string name="style_formality_polite">Polite</string>
+    <string name="style_formality_casual">Casual</string>
+    <string name="style_gender_title">Speaker\'s gender</string>
+    <string name="style_gender_unset">Not set</string>
+    <string name="style_gender_male">Male</string>
+    <string name="style_gender_female">Female</string>
+    <string name="style_gender_hint">For word forms and polite particles: Thai ครับ/ค่ะ, Spanish cansado/cansada. Not set — neutral forms where possible.</string>
+    <string name="style_section_pace">Speech speed</string>
+    <string name="style_pace_slower">Slower</string>
+    <string name="style_pace_normal">Normal</string>
+    <string name="style_pace_faster">Faster</string>
+    <string name="style_pace_hint">For everything you hear. Your partner always hears normal speed.</string>
+    <string name="style_test">Try it</string>
+    <string name="style_test_cancel">Stop</string>
+    <string name="style_test_question">What should I see in London in one day?</string>
+    <string name="style_test_label">Test question</string>
+    <string name="style_test_note">Any question with the settings above, before saving; empty — the example. The answer does not go into the conversation.</string>
+    <string name="style_test_no_key">To try it, add the key for the assistant model in Settings.</string>
+    <string name="style_clear">Clear</string>
+    <string name="style_save">Save</string>
+    <string name="style_unsaved_title">Save changes?</string>
+    <string name="style_unsaved_text">The communication style has unsaved changes.</string>
+    <string name="style_unsaved_discard">Don\'t save</string>
+    <string name="translate_gender_hint">In this language the translation of your phrases depends on your gender: word forms and polite particles. Set it in “Communication style”.</string>
+    <string name="translate_gender_hint_open">Set</string>
 </resources>

@@ -25,6 +25,7 @@ import ru.vasev.glasses.nav.TaxiAddresses
 import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.places.PlaceStore
 import ru.vasev.glasses.profile.ProfileSettings
+import ru.vasev.glasses.profile.StyleSettings
 import ru.vasev.glasses.rates.CbrRates
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.security.ApiKeyStore
@@ -129,6 +130,10 @@ class GlassesApp : Application() {
     lateinit var navigator: NavigatorSettings
         private set
 
+    /** «Стиль общения»: стиль ассистента, обращение и пол в переводе, скорость речи. */
+    lateinit var style: StyleSettings
+        private set
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -138,6 +143,7 @@ class GlassesApp : Application() {
         apiKeys = ApiKeyStore(this)
         aiSettings = AiSettings(this)
         profile = ProfileSettings(this)
+        style = StyleSettings(this)
         journal = RequestJournal(this)
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }
         Wearables.initialize(this)
@@ -152,7 +158,7 @@ class GlassesApp : Application() {
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)
         navigatorVoice = NavigatorVoice(this)
-        audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this), navigatorVoice)
+        audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this), navigatorVoice) { style.current.value.pace }
         headsetButtons = HeadsetButtons(this)
         notes = NoteStore(this)
         location = DeviceLocation(this)

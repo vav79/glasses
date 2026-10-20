@@ -65,6 +65,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     private val speech = (app as GlassesApp).speechSource
     private val audio = (app as GlassesApp).audioOutput
     private val llm = (app as GlassesApp).llm
+    private val styleSettings = (app as GlassesApp).style
     private val translator = Translator(llm)
     private val prefs = app.getSharedPreferences("translate", Context.MODE_PRIVATE)
     private val noiseFilter = NoiseFilter.load(app)
@@ -218,7 +219,8 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         _state.update { it.copy(phase = TranslatePhase.TRANSLATING, pending = heard.text) }
-        val prompt = TranslationPrompt.build(language, my, who, heard.text, lines)
+        val style = styleSettings.current.value
+        val prompt = TranslationPrompt.build(language, my, who, heard.text, lines, SpeakerVoice(style.formality, style.gender))
         val answer = translator.translate(prompt)
         val translation = answer.text
         val tTranslated = SystemClock.elapsedRealtime()

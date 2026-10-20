@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.vasev.glasses.i18n.AppLanguage
+import ru.vasev.glasses.profile.Formality
+import ru.vasev.glasses.profile.SpeakerGender
 
 class TranslationPromptTest {
 
@@ -79,5 +81,35 @@ class TranslationPromptTest {
         assertEquals(PartnerLanguage.partnersFor(en).first(), PartnerLanguage.resolvePartner(en, en))
         assertEquals(PartnerLanguage.TURKISH, PartnerLanguage.resolvePartner(PartnerLanguage.TURKISH, en))
         assertEquals(PartnerLanguage.partnersFor(ru).first(), PartnerLanguage.resolvePartner(null, ru))
+    }
+
+    @Test
+    fun `обращение и пол — только в моих фразах собеседнику`() {
+        val voice = SpeakerVoice(Formality.CASUAL, SpeakerGender.FEMALE)
+        val mine = TranslationPrompt.build(PartnerLanguage.SPANISH, ru, Who.ME, "Я устала", emptyList(), voice)
+        assertTrue(mine.contains("tú"))
+        assertTrue(mine.contains("woman"))
+        assertTrue(mine.endsWith("Translate from Russian into Spanish:\nЯ устала"))
+        val partners = TranslationPrompt.build(PartnerLanguage.SPANISH, ru, Who.PARTNER, "Estoy cansada", emptyList(), voice)
+        assertEquals("Translate from Spanish into Russian:\nEstoy cansada", partners)
+    }
+
+    @Test
+    fun `тайский — мужчина ครับ, женщина ค่ะ и คะ в вопросах`() {
+        val male = TranslationPrompt.voiceRules(SpeakerVoice(Formality.POLITE, SpeakerGender.MALE)).joinToString("\n")
+        assertTrue(male.contains("ผม") && male.contains("ครับ"))
+        assertFalse(male.contains("ค่ะ"))
+        val female = TranslationPrompt.voiceRules(SpeakerVoice(Formality.POLITE, SpeakerGender.FEMALE)).joinToString("\n")
+        assertTrue(female.contains("ฉัน") && female.contains("ค่ะ") && female.contains("questions with คะ"))
+    }
+
+    @Test
+    fun `не указан — без строк про мужской и женский род`() {
+        val rules = TranslationPrompt.voiceRules(SpeakerVoice(Formality.POLITE, SpeakerGender.UNSET)).joinToString("\n")
+        listOf("is a man", "is a woman", "masculine", "feminine", "cansado", "cansada").forEach {
+            assertFalse("лишнее: $it", rules.contains(it))
+        }
+        assertTrue(rules.contains("do not add the polite particles"))
+        assertTrue(rules.contains("usted"))
     }
 }

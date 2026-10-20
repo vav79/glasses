@@ -44,6 +44,10 @@ import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
 import androidx.compose.ui.graphics.toArgb
 import ru.vasev.glasses.ui.theme.glassesColorScheme
+import ru.vasev.glasses.profile.AnswerStyle
+import ru.vasev.glasses.profile.Formality
+import ru.vasev.glasses.profile.SpeakerGender
+import ru.vasev.glasses.profile.SpeechPace
 import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
@@ -377,6 +381,7 @@ class MainActivity : AppCompatActivity() {
  *  - снимок из файла files/<имя>: --es frame_file qr.png (вместе с question + with_frame или translate_view)
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
+     *  - стиль:     --es style_answer guide --es style_formality casual --es style_gender male|female|unset --es style_pace slower
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
      *  - снимки:    --es image_source glasses|phone|simulator
      *  - вкладка:    --es tab assistant|camera|translate|navigation|settings|development (журнал в настройках)
@@ -426,6 +431,20 @@ class MainActivity : AppCompatActivity() {
                 intent.removeExtra(extra)
                 ModelCatalog.byId(id)?.let { app.aiSettings.setModel(role, it) }
             }
+        }
+        // «Стиль общения» без шторки: --es style_gender male --es style_formality casual (сохраняется, как «Сохранить»).
+        val styleExtras = listOf("style_answer", "style_formality", "style_gender", "style_pace")
+        if (styleExtras.any(intent::hasExtra)) {
+            var style = app.style.current.value
+            fun <T : Enum<T>> pick(extra: String, values: Array<T>): T? =
+                intent.getStringExtra(extra)?.let { name -> values.firstOrNull { it.name.equals(name, ignoreCase = true) } }
+            pick("style_answer", AnswerStyle.entries.toTypedArray())?.let { style = style.copy(answer = it) }
+            pick("style_formality", Formality.entries.toTypedArray())?.let { style = style.copy(formality = it) }
+            pick("style_gender", SpeakerGender.entries.toTypedArray())?.let { style = style.copy(gender = it) }
+            pick("style_pace", SpeechPace.entries.toTypedArray())?.let { style = style.copy(pace = it) }
+            styleExtras.forEach(intent::removeExtra)
+            app.style.save(style)
+            Log.d(TAG, "debug style: $style")
         }
         intent.getStringExtra("fail_claude")?.let { kind ->
             intent.removeExtra("fail_claude")

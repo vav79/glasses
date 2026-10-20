@@ -164,6 +164,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val headsetButtons = (app as GlassesApp).headsetButtons
     private val profile = (app as GlassesApp).profile
     private val llm = (app as GlassesApp).llm
+    private val styleSettings = (app as GlassesApp).style
     private val assistant = AssistantClient(llm)
     private val abbreviations = SentenceSplitter.loadAbbreviations(app)
 
@@ -723,6 +724,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     language,
                     myCurrency,
                     where,
+                    styleSettings.current.value,
                     metrics,
                     onFallback = { sentences.trySend(L.s(R.string.say_fallback_intro)) },
                     onText = { delta ->

@@ -753,4 +753,47 @@
         <item>я припарковался здесь</item>
         <item>я припарковался</item>
     </string-array>
+
+    <!-- Стиль общения -->
+    <string name="settings_style_title">Стиль общения</string>
+    <string name="settings_style_hint">Как отвечает ассистент, как перевод обращается к собеседнику, скорость речи.</string>
+    <string name="style_summary_custom">%1$s + своё</string>
+    <string name="style_brief">Кратко</string>
+    <string name="style_detailed">Подробно</string>
+    <string name="style_friendly">Дружески</string>
+    <string name="style_business">Деловой</string>
+    <string name="style_guide">Экскурсовод</string>
+    <string name="style_simple">Просто</string>
+    <string name="style_section_assistant">Ассистент</string>
+    <string name="style_custom_label">Свой промт</string>
+    <string name="style_custom_placeholder">Например: обращайся ко мне по имени, Саша; без шуток; цены — в евро</string>
+    <string name="style_custom_counter">%1$d / %2$d</string>
+    <string name="style_custom_note">Пожелания меняют только тон и подробность ответов. Служебные правила приложения остаются в силе.</string>
+    <string name="style_section_translation">Перевод</string>
+    <string name="style_formality_title">Обращение к собеседнику</string>
+    <string name="style_formality_polite">Вежливо</string>
+    <string name="style_formality_casual">По-простому</string>
+    <string name="style_gender_title">Пол говорящего</string>
+    <string name="style_gender_unset">Не указан</string>
+    <string name="style_gender_male">Мужской</string>
+    <string name="style_gender_female">Женский</string>
+    <string name="style_gender_hint">Для форм слов и вежливых частиц: тайское ครับ/ค่ะ, испанское cansado/cansada. «Не указан» — нейтральные формы, где возможно.</string>
+    <string name="style_section_pace">Скорость речи</string>
+    <string name="style_pace_slower">Медленнее</string>
+    <string name="style_pace_normal">Обычно</string>
+    <string name="style_pace_faster">Быстрее</string>
+    <string name="style_pace_hint">Для всего, что слышите вы. Собеседнику — всегда обычная.</string>
+    <string name="style_test">Проверить</string>
+    <string name="style_test_cancel">Остановить</string>
+    <string name="style_test_question">Что посмотреть в Санкт-Петербурге за один день?</string>
+    <string name="style_test_label">Пробный вопрос</string>
+    <string name="style_test_note">Любой вопрос — с настройками выше, ещё до сохранения; пусто — пример. В историю разговора ответ не попадает.</string>
+    <string name="style_test_no_key">Чтобы проверить, добавьте в настройках ключ для модели ассистента.</string>
+    <string name="style_clear">Очистить</string>
+    <string name="style_save">Сохранить</string>
+    <string name="style_unsaved_title">Сохранить изменения?</string>
+    <string name="style_unsaved_text">В стиле общения есть несохранённые изменения.</string>
+    <string name="style_unsaved_discard">Не сохранять</string>
+    <string name="translate_gender_hint">На этом языке перевод ваших фраз зависит от вашего пола: формы слов и вежливые частицы. Укажите его в «Стиле общения».</string>
+    <string name="translate_gender_hint_open">Указать</string>
 </resources>

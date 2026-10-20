@@ -9,6 +9,8 @@ import ru.vasev.glasses.llm.StreamedAnswer
 import ru.vasev.glasses.llm.ToolSet
 import ru.vasev.glasses.llm.TurnMetrics
 import ru.vasev.glasses.llm.WebSearch
+import ru.vasev.glasses.profile.CommunicationStyle
+import ru.vasev.glasses.profile.StylePrompt
 
 /** Где пользователь сейчас — для веб-поиска и валюты на ценниках. */
 data class Whereabouts(val country: String?, val timezone: String?, val localCurrency: String?)
@@ -30,13 +32,14 @@ class AssistantClient(private val llm: LlmService) {
         language: AppLanguage,
         myCurrency: String,
         where: Whereabouts,
+        style: CommunicationStyle,
         metrics: TurnMetrics,
         onFallback: () -> Unit,
         onText: (String) -> Unit,
     ): StreamedAnswer = llm.stream(
         role = Role.ASSISTANT,
         system = when (mode) {
-            AssistantMode.CHAT -> systemPrompt(language, plan, myCurrency)
+            AssistantMode.CHAT -> systemPrompt(language, plan, myCurrency, style)
             AssistantMode.TRANSLATE_VIEW -> translateViewPrompt(language, myCurrency, where)
         },
         turns = turns,
@@ -58,7 +61,7 @@ class AssistantClient(private val llm: LlmService) {
          * Промпт на английском; язык ответа — язык приложения. Меняется вместе с языком и набором инструментов
          * (удаление заметок — только по явной просьбе), тогда кэш начнётся заново.
          */
-        fun systemPrompt(language: AppLanguage, plan: ToolPlan, myCurrency: String): String = buildString {
+        fun systemPrompt(language: AppLanguage, plan: ToolPlan, myCurrency: String, style: CommunicationStyle? = null): String = buildString {
             appendLine(
                 """
                 You are a voice assistant built into Ray-Ban Meta smart glasses. Always answer in ${language.englishName}.
@@ -93,6 +96,8 @@ class AssistantClient(private val llm: LlmService) {
             if (plan.rates) {
                 appendLine("To convert money into the user's currency ($myCurrency), use convert_prices: it has the official Bank of Russia rates.")
             }
+            // «Стиль общения» — последним и с меньшим приоритетом: служебные правила выше он не меняет.
+            style?.let(StylePrompt::block)?.let(::appendLine)
         }.trim()
 
         /** «Переведи, что вижу»: весь текст снимка на язык приложения, вслух — кратко, полностью — в чате. */
