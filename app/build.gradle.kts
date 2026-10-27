@@ -30,9 +30,16 @@ android {
         // API-ключи провайдеров в сборку не входят: они вводятся в приложении и хранятся зашифрованными (ApiKeyStore).
         // Симулятор очков выбирается в приложении как источник снимков (только в debug-сборке).
 
-        // В Developer Mode приложения Meta AI аттестация не используется — достаточно "0".
-        manifestPlaceholders["mwdat_application_id"] = localProps.getProperty("mwdat_application_id", "0")
-        manifestPlaceholders["mwdat_client_token"] = localProps.getProperty("mwdat_client_token", "0")
+        // Идентификаторы проекта из Wearables Developer Center — только в local.properties (не в git):
+        // mwdat.applicationId и mwdat.clientToken (старые имена mwdat_application_id / mwdat_client_token тоже читаются).
+        // Нет строк — "0": режим разработчика Meta AI, аттестация не используется.
+        fun mwdat(name: String, legacy: String): String =
+            (localProps.getProperty(name) ?: localProps.getProperty(legacy))?.trim()?.takeIf { it.isNotEmpty() } ?: "0"
+        val mwdatAppId = mwdat("mwdat.applicationId", "mwdat_application_id")
+        manifestPlaceholders["mwdat_application_id"] = mwdatAppId
+        manifestPlaceholders["mwdat_client_token"] = mwdat("mwdat.clientToken", "mwdat_client_token")
+        // Режим в лог при запуске (сами значения не пишем).
+        buildConfigField("boolean", "MWDAT_DEV_MODE", (mwdatAppId == "0").toString())
     }
 
     buildTypes {

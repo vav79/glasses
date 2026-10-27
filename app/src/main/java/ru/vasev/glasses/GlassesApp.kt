@@ -55,7 +55,7 @@ class GlassesApp : Application() {
     lateinit var glasses: GlassesManager
         private set
 
-    /** «Hey Meta, start Glasses Helper» — поток голосовых запусков от Meta AI. */
+    /** «Hey Meta, start Sputnik» — поток голосовых запусков от Meta AI. */
     lateinit var voiceLaunch: VoiceLaunch
         private set
 
@@ -163,6 +163,7 @@ class GlassesApp : Application() {
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
+        Log.d(TAG, "DAT config: ${if (BuildConfig.MWDAT_DEV_MODE) "developer mode (application id 0)" else "Developer Center application id"}")
         glasses = GlassesManager(this)
         voiceLaunch = VoiceLaunch(CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
         imageSources = ImageSourceSettings(this, glasses)

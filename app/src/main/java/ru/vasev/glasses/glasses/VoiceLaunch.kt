@@ -18,11 +18,12 @@ import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp.Companion.TAG
 
 /**
- * «Hey Meta, start Glasses Helper»: Meta AI запускает приложение и присылает [LaunchApp] через поток голосовых запусков.
+ * «Hey Meta, start Sputnik»: Meta AI запускает приложение и присылает [LaunchApp] через поток голосовых запусков.
  * Поток один на всё приложение и живёт, пока приложение зарегистрировано в Meta AI. Событие ждёт экран ([pending]):
  * «Ассистент» начинает слушать вопрос и отвечает Meta AI ([respond]). На каждое событие — ровно один ответ:
  * не забрали за [CLAIM_TIMEOUT_MS] (экран не показался) — отказ, иначе Meta AI ждала бы и показала бы запасной экран.
- * Имя для «Hey Meta» и разрешение Voice Invocation задаются в Wearables Developer Center, не в манифесте.
+ * Имя для «Hey Meta» («Sputnik»; название приложения на телефоне — другое) и разрешение Voice Invocation задаются
+ * в Wearables Developer Center, не в манифесте.
  */
 class VoiceLaunch(private val scope: CoroutineScope) {
 

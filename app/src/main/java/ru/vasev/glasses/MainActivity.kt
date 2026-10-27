@@ -376,9 +376,14 @@ class MainActivity : AppCompatActivity() {
     /** Запущены голосом через Meta AI: сразу «Ассистент». Слушать начнём по событию из потока ([handleVoiceLaunch]). */
     private fun handleVoiceIntent(intent: Intent) {
         if (!isVoiceInvocationsIntent(intent)) return
-        Log.d(TAG, "VoiceInvocation: launched by Meta AI")
+        Log.d(TAG, "VoiceInvocation: launched by Meta AI, tab=$tab")
         selectTab(AppTab.ASSISTANT)
     }
+
+    /**
+     * Голосовой запуск — всегда «Ассистент»: идущий перевод останавливается (selectTab), открытые настройки закрываются.
+     * Компас работает дальше — он живёт на всё приложение (CompassController + foreground-сервис), а не на вкладке.
+     */
 
     private fun handleVoiceLaunch() {
         val app = application as GlassesApp
@@ -390,6 +395,7 @@ class MainActivity : AppCompatActivity() {
                 requestRuntimePermissions()
             }
             else -> {
+                Log.d(TAG, "VoiceInvocation: claimed on tab=$tab settings=$settingsOpen")
                 selectTab(AppTab.ASSISTANT)
                 val ok = viewModel.voiceLaunch()
                 app.voiceLaunch.respond(launch, ok, reason = if (ok) "" else "no API key")

@@ -284,7 +284,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun ask() = run(withFrame = false)
 
     /**
-     * «Hey Meta, start Glasses Helper»: сразу слушать вопрос (идущий ответ прерывается, как кнопкой).
+     * «Hey Meta, start Sputnik»: сразу слушать вопрос (идущий ответ прерывается, как кнопкой).
      * false — ответить нечем (нет ключа для модели ассистента): об этом сказано вслух.
      */
     fun voiceLaunch(): Boolean {
