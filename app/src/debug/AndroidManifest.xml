@@ -12,5 +12,10 @@
             android:name=".debug.GlassShowcaseActivity"
             android:exported="true"
             android:theme="@style/Theme.Glasses" />
+        <!-- Проба DAT Speech на очках: adb shell am start -n ru.vasev.glasses/.debug.SpeechProbeActivity -->
+        <activity
+            android:name=".debug.SpeechProbeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Glasses" />
     </application>
 </manifest>

@@ -89,6 +89,8 @@ dependencies {
     implementation(libs.haze.blur)
     implementation(libs.haze.blur.materials)
     debugImplementation(libs.backdrop)
+    // DAT Speech (экспериментальный, только dev/beta) — пока только debug-проба SpeechProbeActivity.
+    debugImplementation(libs.mwdat.speech)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
