@@ -254,6 +254,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Индикатор очков: заряд и «хоть раз подключались». */
     val glassesBattery: StateFlow<Int?> = glasses.battery
     val glassesEverConnected: StateFlow<Boolean> = glasses.everConnected
+    val glassesNotice: StateFlow<Int?> = glasses.notice
+
+    fun dismissGlassesNotice() = glasses.dismissNotice()
 
     /** Выбор микрофона (шторка в «Камере»). */
     private val micSettings = (app as GlassesApp).micSettings

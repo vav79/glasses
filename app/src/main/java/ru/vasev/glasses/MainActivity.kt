@@ -255,7 +255,7 @@ class MainActivity : AppCompatActivity() {
                             viewModel = viewModel,
                             cameraGranted = cameraGranted,
                             onSelectSource = ::selectImageSource,
-                            onConnectGlasses = { Wearables.startRegistration(this) },
+                            onConnectGlasses = { (application as GlassesApp).glasses.connect(this) },
                             onDescribe = viewModel::cameraDescribe,
                             onAsk = { withMic(viewModel::cameraAsk) },
                             onTranslate = viewModel::cameraTranslate,
@@ -521,7 +521,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleRegistrationIntent(intent: Intent) {
         Wearables.handleIntent(intent) { request ->
             request.continueRegistration(this)
-                .onFailure { error, _ -> Log.e(TAG, "Registration failed: ${error.description}") }
+                .onFailure { error, _ -> (application as GlassesApp).glasses.registrationRequestFailed(error.description) }
         }
     }
 

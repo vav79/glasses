@@ -77,7 +77,7 @@
     <string name="glasses_simulator_ready">Симулятор очков готов</string>
     <string name="glasses_connected">Очки подключены</string>
     <string name="glasses_err_not_registered">Приложение не подключено к Meta AI. Нажмите «Подключить очки».</string>
-    <string name="glasses_err_not_found">Очки не найдены. Наденьте их и проверьте Bluetooth.</string>
+    <string name="glasses_err_not_found">Очки не найдены. Наденьте их и откройте Meta AI — очки должны быть подключены там.</string>
     <string name="glasses_err_session">Не удалось открыть сессию с очками.</string>
     <string name="glasses_err_camera_unavailable">Камера недоступна: %1$s</string>
     <string name="glasses_err_unknown">неизвестная ошибка</string>
@@ -86,6 +86,18 @@
     <string name="glasses_err_capture">Не удалось сделать снимок: %1$s</string>
     <string name="glasses_err_camera_permission">Нет доступа к камере очков. Разрешите его в Meta AI.</string>
     <string name="glasses_err_not_responding">Очки не отвечают. Проверьте, что они включены и надеты.</string>
+    <string name="glasses_err_not_connected">Очки не подключены. Наденьте их и проверьте, что они подключены в Meta AI.</string>
+    <string name="glasses_err_busy">Подключение к очкам занято другим приложением. Закройте его и попробуйте ещё раз.</string>
+    <string name="glasses_err_ended_by_device">Очки прервали съёмку — возможно, камеру занял Meta AI. Попробуйте ещё раз.</string>
+    <string name="glasses_err_update_dat">Обновите DAT SDK на очках: Meta AI → Подключения приложений.</string>
+    <string name="glasses_err_open_meta_ai">Откройте Meta AI и проверьте, что очки подключены и настроены, затем повторите.</string>
+    <string name="glasses_err_app_outdated">Очки больше не поддерживают эту версию приложения — нужна новая версия Glasses.</string>
+    <string name="glasses_err_overheated">Очки перегрелись. Снимите их на несколько минут.</string>
+    <string name="glasses_err_battery">Очки почти разряжены. Поставьте их в футляр на зарядку.</string>
+    <string name="glasses_reg_install_meta_ai">Установите приложение Meta AI и подключите в нём очки.</string>
+    <string name="glasses_reg_failed">Не удалось подключиться. Откройте Meta AI: очки должны быть подключены там, режим разработчика — включён.</string>
+    <string name="glasses_hint_versions">Версии приложения и программы очков расходятся. Снимки работают; если что-то пойдёт не так — обновите очки в Meta AI.</string>
+    <string name="glasses_notice_close">Закрыть подсказку</string>
 
     <!-- Речь -->
     <string name="speech_not_heard">Не расслышал. Попробуйте ещё раз.</string>

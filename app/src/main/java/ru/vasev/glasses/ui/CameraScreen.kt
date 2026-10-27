@@ -81,6 +81,7 @@ import ru.vasev.glasses.camera.Shot
 import ru.vasev.glasses.speech.MicChoice
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
+import ru.vasev.glasses.ui.glass.GlassCard
 import ru.vasev.glasses.ui.glass.GlassIconButton
 import ru.vasev.glasses.ui.glass.GlassShapes
 import ru.vasev.glasses.ui.glass.glass
@@ -111,6 +112,7 @@ fun CameraScreen(
     val source by viewModel.imageSource.collectAsStateWithLifecycle()
     val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
     val battery by viewModel.glassesBattery.collectAsStateWithLifecycle()
+    val notice by viewModel.glassesNotice.collectAsStateWithLifecycle()
     val mic by viewModel.micChoice.collectAsStateWithLifecycle()
     val shots by viewModel.shots.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
@@ -139,6 +141,16 @@ fun CameraScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     textStyle = MaterialTheme.typography.labelMedium,
                 )
+            }
+        }
+
+        // Что не так с подключением очков (регистрация, версии) — под кнопкой «Подключить очки».
+        notice?.let { res ->
+            GlassCard(contentPadding = PaddingValues(start = 16.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(res), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    GlassIconButton(R.drawable.ic_sym_close, stringResource(R.string.glasses_notice_close), onClick = viewModel::dismissGlassesNotice, size = 44.dp)
+                }
             }
         }
 

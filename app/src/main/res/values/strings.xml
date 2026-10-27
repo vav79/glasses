@@ -78,7 +78,7 @@
     <string name="glasses_simulator_ready">Glasses simulator is ready</string>
     <string name="glasses_connected">Glasses connected</string>
     <string name="glasses_err_not_registered">The app is not connected to Meta AI. Tap “Connect glasses”.</string>
-    <string name="glasses_err_not_found">Glasses not found. Put them on and check Bluetooth.</string>
+    <string name="glasses_err_not_found">Glasses not found. Put them on and open Meta AI — the glasses must be connected there.</string>
     <string name="glasses_err_session">Could not open a session with the glasses.</string>
     <string name="glasses_err_camera_unavailable">Camera unavailable: %1$s</string>
     <string name="glasses_err_unknown">unknown error</string>
@@ -87,6 +87,18 @@
     <string name="glasses_err_capture">Could not take a photo: %1$s</string>
     <string name="glasses_err_camera_permission">No access to the glasses camera. Allow it in Meta AI.</string>
     <string name="glasses_err_not_responding">The glasses are not responding. Check that they are on and being worn.</string>
+    <string name="glasses_err_not_connected">The glasses are not connected. Put them on and check that they are connected in Meta AI.</string>
+    <string name="glasses_err_busy">The connection to the glasses is busy with another app. Close it and try again.</string>
+    <string name="glasses_err_ended_by_device">The glasses stopped the capture — Meta AI may have taken the camera. Try again.</string>
+    <string name="glasses_err_update_dat">Update the DAT SDK on the glasses: Meta AI → App connections.</string>
+    <string name="glasses_err_open_meta_ai">Open Meta AI and check that the glasses are connected and set up, then try again.</string>
+    <string name="glasses_err_app_outdated">The glasses no longer support this version of the app. A new version of Glasses is needed.</string>
+    <string name="glasses_err_overheated">The glasses are too hot. Take them off for a few minutes.</string>
+    <string name="glasses_err_battery">The glasses battery is almost empty. Put them in the case to charge.</string>
+    <string name="glasses_reg_install_meta_ai">Install the Meta AI app and connect the glasses in it.</string>
+    <string name="glasses_reg_failed">Could not connect. Open Meta AI: the glasses must be connected there and Developer Mode turned on.</string>
+    <string name="glasses_hint_versions">The app and the glasses software versions differ. Photos still work; if something goes wrong, update the glasses in Meta AI.</string>
+    <string name="glasses_notice_close">Close hint</string>
 
     <!-- Speech -->
     <string name="speech_not_heard">I didn\'t catch that. Please try again.</string>
