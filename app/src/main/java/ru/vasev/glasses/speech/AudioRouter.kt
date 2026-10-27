@@ -22,8 +22,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Подключённая Bluetooth-гарнитура: [mic] — HFP/SCO (или LE Audio) для микрофона, [output] — для звука. */
-data class Headset(val name: String, val mic: AudioDeviceInfo?, val output: AudioDeviceInfo?)
+/**
+ * Подключённая Bluetooth-гарнитура: [mic] — HFP/SCO (или LE Audio) для микрофона, [output] — для звука.
+ * [glasses] — это очки Meta (они подключаются к телефону как обычная гарнитура).
+ */
+data class Headset(val name: String, val mic: AudioDeviceInfo?, val output: AudioDeviceInfo?, val glasses: Boolean = false)
 
 /**
  * Маршрутизация звука между телефоном и Bluetooth-гарнитурой (репетиция перед очками — они подключаются так же).
@@ -39,16 +42,32 @@ class AudioRouter(context: Context) {
     /** Выбор микрофона из «Камеры» ([MicChoice]); «Телефон» — гарнитуру для моего голоса не берём. */
     var micChoice: () -> MicChoice = { MicChoice.AUTO }
 
+    /** Имена очков из DAT SDK — чтобы узнать очки среди Bluetooth-устройств ([HeadsetPick.isGlasses]). */
+    var glassesNames: () -> Collection<String> = { emptyList() }
+
     private val appContext = context.applicationContext
     private val audio = context.getSystemService(AudioManager::class.java)
     private var settled: CompletableDeferred<Unit>? = null
     private val main = Handler(Looper.getMainLooper())
     private val mainExecutor = context.mainExecutor
 
+    private val _headsets = MutableStateFlow<List<Headset>>(emptyList())
+
+    /** Все подключённые гарнитуры (очки — первыми). */
+    val headsets: StateFlow<List<Headset>> = _headsets.asStateFlow()
+
     private val _headset = MutableStateFlow<Headset?>(null)
+
+    /** Гарнитура, в которую сейчас идёт звук «мне» (очки, если подключены); null — звук через телефон. */
     val headset: StateFlow<Headset?> = _headset.asStateFlow()
 
+    /** Гарнитура, чьим микрофоном слушать мой голос при текущем [micChoice]; null — микрофон телефона. */
+    fun micHeadset(): Headset? = HeadsetPick.pick(micChoice(), _headsets.value.filter { it.mic != null }) { it.glasses }
+
     private var micRouted = false
+
+    /** Микрофон, на который сейчас переключена связь (SCO или LE Audio). */
+    private var routedMic: AudioDeviceInfo? = null
 
     /** Микрофон гарнитуры держится на время ответа ([holdMic]). */
     private var micHeld = false
@@ -66,16 +85,23 @@ class AudioRouter(context: Context) {
 
     /** Подготовить микрофон для того, кто сейчас говорит. Возвращает описание выбранного входа (для логов). */
     suspend fun routeMic(talker: Talker): String {
-        val mic = _headset.value?.mic?.takeIf { micChoice().allowsHeadset }
+        val chosen = micHeadset()
+        val mic = chosen?.mic
         if (talker != Talker.USER || mic == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             releaseMic()
-            return log("in", "phone mic" + if (talker == Talker.PARTNER) " (partner speaking)" else "")
+            val why = when {
+                talker == Talker.PARTNER -> " (partner speaking)"
+                micChoice() == MicChoice.GLASSES -> " (glasses not connected via Bluetooth)"
+                else -> ""
+            }
+            return log("in", "mic=phone$why")
         }
+        val kind = if (chosen.glasses) "glasses" else "headset"
         return if (switchToHeadsetMic(mic)) {
-            log("in", "headset mic \"${_headset.value?.name}\" (${typeName(mic)})")
+            log("in", "mic=$kind \"${chosen.name}\" (${typeName(mic)})")
         } else {
             releaseMic()
-            log("in", "phone mic (headset mic did not turn on within ${SCO_TIMEOUT_MS} ms)")
+            log("in", "mic=phone ($kind mic did not turn on within ${SCO_TIMEOUT_MS} ms)")
         }
     }
 
@@ -89,6 +115,8 @@ class AudioRouter(context: Context) {
     fun releaseMic() {
         if (!micRouted || micHeld) return
         micRouted = false
+        val releasedMic = routedMic
+        routedMic = null
         val startedAt = SystemClock.elapsedRealtime()
         val done = CompletableDeferred<Unit>()
         settled = done
@@ -140,7 +168,7 @@ class AudioRouter(context: Context) {
         audio.mode = AudioManager.MODE_NORMAL
 
         // LE Audio не шлёт события SCO; если устройство связи уже сменилось — ждать нечего.
-        if (_headset.value?.mic?.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO || !audio.isBluetoothScoOnCompat()) {
+        if (releasedMic?.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO || !audio.isBluetoothScoOnCompat()) {
             scoDisconnected = true
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || audio.communicationDevice?.type !in HEADSET_MIC_TYPES) {
@@ -162,8 +190,7 @@ class AudioRouter(context: Context) {
      * false — гарнитуры с микрофоном нет или она не ответила: держать нечего.
      */
     suspend fun holdMic(): Boolean {
-        if (!micChoice().allowsHeadset) return false
-        val mic = _headset.value?.mic ?: return false
+        val mic = micHeadset()?.mic ?: return false
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !switchToHeadsetMic(mic)) {
             releaseMic()
             return false
@@ -236,6 +263,7 @@ class AudioRouter(context: Context) {
         try {
             audio.mode = AudioManager.MODE_IN_COMMUNICATION
             micRouted = true
+            routedMic = mic
             if (!audio.setCommunicationDevice(mic)) return false
             if (audio.communicationDevice?.id == mic.id) connected.complete(Unit)
             return withTimeoutOrNull(SCO_TIMEOUT_MS) { connected.await() } != null
@@ -244,32 +272,41 @@ class AudioRouter(context: Context) {
         }
     }
 
-    private fun refresh() {
-        val outputs = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val output = outputs.firstOrNull { it.type in HEADSET_OUTPUT_TYPES }
-        val mic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            audio.availableCommunicationDevices.firstOrNull { it.type in HEADSET_MIC_TYPES }
+    /** Пересобрать список гарнитур: устройства Bluetooth сменились или DAT сообщил имена очков. */
+    fun refresh() {
+        val outputs = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).filter { it.type in HEADSET_OUTPUT_TYPES }
+        val mics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audio.availableCommunicationDevices.filter { it.type in HEADSET_MIC_TYPES }
         } else {
-            null
+            emptyList()
         }
-        val headset = if (output != null || mic != null) {
-            Headset(name = (output ?: mic)!!.productName.toString(), mic = mic, output = output)
-        } else {
-            null
-        }
-        if (headset?.name != _headset.value?.name || (headset?.mic == null) != (_headset.value?.mic == null)) {
+        // Одно Bluetooth-устройство — это несколько AudioDeviceInfo (SCO, A2DP) с одним именем.
+        val datNames = glassesNames()
+        val headsets = (outputs + mics).map { it.productName.toString() }.distinct().map { name ->
+            Headset(
+                name = name,
+                mic = mics.firstOrNull { it.productName.toString() == name },
+                output = outputs.firstOrNull { it.productName.toString() == name },
+                glasses = HeadsetPick.isGlasses(name, datNames),
+            )
+        }.sortedByDescending { it.glasses }
+        if (headsets != _headsets.value) {
             Log.d(
                 TAG,
-                if (headset == null) {
+                if (headsets.isEmpty()) {
                     "headset disconnected, audio via phone"
                 } else {
-                    "headset \"${headset.name}\": mic ${headset.mic?.let(::typeName) ?: "none"}, " +
-                        "output ${headset.output?.let(::typeName) ?: "none"}"
+                    headsets.joinToString("; ") { h ->
+                        "${if (h.glasses) "glasses" else "headset"} \"${h.name}\": mic ${h.mic?.let(::typeName) ?: "none"}, " +
+                            "output ${h.output?.let(::typeName) ?: "none"}"
+                    }
                 },
             )
         }
-        _headset.value = headset
-        if (headset?.mic == null && micRouted) releaseMic()
+        _headsets.value = headsets
+        _headset.value = headsets.firstOrNull { it.output != null } ?: headsets.firstOrNull()
+        val routed = routedMic
+        if (micRouted && routed != null && mics.none { it.id == routed.id }) releaseMic()
     }
 
     private fun typeName(device: AudioDeviceInfo): String = when (device.type) {

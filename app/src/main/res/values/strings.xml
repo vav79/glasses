@@ -386,7 +386,8 @@
     <string name="mic_glasses_soon">soon</string>
     <string name="mic_headset">Headset</string>
     <string name="mic_phone">Phone</string>
-    <string name="mic_auto_hint">The headset if connected, otherwise the phone microphone. In Translate the other person is always heard by the phone.</string>
+    <string name="mic_auto_hint">Auto: the glasses or another Bluetooth headset if connected (glasses first), otherwise the phone microphone. In Translate the other person is always heard by the phone.</string>
+    <string name="mic_glasses_not_connected">The glasses are not connected via Bluetooth — your voice is heard by the phone microphone. Check that the glasses are connected in the phone’s Bluetooth settings.</string>
     <string name="photos_source_title">Photos</string>
     <string name="glasses_connect_short">Connect glasses</string>
     <string name="glasses_on">Glasses</string>

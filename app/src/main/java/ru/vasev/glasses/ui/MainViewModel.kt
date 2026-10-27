@@ -74,6 +74,7 @@ import ru.vasev.glasses.notes.Note
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.speech.AudioChannel
+import ru.vasev.glasses.speech.Headset
 import ru.vasev.glasses.speech.MicChoice
 import ru.vasev.glasses.speech.SpeechException
 import ru.vasev.glasses.speech.Talker
@@ -262,6 +263,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val micSettings = (app as GlassesApp).micSettings
     val micChoice: StateFlow<MicChoice> = micSettings.choice
     fun setMicChoice(choice: MicChoice) = micSettings.set(choice)
+
+    /** Подключённые гарнитуры (очки — первыми): на чипе «Микрофон» видно, чей микрофон слушает. */
+    val headsets: StateFlow<List<Headset>> = router.headsets
 
     /** Метку модели у ответов показываем всегда только разработчику; остальным — когда ответила не основная модель. */
     val showAllModelLabels: StateFlow<Boolean> = profile.role.map { it == UserRole.DEVELOPER }
@@ -688,7 +692,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             coroutineScope {
                 // Голосовое «стоп»: микрофон гарнитуры включается параллельно с запросом к модели,
                 // чтобы первая фраза уже звучала по тому же маршруту (без переключения посреди ответа).
-                val micHeld = if (!silent && profile.voiceStop.value && router.headset.value?.mic != null) async { router.holdMic() } else null
+                val micHeld = if (!silent && profile.voiceStop.value && router.micHeadset()?.mic != null) async { router.holdMic() } else null
                 val voiceStop = launch {
                     if (micHeld?.await() == true) listenForStop(language)
                 }

@@ -99,6 +99,15 @@ class GlassesManager(private val context: Context) {
         }
         .stateIn(scope, SharingStarted.Eagerly, null)
 
+    /** Имена подключённых очков (как в Meta AI; у Ray-Ban Meta совпадает с Bluetooth-именем) — чтобы узнать их микрофон. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val deviceNames: StateFlow<Set<String>> = Wearables.devices
+        .flatMapLatest { ids ->
+            val flows = ids.mapNotNull { Wearables.devicesMetadata[it] }
+            if (flows.isEmpty()) flowOf(emptySet()) else combine(flows) { devices -> devices.map { it.name }.filter { it.isNotBlank() }.toSet() }
+        }
+        .stateIn(scope, SharingStarted.Eagerly, emptySet())
+
     private val _everConnected = MutableStateFlow(prefs.getBoolean(KEY_EVER_CONNECTED, false))
 
     /** Очки хоть раз подключались: пока нет и снимки с телефона, индикатор очков в «Ассистенте» не показывается. */

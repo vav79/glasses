@@ -78,6 +78,7 @@ import ru.vasev.glasses.R
 import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.camera.Shot
+import ru.vasev.glasses.speech.HeadsetPick
 import ru.vasev.glasses.speech.MicChoice
 import ru.vasev.glasses.ui.glass.GlassButton
 import ru.vasev.glasses.ui.glass.GlassButtonKind
@@ -114,6 +115,21 @@ fun CameraScreen(
     val battery by viewModel.glassesBattery.collectAsStateWithLifecycle()
     val notice by viewModel.glassesNotice.collectAsStateWithLifecycle()
     val mic by viewModel.micChoice.collectAsStateWithLifecycle()
+    val headsets by viewModel.headsets.collectAsStateWithLifecycle()
+    // Чей микрофон слушает мой голос при этом выборе; null — телефона.
+    val micDevice = HeadsetPick.pick(mic, headsets.filter { it.mic != null }) { it.glasses }
+    // «Авто» на чипе — тот, кто реально слушает («Авто · Очки» не влезает); сам выбор «Авто» виден в шторке.
+    val micValue = if (mic == MicChoice.AUTO) {
+        stringResource(
+            when {
+                micDevice == null -> R.string.mic_phone
+                micDevice.glasses -> R.string.mic_glasses
+                else -> R.string.mic_headset
+            },
+        )
+    } else {
+        stringResource(mic.titleRes)
+    }
     val shots by viewModel.shots.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
@@ -128,7 +144,7 @@ fun CameraScreen(
             // Чипы сжимаются (с многоточием), статус очков справа — всегда целиком.
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(R.drawable.ic_sym_photo_camera, stringResource(source.titleRes), stringResource(R.string.photos_source_title), enabled = !busy, Modifier.weight(1f, fill = false)) { sheet = SHEET_SOURCE }
-                Chip(R.drawable.ic_sym_mic, stringResource(mic.titleRes), stringResource(R.string.mic_label), enabled = !busy, Modifier.weight(1f, fill = false)) { sheet = SHEET_MIC }
+                Chip(R.drawable.ic_sym_mic, micValue, stringResource(R.string.mic_label), enabled = !busy, Modifier.weight(1f, fill = false)) { sheet = SHEET_MIC }
             }
             if (status.ready) {
                 GlassesState(battery)
@@ -203,7 +219,7 @@ fun CameraScreen(
                 Triple(choice.name, if (choice.available) title else title + " · " + stringResource(R.string.mic_glasses_soon), choice.available)
             },
             selected = mic.name,
-            note = stringResource(R.string.mic_auto_hint),
+            note = stringResource(if (mic == MicChoice.GLASSES && micDevice == null) R.string.mic_glasses_not_connected else R.string.mic_auto_hint),
             onPick = { name -> MicChoice.entries.firstOrNull { it.name == name }?.let(viewModel::setMicChoice) },
             onDismiss = { sheet = null },
         )

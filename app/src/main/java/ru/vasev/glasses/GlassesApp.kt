@@ -164,6 +164,9 @@ class GlassesApp : Application() {
         audioRouter = AudioRouter(this)
         micSettings = MicSettings(this)
         audioRouter.micChoice = { micSettings.choice.value }
+        audioRouter.glassesNames = { glasses.deviceNames.value }
+        // Имена очков DAT присылает позже, чем Bluetooth подключает очки, — тогда переопределяем, где очки.
+        scope.launch(Dispatchers.Main) { glasses.deviceNames.collect { audioRouter.refresh() } }
         shots = ShotStore(this)
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)

@@ -387,7 +387,8 @@
     <string name="mic_glasses_soon">скоро</string>
     <string name="mic_headset">Гарнитура</string>
     <string name="mic_phone">Телефон</string>
-    <string name="mic_auto_hint">Гарнитура, если подключена, иначе микрофон телефона. Собеседника в «Переводе» всегда слушает телефон.</string>
+    <string name="mic_auto_hint">«Авто» — очки или другая Bluetooth-гарнитура, если подключены (очки в приоритете), иначе микрофон телефона. Собеседника в «Переводе» всегда слушает телефон.</string>
+    <string name="mic_glasses_not_connected">Очки не подключены по Bluetooth — ваш голос слушает микрофон телефона. Проверьте, что очки подключены в настройках Bluetooth телефона.</string>
     <string name="photos_source_title">Снимки</string>
     <string name="glasses_connect_short">Подключить очки</string>
     <string name="glasses_on">Очки</string>
