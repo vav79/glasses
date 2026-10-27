@@ -133,6 +133,12 @@ class GlassesManager(private val context: Context) {
             }
         }
         scope.launch {
+            // Режим разработчика или проект Developer Center — по самой регистрации, а не по сборке.
+            Wearables.registrationState.collect { state ->
+                Log.d(TAG, "DAT registration=$state" + if (state == RegistrationState.REGISTERED) " devMode=${Wearables.isDevMode}" else "")
+            }
+        }
+        scope.launch {
             Wearables.registrationErrorStream.collect { error ->
                 Log.w(TAG, "DAT error=$error stage=registration")
                 DatErrors.registration(error)?.let { _notice.value = it }

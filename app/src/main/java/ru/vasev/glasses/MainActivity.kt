@@ -533,6 +533,15 @@ class MainActivity : AppCompatActivity() {
                 ru.vasev.glasses.speech.FakeNavigatorVoice.play()
             }
         }
+        // Переподключение к Meta AI (например, после смены ID проекта): отключить, затем подключить заново.
+        if (intent.getBooleanExtra("dat_unregister", false)) {
+            intent.removeExtra("dat_unregister")
+            Wearables.startUnregistration(this)
+        }
+        if (intent.getBooleanExtra("dat_register", false)) {
+            intent.removeExtra("dat_register")
+            Wearables.startRegistration(this)
+        }
         // «Hey Meta, start …» в симуляторе (источник снимков — «Симулятор очков»).
         if (intent.getBooleanExtra("simulate_hey_meta", false)) {
             intent.removeExtra("simulate_hey_meta")
