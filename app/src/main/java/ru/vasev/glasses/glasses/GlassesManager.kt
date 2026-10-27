@@ -163,6 +163,9 @@ class GlassesManager(private val context: Context) {
         _notice.value = null
     }
 
+    /** Только debug и симулятор: имитация «Hey Meta, start …». */
+    fun simulateVoiceLaunch(): Boolean = BuildConfig.DEBUG && _mockMode.value && mock.simulateVoiceLaunch()
+
     fun setMockMode(requested: Boolean) {
         val enabled = requested && BuildConfig.DEBUG
         if (enabled == _mockMode.value) return

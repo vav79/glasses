@@ -13,6 +13,7 @@ import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.camera.ShotStore
 import ru.vasev.glasses.glasses.GlassesManager
+import ru.vasev.glasses.glasses.VoiceLaunch
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
@@ -52,6 +53,10 @@ class GlassesApp : Application() {
         private set
 
     lateinit var glasses: GlassesManager
+        private set
+
+    /** «Hey Meta, start Glasses Helper» — поток голосовых запусков от Meta AI. */
+    lateinit var voiceLaunch: VoiceLaunch
         private set
 
     /** Общие для ассистента и переводчика источник речи и вывод звука — чтобы вкладки не спорили за звук. */
@@ -159,6 +164,7 @@ class GlassesApp : Application() {
         Wearables.initialize(this)
             .onFailure { error, _ -> Log.e(TAG, "DAT init failed: ${error.description}") }
         glasses = GlassesManager(this)
+        voiceLaunch = VoiceLaunch(CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
         imageSources = ImageSourceSettings(this, glasses)
         phoneCamera = PhoneCamera(this)
         audioRouter = AudioRouter(this)

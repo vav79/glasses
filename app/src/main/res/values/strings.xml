@@ -772,4 +772,5 @@
     <string name="style_unsaved_discard">Don\'t save</string>
     <string name="translate_gender_hint">In this language the translation of your phrases depends on your gender: word forms and polite particles. Set it in “Communication style”.</string>
     <string name="translate_gender_hint_open">Set</string>
+    <string name="say_voice_launch_no_key">To answer, enter an API key in the app settings on the phone.</string>
 </resources>

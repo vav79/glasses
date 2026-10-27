@@ -44,6 +44,13 @@ class MockGlassesController(private val context: Context) {
         glasses.services.camera.setCapturedImage(testImageUri())
     }
 
+    /** «Hey Meta, start …» в симуляторе; false — наше приложение не слушает голосовые запуски. */
+    fun simulateVoiceLaunch(): Boolean {
+        val voice = kit.pairedDevices.filterIsInstance<MockGlasses>().firstOrNull()?.services?.voiceInvocation ?: return false
+        if (!voice.hasConnectedApps()) return false
+        return voice.simulateLaunchAppAction() != null
+    }
+
     fun disable() {
         if (kit.isEnabled) kit.disable()
     }

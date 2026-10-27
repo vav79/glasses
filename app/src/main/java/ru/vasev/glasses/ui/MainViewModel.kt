@@ -283,6 +283,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun ask() = run(withFrame = false)
 
+    /**
+     * «Hey Meta, start Glasses Helper»: сразу слушать вопрос (идущий ответ прерывается, как кнопкой).
+     * false — ответить нечем (нет ключа для модели ассистента): об этом сказано вслух.
+     */
+    fun voiceLaunch(): Boolean {
+        if (hasApiKey.value) {
+            ask()
+            return true
+        }
+        job?.cancel()
+        audio.stop()
+        job = viewModelScope.launch { failAloud(L.s(R.string.say_voice_launch_no_key)) }
+        return false
+    }
+
     /** «Что я вижу»: снимок из выбранного источника и описание — голосом вопрос задавать не нужно. */
     fun whatDoISee() = run(withFrame = true, presetQuestion = L.s(R.string.what_do_i_see_question))
 

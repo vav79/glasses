@@ -809,4 +809,5 @@
     <string name="style_unsaved_discard">Не сохранять</string>
     <string name="translate_gender_hint">На этом языке перевод ваших фраз зависит от вашего пола: формы слов и вежливые частицы. Укажите его в «Стиле общения».</string>
     <string name="translate_gender_hint_open">Указать</string>
+    <string name="say_voice_launch_no_key">Чтобы отвечать, введите ключ в настройках приложения на телефоне.</string>
 </resources>

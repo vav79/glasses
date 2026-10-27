@@ -24,8 +24,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import com.meta.wearable.dat.core.voiceinvocations.isVoiceInvocationsIntent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
@@ -204,9 +208,17 @@ class MainActivity : AppCompatActivity() {
         // После пересоздания интент тот же — debug-сценарий и регистрацию повторно не запускаем.
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
+            handleVoiceIntent(intent)
             handleDebugIntent(intent)
         }
         requestRuntimePermissions()
+        // «Hey Meta, start …»: запуск ждёт, пока экран на виду, — тогда слушаем вопрос и отвечаем Meta AI.
+        val voiceLaunch = (application as GlassesApp).voiceLaunch
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                voiceLaunch.pending.filterNotNull().collect { handleVoiceLaunch() }
+            }
+        }
 
         setContent {
             GlassesTheme {
@@ -355,8 +367,34 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleRegistrationIntent(intent)
+        handleVoiceIntent(intent)
         handleDebugIntent(intent)
+    }
+
+    /** Запущены голосом через Meta AI: сразу «Ассистент». Слушать начнём по событию из потока ([handleVoiceLaunch]). */
+    private fun handleVoiceIntent(intent: Intent) {
+        if (!isVoiceInvocationsIntent(intent)) return
+        Log.d(TAG, "VoiceInvocation: launched by Meta AI")
+        selectTab(AppTab.ASSISTANT)
+    }
+
+    private fun handleVoiceLaunch() {
+        val app = application as GlassesApp
+        val launch = app.voiceLaunch.take() ?: return
+        when {
+            !app.profile.onboarded.value -> app.voiceLaunch.respond(launch, ok = false, reason = "first-run setup is not finished")
+            !hasMic() -> {
+                app.voiceLaunch.respond(launch, ok = false, reason = "no microphone permission")
+                requestRuntimePermissions()
+            }
+            else -> {
+                selectTab(AppTab.ASSISTANT)
+                val ok = viewModel.voiceLaunch()
+                app.voiceLaunch.respond(launch, ok, reason = if (ok) "" else "no API key")
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -488,6 +526,11 @@ class MainActivity : AppCompatActivity() {
                 kotlinx.coroutines.delay(delayMs.toLong())
                 ru.vasev.glasses.speech.FakeNavigatorVoice.play()
             }
+        }
+        // «Hey Meta, start …» в симуляторе (источник снимков — «Симулятор очков»).
+        if (intent.getBooleanExtra("simulate_hey_meta", false)) {
+            intent.removeExtra("simulate_hey_meta")
+            Log.d(TAG, "VoiceInvocation: simulated=${app.glasses.simulateVoiceLaunch()}")
         }
         intent.getStringExtra("compass_status")?.let {
             intent.removeExtra("compass_status")
