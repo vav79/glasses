@@ -1,5 +1,7 @@
 package ru.vasev.glasses.ui
 
+import ru.vasev.glasses.speech.GestureState
+import ru.vasev.glasses.speech.Tap
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -85,6 +87,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, (app as GlassesApp).audioRouter.headset.value?.mic != null)
 
     fun setVoiceStop(enabled: Boolean) = profile.setVoiceStop(enabled)
+
+    /** «Жест на дужке»: включён ли, какой жест и ловятся ли касания сейчас. */
+    private val gestureSettings = (app as GlassesApp).gestureSettings
+    val gestureEnabled: StateFlow<Boolean> = gestureSettings.enabled
+    val gestureTap: StateFlow<Tap> = gestureSettings.tap
+    val gestureState: StateFlow<GestureState> = (app as GlassesApp).gestures.state
+
+    fun setGestureEnabled(enabled: Boolean) = gestureSettings.setEnabled(enabled)
+    fun setGestureTap(tap: Tap) = gestureSettings.setTap(tap)
 
     /** «Меньше прозрачности» — стекло плотнее. */
     val lessTransparency: StateFlow<Boolean> = profile.lessTransparency

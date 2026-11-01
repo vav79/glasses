@@ -15,6 +15,7 @@ import ru.vasev.glasses.camera.ShotStore
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.glasses.VoiceLaunch
 import ru.vasev.glasses.i18n.L
+import ru.vasev.glasses.i18n.LanguageSettings
 import ru.vasev.glasses.llm.AiSettings
 import ru.vasev.glasses.llm.LlmService
 import ru.vasev.glasses.llm.RequestJournal
@@ -32,10 +33,12 @@ import ru.vasev.glasses.profile.StyleSettings
 import ru.vasev.glasses.rates.CbrRates
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.security.ApiKeyStore
+import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.AudioFocus
 import ru.vasev.glasses.speech.AudioOutput
 import ru.vasev.glasses.speech.AudioRouter
-import ru.vasev.glasses.speech.HeadsetButtons
+import ru.vasev.glasses.speech.GestureSettings
+import ru.vasev.glasses.speech.GlassesGestures
 import ru.vasev.glasses.speech.MicSettings
 import ru.vasev.glasses.speech.NavigatorVoice
 import ru.vasev.glasses.speech.PhoneMicSpeechSource
@@ -75,8 +78,10 @@ class GlassesApp : Application() {
     lateinit var navigatorVoice: NavigatorVoice
         private set
 
-    /** Кнопка гарнитуры, пока звучит ответ ассистента. */
-    lateinit var headsetButtons: HeadsetButtons
+    /** Касания дужки очков (вопрос в покое) и кнопка гарнитуры (перебить ответ). */
+    lateinit var gestures: GlassesGestures
+        private set
+    lateinit var gestureSettings: GestureSettings
         private set
 
     /** Зашифрованные API-ключи провайдеров ИИ (вводятся на экране «Настройки»). */
@@ -179,7 +184,15 @@ class GlassesApp : Application() {
         speaker = Speaker(this)
         navigatorVoice = NavigatorVoice(this)
         audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this), navigatorVoice) { style.current.value.pace }
-        headsetButtons = HeadsetButtons(this)
+        gestureSettings = GestureSettings(this)
+        gestures = GlassesGestures(this, audioRouter, gestureSettings) { speaker.playingToPartner }
+        // Жест есть, а экрана нет (приложение закрыто): вопрос задать нечем — говорим, что нужно открыть приложение.
+        gestures.onNoScreen = {
+            Log.d(TAG, "gesture: no screen, asking to open the app")
+            scope.launch(Dispatchers.Main) {
+                runCatching { audioOutput.speak(L.s(R.string.say_gesture_open_app), LanguageSettings.current.value.locale, AudioChannel.ME) }
+            }
+        }
         notes = NoteStore(this)
         location = DeviceLocation(this)
         places = PlaceStore(this)

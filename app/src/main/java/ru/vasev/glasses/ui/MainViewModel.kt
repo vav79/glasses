@@ -74,6 +74,7 @@ import ru.vasev.glasses.notes.Note
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.speech.AudioChannel
+import ru.vasev.glasses.speech.Beeps
 import ru.vasev.glasses.speech.Headset
 import ru.vasev.glasses.speech.MicChoice
 import ru.vasev.glasses.speech.SpeechException
@@ -162,7 +163,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val speech = (app as GlassesApp).speechSource
     private val audio = (app as GlassesApp).audioOutput
     private val router = (app as GlassesApp).audioRouter
-    private val headsetButtons = (app as GlassesApp).headsetButtons
+    private val gestures = (app as GlassesApp).gestures
+    private val gestureSettings = (app as GlassesApp).gestureSettings
     private val profile = (app as GlassesApp).profile
     private val llm = (app as GlassesApp).llm
     private val styleSettings = (app as GlassesApp).style
@@ -292,10 +294,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             ask()
             return true
         }
+        noKeyAloud()
+        return false
+    }
+
+    /**
+     * Вопрос жестом на дужке: сигнал «слушаю» и сразу микрофон. Речи нет 5 с — тихая отмена с сигналом «отбой»,
+     * запроса к модели нет (очки поправили, а не позвали ассистента).
+     */
+    fun gestureAsk() {
+        if (hasApiKey.value) run(withFrame = false, byGesture = true) else noKeyAloud()
+    }
+
+    private fun noKeyAloud() {
         job?.cancel()
         audio.stop()
         job = viewModelScope.launch { failAloud(L.s(R.string.say_voice_launch_no_key)) }
-        return false
     }
 
     /** «Что я вижу»: снимок из выбранного источника и описание — голосом вопрос задавать не нужно. */
@@ -469,6 +483,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         mode: AssistantMode = AssistantMode.CHAT,
         silent: Boolean = false,
         origin: Origin = Origin.ASSISTANT,
+        byGesture: Boolean = false,
     ) {
         if (_state.value.phase.interruptible) Log.d(TAG, "Assistant: answer interrupted, listening for a new question")
         linkOffer?.cancel()
@@ -499,13 +514,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 var endOfSpeechAt = SystemClock.elapsedRealtime()
                 val question = presetQuestion ?: run {
                     setPhase(Phase.LISTENING)
+                    if (byGesture) Beeps.listening()
                     haptics.listenStart()
                     try {
-                        speech.listen(
-                            language.speechTag,
-                            onPartial = { partial -> _state.update { it.copy(pendingQuestion = partial) } },
-                            onLevel = { _micLevel.value = it },
-                        ).also { endOfSpeechAt = it.endOfSpeechAt }.text
+                        if (byGesture) {
+                            listenAfterGesture(language) { endOfSpeechAt = it } ?: return@launch cancelGestureQuestion()
+                        } else {
+                            speech.listen(
+                                language.speechTag,
+                                onPartial = { partial -> _state.update { it.copy(pendingQuestion = partial) } },
+                                onLevel = { _micLevel.value = it },
+                            ).also { endOfSpeechAt = it.endOfSpeechAt }.text
+                        }
                     } finally {
                         _micLevel.value = 0f
                         haptics.listenEnd()
@@ -563,6 +583,47 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(phase = Phase.IDLE, error = message) }
             }
         }
+    }
+
+    /**
+     * Вопрос после жеста. null — за [GESTURE_SILENCE_MS] не прозвучало ни слова (или распознаватель ничего
+     * не услышал): ложное срабатывание, отменяем молча.
+     */
+    private suspend fun listenAfterGesture(language: AppLanguage, onEnd: (Long) -> Unit): String? = coroutineScope {
+        val spoke = CompletableDeferred<Unit>()
+        val listening = async {
+            speech.listen(
+                language.speechTag,
+                onPartial = { partial ->
+                    if (partial.isNotBlank()) spoke.complete(Unit)
+                    _state.update { it.copy(pendingQuestion = partial) }
+                },
+                onLevel = { _micLevel.value = it },
+            )
+        }
+        val watchdog = launch {
+            delay(GESTURE_SILENCE_MS)
+            if (!spoke.isCompleted) listening.cancel()
+        }
+        try {
+            listening.await().also { onEnd(it.endOfSpeechAt) }.text
+        } catch (e: SpeechException) {
+            if (e.noSpeech) null else throw e
+        } catch (e: CancellationException) {
+            // Отменил сторожевой таймер (сам ход не отменён) — тишина; иначе отмена хода, пробрасываем.
+            if (isActive && !spoke.isCompleted) null else throw e
+        } finally {
+            watchdog.cancel()
+        }
+    }
+
+    /** Ложное срабатывание жеста: «отбой» в очки, без ошибки на экране и без запроса. */
+    private suspend fun cancelGestureQuestion() {
+        Log.d(TAG, "Assistant: gesture question cancelled, no speech in ${GESTURE_SILENCE_MS} ms")
+        _state.update { it.copy(phase = Phase.IDLE, pendingQuestion = "") }
+        // Пока SCO не разорван, сигнал ушёл бы в очки в качестве звонка.
+        router.awaitRouteSettled()
+        Beeps.cancelled()
     }
 
     /**
@@ -698,9 +759,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Вопрос текстом — ответ только на экране: ни звука, ни приглушения музыки, ни кнопки гарнитуры.
         if (!silent) {
             audio.holdFocus()
-            headsetButtons.listen {
-                Log.d(TAG, "Assistant: interrupted by headset button")
-                ask()
+            gestures.answering {
+                Log.d(TAG, "Assistant: interrupted by headset button or glasses tap")
+                // С «Жестом на дужке» перебивание — как вопрос жестом: сигнал и тихая отмена, если промолчали.
+                if (gestureSettings.chosen != null) gestureAsk() else ask()
             }
         }
         try {
@@ -779,7 +841,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         } finally {
             sentences.close()
             if (!silent) {
-                headsetButtons.stop()
+                gestures.answerDone()
                 router.unholdMic()
                 audio.releaseFocus()
             }
@@ -1024,7 +1086,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         audio.stop()
-        headsetButtons.stop()
+        gestures.answerDone()
     }
 
     private companion object {
@@ -1032,6 +1094,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         const val VOICE_CONFIRM_MS = 10_000L
         const val REMEMBER_LISTEN_MS = 12_000L
         const val ECHO_GUARD_MS = 1_000L
+        const val GESTURE_SILENCE_MS = 5_000L
         const val NOTE_PREVIEW_SIDE = 640
         const val MAX_FOUND_CARDS = 3
     }

@@ -47,6 +47,8 @@ import ru.vasev.glasses.nav.NavHooks
 import ru.vasev.glasses.nav.PlacesViewModel
 import ru.vasev.glasses.nav.TargetViewModel
 import ru.vasev.glasses.nav.TaxiViewModel
+import ru.vasev.glasses.speech.GesturesService
+import ru.vasev.glasses.speech.Tap
 import ru.vasev.glasses.ui.NavViewModels
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
@@ -217,6 +219,15 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 voiceLaunch.pending.filterNotNull().collect { handleVoiceLaunch() }
+            }
+        }
+        // «Жест на дужке»: вопрос, пока Activity жива — и в фоне, и с погасшим экраном (держит GesturesService).
+        // Сервис запускается только отсюда, пока приложение на экране: иначе Android не даст микрофон из фона.
+        val app = application as GlassesApp
+        app.gestures.onAsk = ::handleGestureAsk
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                app.gestureSettings.enabled.collect { GesturesService.sync(this@MainActivity, it && hasMic()) }
             }
         }
 
@@ -403,6 +414,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Жест на дужке в покое: как голосовой запуск — «Ассистент» и сразу слушать вопрос. */
+    private fun handleGestureAsk() {
+        val app = application as GlassesApp
+        when {
+            !app.profile.onboarded.value -> Log.d(TAG, "gesture: ignored, first-run setup is not finished")
+            !hasMic() -> Log.d(TAG, "gesture: ignored, no microphone permission")
+            else -> {
+                Log.d(TAG, "gesture: ask on tab=$tab settings=$settingsOpen")
+                selectTab(AppTab.ASSISTANT)
+                viewModel.gestureAsk()
+            }
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_TAB, tab.name)
@@ -433,6 +458,8 @@ class MainActivity : AppCompatActivity() {
         viewModel.navCommandHandler = null
         viewModel.navCommandDone = null
         viewModel.navVocabulary = null
+        // Без экрана жест скажет «откройте приложение» (GlassesApp); при повороте новая Activity поставит своё.
+        (application as GlassesApp).gestures.onAsk = null
         // Поворот: открытый системный диалог или галерея ответит новой Activity — запросы не отменяем.
         if (!isChangingConfigurations) requests.cancelAll()
         super.onDestroy()
@@ -445,6 +472,7 @@ class MainActivity : AppCompatActivity() {
  *  - снимок из файла files/<имя>: --es frame_file qr.png (вместе с question + with_frame или translate_view)
      *  - перевод:   --es translate_partner "Merhaba" | --es translate_me "Привет" [--es language TURKISH]
      *  - модели:    --es model_assistant deepseek-v4-pro | --es model_translation deepseek-flash
+     *  - жест:      --es gesture double|single|off
      *  - стиль:     --es style_answer guide --es style_formality casual --es style_gender male|female|unset --es style_pace slower
      *  - сбой:      --es fail_claude server|network|forbidden|ratelimit (следующий запрос к Claude)
      *  - снимки:    --es image_source glasses|phone|simulator
@@ -541,6 +569,13 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra("dat_register", false)) {
             intent.removeExtra("dat_register")
             Wearables.startRegistration(this)
+        }
+        // «Жест на дужке» без настроек: --es gesture double|single|off (сохраняется).
+        intent.getStringExtra("gesture")?.let { value ->
+            intent.removeExtra("gesture")
+            Tap.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }?.let(app.gestureSettings::setTap)
+            app.gestureSettings.setEnabled(!value.equals("off", ignoreCase = true))
+            Log.d(TAG, "debug gesture: enabled=${app.gestureSettings.enabled.value} tap=${app.gestureSettings.tap.value}")
         }
         // «Hey Meta, start …» в симуляторе (источник снимков — «Симулятор очков»).
         if (intent.getBooleanExtra("simulate_hey_meta", false)) {

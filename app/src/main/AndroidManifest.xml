@@ -21,6 +21,9 @@
     <!-- «Компас» работает с выключенным экраном: фоновый сервис с типом location и уведомление «Стоп». -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- «Жест на дужке» с погасшим экраном: сервис с микрофоном (вопрос) и беззвучной дорожкой (касания очков). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Android 11+: доступ к системным сервисам распознавания речи и синтеза. -->
@@ -113,6 +116,10 @@
             android:name=".nav.CompassService"
             android:exported="false"
             android:foregroundServiceType="location" />
+        <service
+            android:name=".speech.GesturesService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|mediaPlayback" />
 
     </application>
 </manifest>

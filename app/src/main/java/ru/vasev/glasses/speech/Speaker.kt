@@ -27,6 +27,9 @@ class Speaker(context: Context) {
     @Volatile
     private var player: MediaPlayer? = null
 
+    /** Звучит фраза собеседнику через динамик (USAGE_MEDIA): жесты не должны принять её за чужую музыку. */
+    val playingToPartner: Boolean get() = player != null
+
     @Volatile
     private var pending: (() -> Unit)? = null
 

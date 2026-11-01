@@ -810,4 +810,22 @@
     <string name="translate_gender_hint">На этом языке перевод ваших фраз зависит от вашего пола: формы слов и вежливые частицы. Укажите его в «Стиле общения».</string>
     <string name="translate_gender_hint_open">Указать</string>
     <string name="say_voice_launch_no_key">Чтобы отвечать, введите ключ в настройках приложения на телефоне.</string>
+    <!-- «Жест на дужке»: касания очков приходят медиакнопками Bluetooth. -->
+    <string name="settings_glasses">Очки</string>
+    <string name="settings_gesture_title">Жест на дужке — вопрос</string>
+    <string name="settings_gesture_subtitle">Касание очков начинает вопрос, даже с погасшим экраном. Во время ответа любое касание его перебивает.</string>
+    <string name="settings_gesture_hint">Не работает, пока играет музыка других приложений, и минуту после неё — тогда касание остаётся паузой музыки. Свайп, удержание и кнопка съёмки остаются за Meta.</string>
+    <string name="gesture_tap_double">Двойное касание</string>
+    <string name="gesture_tap_single">Одно касание</string>
+    <string name="gesture_channel">Жесты очков</string>
+    <string name="gesture_notification_title">Жесты очков включены</string>
+    <string name="gesture_off">Выключить</string>
+    <string name="gesture_state_ready_double">Сейчас: двойное касание — вопрос</string>
+    <string name="gesture_state_ready_single">Сейчас: одно касание — вопрос</string>
+    <string name="gesture_state_no_glasses">Сейчас: очки не подключены по Bluetooth</string>
+    <string name="gesture_state_other_media">Сейчас: играет другое приложение — касание ставит его на паузу</string>
+    <string name="gesture_state_cooldown">Сейчас: ждём минуту после остановки музыки</string>
+    <string name="gesture_state_call">Сейчас: идёт звонок</string>
+    <string name="gesture_state_off">Выключено</string>
+    <string name="say_gesture_open_app">Чтобы спрашивать касанием, откройте приложение на телефоне.</string>
 </resources>

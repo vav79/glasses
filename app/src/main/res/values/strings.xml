@@ -773,4 +773,22 @@
     <string name="translate_gender_hint">In this language the translation of your phrases depends on your gender: word forms and polite particles. Set it in “Communication style”.</string>
     <string name="translate_gender_hint_open">Set</string>
     <string name="say_voice_launch_no_key">To answer, enter an API key in the app settings on the phone.</string>
+    <!-- «Жест на дужке»: касания очков приходят медиакнопками Bluetooth. -->
+    <string name="settings_glasses">Glasses</string>
+    <string name="settings_gesture_title">Tap on the temple to ask</string>
+    <string name="settings_gesture_subtitle">A tap on the glasses starts a question, even with the screen off. Any tap interrupts an answer.</string>
+    <string name="settings_gesture_hint">Doesn’t work while another app is playing music, and for a minute after it stops — then the tap stays the music’s pause. Swipe, tap and hold, and the capture button stay with Meta.</string>
+    <string name="gesture_tap_double">Double tap</string>
+    <string name="gesture_tap_single">Single tap</string>
+    <string name="gesture_channel">Glasses gestures</string>
+    <string name="gesture_notification_title">Glasses gestures are on</string>
+    <string name="gesture_off">Turn off</string>
+    <string name="gesture_state_ready_double">Now: double tap — question</string>
+    <string name="gesture_state_ready_single">Now: single tap — question</string>
+    <string name="gesture_state_no_glasses">Now: glasses aren’t connected via Bluetooth</string>
+    <string name="gesture_state_other_media">Now: another app is playing — the tap pauses it</string>
+    <string name="gesture_state_cooldown">Now: waiting a minute after the music stopped</string>
+    <string name="gesture_state_call">Now: a call is in progress</string>
+    <string name="gesture_state_off">Off</string>
+    <string name="say_gesture_open_app">Open the app on the phone to ask by tapping.</string>
 </resources>

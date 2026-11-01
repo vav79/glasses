@@ -1,5 +1,7 @@
 package ru.vasev.glasses.ui
 
+import ru.vasev.glasses.speech.GesturesService
+import ru.vasev.glasses.speech.Tap
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.selection.toggleable
@@ -94,6 +96,9 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val journalTexts by viewModel.journalTexts.collectAsStateWithLifecycle()
     val voiceStop by viewModel.voiceStop.collectAsStateWithLifecycle()
     val headsetMic by viewModel.headsetMic.collectAsStateWithLifecycle()
+    val gestureEnabled by viewModel.gestureEnabled.collectAsStateWithLifecycle()
+    val gestureTap by viewModel.gestureTap.collectAsStateWithLifecycle()
+    val gestureState by viewModel.gestureState.collectAsStateWithLifecycle()
     val lessTransparency by viewModel.lessTransparency.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
     val rates by viewModel.rates.collectAsStateWithLifecycle()
@@ -170,6 +175,20 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
         BackgroundTitle(stringResource(R.string.settings_role))
         RolePicker(role, viewModel::setRole)
         BackgroundHint(stringResource(R.string.settings_role_hint))
+
+        Section(stringResource(R.string.settings_glasses)) {
+            SwitchRow(
+                title = stringResource(R.string.settings_gesture_title),
+                subtitle = stringResource(R.string.settings_gesture_subtitle),
+                checked = gestureEnabled,
+                onChange = viewModel::setGestureEnabled,
+            )
+            if (gestureEnabled) {
+                TapPicker(gestureTap, viewModel::setGestureTap)
+                Hint(stringResource(GesturesService.stateText(gestureState, gestureTap)))
+            }
+            Hint(stringResource(R.string.settings_gesture_hint))
+        }
 
         Section(stringResource(R.string.settings_headset)) {
             SwitchRow(
@@ -464,6 +483,29 @@ private fun TaxiLanguagePicker(selected: String?, onSelect: (String?) -> Unit) {
 }
 
 /** Навигатор: Авто / Яндекс / Google. */
+@Composable
+private fun TapPicker(selected: Tap, onSelect: (Tap) -> Unit) {
+    // Двойное — первым: оно по умолчанию (одиночное срабатывает, когда поправляешь очки).
+    val choices = listOf(Tap.DOUBLE, Tap.SINGLE)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == selected,
+                onClick = { if (choice != selected) onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
+                icon = {},
+            ) {
+                Text(
+                    stringResource(if (choice == Tap.DOUBLE) R.string.gesture_tap_double else R.string.gesture_tap_single),
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun NavigatorPicker(selected: NavigatorChoice, onSelect: (NavigatorChoice) -> Unit) {
     val choices = NavigatorChoice.entries
