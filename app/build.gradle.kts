@@ -98,6 +98,8 @@ dependencies {
     debugImplementation(libs.backdrop)
     // DAT Speech (экспериментальный, только dev/beta) — пока только debug-проба SpeechProbeActivity.
     debugImplementation(libs.mwdat.speech)
+    // DAT Inputs (сенсорная панель и кнопки очков, только dev/beta) — пока только debug-проба InputsProbeActivity.
+    debugImplementation(libs.mwdat.inputs)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
