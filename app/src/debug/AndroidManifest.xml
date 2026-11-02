@@ -9,6 +9,11 @@
             android:theme="@style/Theme.Glasses" />
         <!-- Проба DAT Speech на очках: adb shell am start -n ru.vasev.glasses/.debug.SpeechProbeActivity -->
         <!-- Проба жестов очков (DAT Inputs и медиакнопки): adb shell am start -n ru.vasev.glasses/.debug.InputsProbeActivity -->
+        <!-- Проба видео с очков (HEVC → MP4): adb shell am start -n ru.vasev.glasses/.debug.VideoProbeActivity -->
+        <activity
+            android:name=".debug.VideoProbeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Glasses" />
         <activity
             android:name=".debug.InputsProbeActivity"
             android:exported="true"

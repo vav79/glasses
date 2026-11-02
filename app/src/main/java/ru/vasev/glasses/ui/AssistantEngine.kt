@@ -1046,11 +1046,13 @@ class AssistantEngine(private val app: Application) {
                 if (gestureSettings.chosen != null) gestureAsk() else ask()
             }
         }
+        // Удержал ли этот ответ микрофон гарнитуры: отпускаем только своё (его же держит и запись видео со звуком).
+        var heldMic = false
         try {
             coroutineScope {
                 // Голосовое «стоп»: микрофон гарнитуры включается параллельно с запросом к модели,
                 // чтобы первая фраза уже звучала по тому же маршруту (без переключения посреди ответа).
-                val micHeld = if (!silent && profile.voiceStop.value && router.micHeadset()?.mic != null) async { router.holdMic() } else null
+                val micHeld = if (!silent && profile.voiceStop.value && router.micHeadset()?.mic != null) async { router.holdMic().also { heldMic = it } } else null
                 val voiceStop = launch {
                     if (micHeld?.await() == true) listenForStop(language)
                 }
@@ -1126,7 +1128,7 @@ class AssistantEngine(private val app: Application) {
             sentences.close()
             if (!silent) {
                 gestures.answerDone()
-                router.unholdMic()
+                if (heldMic) router.unholdMic()
                 audio.releaseFocus()
             }
             if (!finished) {

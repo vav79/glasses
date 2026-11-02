@@ -70,7 +70,8 @@ class AudioRouter(context: Context) {
     private var routedMic: AudioDeviceInfo? = null
 
     /** Микрофон гарнитуры держится на время ответа ([holdMic]). */
-    private var micHeld = false
+    // Сколько раз микрофон удержан (голосовое «стоп», запись видео со звуком): отпускается, когда никто не держит.
+    private var micHolds = 0
 
     init {
         audio.registerAudioDeviceCallback(
@@ -113,7 +114,7 @@ class AudioRouter(context: Context) {
      */
     @Suppress("DEPRECATION") // ACTION_SCO_AUDIO_STATE_UPDATED: другого события о разрыве SCO в API нет
     fun releaseMic() {
-        if (!micRouted || micHeld) return
+        if (!micRouted || micHolds > 0) return
         micRouted = false
         val releasedMic = routedMic
         routedMic = null
@@ -184,7 +185,7 @@ class AudioRouter(context: Context) {
     }
 
     /**
-     * Голосовое «стоп» во время ответа: микрофон гарнитуры включается и держится до [unholdMic],
+     * Голосовое «стоп» во время ответа и запись видео со звуком: микрофон гарнитуры включается и держится до [unholdMic],
      * [releaseMic] его не отключает. Пока SCO открыт, ответ звучит в гарнитуре в качестве звонка —
      * у классического Bluetooth микрофон и медиа-звук одновременно не работают.
      * false — гарнитуры с микрофоном нет или она не ответила: держать нечего.
@@ -195,15 +196,15 @@ class AudioRouter(context: Context) {
             releaseMic()
             return false
         }
-        micHeld = true
-        log("in", "headset mic held for voice stop (answer plays in call quality)")
+        micHolds++
+        log("in", "headset mic held (holds=$micHolds; answer plays in call quality)")
         return true
     }
 
     fun unholdMic() {
-        if (!micHeld) return
-        micHeld = false
-        releaseMic()
+        if (micHolds == 0) return
+        micHolds--
+        if (micHolds == 0) releaseMic()
     }
 
     /** Дождаться, пока после [releaseMic] телефон реально вышел из режима связи (или таймаута). */

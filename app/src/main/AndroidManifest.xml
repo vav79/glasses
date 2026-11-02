@@ -24,6 +24,9 @@
     <!-- «Жест на дужке» с погасшим экраном: сервис с микрофоном (вопрос) и беззвучной дорожкой (касания очков). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Запись видео с очков (RecordingService): тип connectedDevice; CHANGE_NETWORK_STATE — одно из условий этого типа. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- «Календарь»: только список ближайших событий; добавление — системным окном, без разрешения на запись. -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
@@ -127,6 +130,11 @@
             android:name=".speech.GesturesService"
             android:exported="false"
             android:foregroundServiceType="microphone|mediaPlayback" />
+
+        <service
+            android:name=".video.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|microphone" />
 
     </application>
 </manifest>

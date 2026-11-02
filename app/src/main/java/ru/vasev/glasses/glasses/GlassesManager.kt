@@ -6,6 +6,7 @@ import android.graphics.ImageDecoder
 import android.util.Log
 import androidx.annotation.StringRes
 import com.meta.wearable.dat.camera.Camera
+import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.types.PhotoData
 import com.meta.wearable.dat.camera.types.StreamConfiguration
@@ -202,6 +203,10 @@ class GlassesManager(private val context: Context) {
      * Делает один снимок с камеры очков и возвращает JPEG (длинная сторона ≤ [MAX_IMAGE_SIDE]).
      * [requestCameraPermission] показывает системный диалог Meta AI, если доступа к камере ещё нет.
      */
+    /** Поток идущей записи видео (VideoRecorder): снимок берётся из него. null — записи нет. */
+    @Volatile
+    var recordingStream: Stream? = null
+
     suspend fun captureJpeg(requestCameraPermission: suspend () -> Boolean): ByteArray {
         val current = status.value
         if (current.registration != RegistrationState.REGISTERED) {
@@ -210,6 +215,14 @@ class GlassesManager(private val context: Context) {
         if (current.deviceCount == 0) throw GlassesException(L.s(R.string.glasses_err_not_found))
 
         ensureCameraPermission(requestCameraPermission)
+
+        // Идёт запись видео: сессией владеет она — кадр из её потока, запись не прерывается (вторая сессия — «занято»).
+        recordingStream?.let { stream ->
+            Log.d(TAG, "capture from recording stream")
+            val photo = stream.capturePhoto()
+            val data = photo.getOrNull() ?: throw GlassesException(L.s(R.string.glasses_err_capture, photo.errorOrNull()?.description.orEmpty()))
+            return withContext(Dispatchers.Default) { toJpeg(data) }
+        }
 
         val created = Wearables.createSession(AutoDeviceSelector())
         val session = created.getOrNull() ?: throw sessionFailure(created.errorOrNull(), "create")

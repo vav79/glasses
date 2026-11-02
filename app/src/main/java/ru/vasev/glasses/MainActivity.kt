@@ -53,6 +53,7 @@ import ru.vasev.glasses.nav.TargetViewModel
 import ru.vasev.glasses.nav.TaxiViewModel
 import ru.vasev.glasses.speech.GesturesService
 import ru.vasev.glasses.speech.Tap
+import ru.vasev.glasses.ui.VideoTab
 import ru.vasev.glasses.ui.NavViewModels
 import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
@@ -553,6 +554,12 @@ class MainActivity : AppCompatActivity() {
                         }
                     },
                     onRoute = { ru.vasev.glasses.ui.openRoute(this@MainActivity, it) },
+                    videoTab = {
+                        val glassesBattery by app.glasses.battery.collectAsStateWithLifecycle()
+                        VideoTab(app.recorder, app.videoSettings, app.videoLibrary, glassesBattery, onStart = {
+                            app.recorder.start()?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show() }
+                        })
+                    },
                 )
                 AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }
@@ -914,6 +921,15 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra("frame_file")?.let { name ->
             intent.removeExtra("frame_file")
             viewModel.debugFrameFile = java.io.File(filesDir, name)
+        }
+        // Запись видео с очков без нажатий: --es video start|stop|resume.
+        intent.getStringExtra("video")?.let { command ->
+            intent.removeExtra("video")
+            when (command) {
+                "start" -> app.recorder.start()?.let { Log.w(TAG, "debug video: not started: ${getString(it)}") }
+                "stop" -> app.recorder.stop()
+                "resume" -> app.recorder.resume()
+            }
         }
         // Прогон сценариев (scripts/assistant-smoke.ps1): свой чат на прогон, после — удалить его.
         if (intent.getBooleanExtra("new_chat", false)) {

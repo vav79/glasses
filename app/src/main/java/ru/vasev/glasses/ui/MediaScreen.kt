@@ -65,7 +65,7 @@ import java.time.format.FormatStyle
 /**
  * «Медиа»: снимки (из чатов и с камер — очки, телефон, галерея) и заметки «Запомни».
  * Снимок можно отправить в чат (прикрепляется к полю ввода), сохранить в галерею или удалить.
- * Видео с очков появятся вместе с задачей «Видео» (BACKLOG).
+ * «Видео» — запись с камеры очков и список роликов ([VideoTab], передаётся снаружи).
  */
 @Composable
 fun MediaScreen(
@@ -73,6 +73,7 @@ fun MediaScreen(
     viewModel: AssistantEngine,
     onToChat: (MediaItem) -> Unit,
     onRoute: (Note) -> Unit,
+    videoTab: @Composable () -> Unit,
 ) {
     val items by library.items.collectAsState()
     LaunchedEffect(Unit) { library.refresh() }
@@ -82,13 +83,15 @@ fun MediaScreen(
     val p = LocalSputnikColors.current
     Column(Modifier.fillMaxSize()) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-            listOf(R.string.media_photos, R.string.notes_title).forEachIndexed { index, label ->
-                SegmentedButton(selected = tab == index, onClick = { tab = index }, shape = SegmentedButtonDefaults.itemShape(index, 2), icon = {}) {
+            listOf(R.string.media_photos, R.string.media_videos, R.string.notes_title).forEachIndexed { index, label ->
+                SegmentedButton(selected = tab == index, onClick = { tab = index }, shape = SegmentedButtonDefaults.itemShape(index, 3), icon = {}) {
                     Text(stringResource(label))
                 }
             }
         }
         if (tab == 1) {
+            videoTab()
+        } else if (tab == 2) {
             NotesScreen(viewModel, onClose = {}, onOpenPhoto = { notePhoto = it }, onRoute = onRoute, embedded = true)
         } else if (items.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {

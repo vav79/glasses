@@ -12,6 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import ru.vasev.glasses.video.VideoLibrary
+import ru.vasev.glasses.video.VideoRecorder
+import ru.vasev.glasses.video.VideoSettings
 import ru.vasev.glasses.ui.AssistantEngine
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
@@ -187,6 +190,11 @@ class GlassesApp : Application() {
     /** Тема и размер шрифта. */
     lateinit var appearance: AppearanceSettings
         private set
+
+    /** Запись видео с очков: настройки, ролики в галерее и сама запись (живёт без экрана, держит RecordingService). */
+    val videoSettings: VideoSettings by lazy { VideoSettings(this) }
+    val videoLibrary: VideoLibrary by lazy { VideoLibrary(this) }
+    val recorder: VideoRecorder by lazy { VideoRecorder(this) }
 
     /** Ход ассистента — на всё приложение: живёт и без экрана (жест на дужке при закрытом приложении). */
     val assistant: AssistantEngine by lazy { AssistantEngine(this).also { it.navVocabulary = navVoice::vocabulary } }
