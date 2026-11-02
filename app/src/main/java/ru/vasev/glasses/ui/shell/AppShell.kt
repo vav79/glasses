@@ -6,6 +6,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.R
+import ru.vasev.glasses.chats.ChatRules
 import ru.vasev.glasses.ui.theme.LocalSputnikColors
 import ru.vasev.glasses.ui.theme.Manrope
 
@@ -110,7 +120,10 @@ sealed interface ShellHeader {
 @Composable
 fun AppShell(
     header: ShellHeader,
-    chats: List<ChatEntry>,
+    /** Чаты по запросу поиска (пустой — все), свежие первыми. */
+    chats: (query: String) -> List<ChatEntry>,
+    onShowAllChats: () -> Unit,
+    onChatLongPress: (ChatEntry) -> Unit,
     modelName: String,
     modelStatus: ModelStatus,
     onMenuItem: (MenuItem) -> Unit,
@@ -141,6 +154,8 @@ fun AppShell(
             ) {
                 DrawerContent(
                     chats = chats,
+                    onShowAll = { closeThen(onShowAllChats) },
+                    onChatLongPress = onChatLongPress,
                     modelName = modelName,
                     modelStatus = modelStatus,
                     onMenuItem = { closeThen { onMenuItem(it) } },
@@ -315,7 +330,9 @@ private fun RoundIcon(
 /** Содержимое меню по макету «Классика»: поиск, пункты, «Чаты», низ с 🔔 ⚙️ и чипом модели. */
 @Composable
 private fun DrawerContent(
-    chats: List<ChatEntry>,
+    chats: (String) -> List<ChatEntry>,
+    onShowAll: () -> Unit,
+    onChatLongPress: (ChatEntry) -> Unit,
     modelName: String,
     modelStatus: ModelStatus,
     onMenuItem: (MenuItem) -> Unit,
@@ -337,10 +354,15 @@ private fun DrawerContent(
             color = p.text2,
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 6.dp).semantics { heading() },
         )
-        // Поиск по чатам: пока чат один — фильтр по названию (полный поиск по тексту — с историей чатов).
-        val shown = chats.filter { query.isBlank() || it.title.contains(query.trim(), ignoreCase = true) }.take(RECENT_CHATS)
-        shown.forEach { chat -> ChatRow(chat) { onChat(chat) } }
-        Spacer(Modifier.weight(1f))
+        // Поиск — по названиям и тексту чатов; в меню — последние семь, остальные — «Показать все».
+        val found = chats(query)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            if (found.isEmpty() && query.isNotBlank()) {
+                Text(stringResource(R.string.chats_not_found), color = p.text2, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+            }
+            found.take(RECENT_CHATS).forEach { chat -> ChatRow(chat, onLongClick = { onChatLongPress(chat) }) { onChat(chat) } }
+            if (found.size > RECENT_CHATS) ShowAllRow(onShowAll)
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -358,7 +380,20 @@ private fun DrawerContent(
 }
 
 @Composable
-private fun SearchField(query: String, onChange: (String) -> Unit) {
+private fun ShowAllRow(onClick: () -> Unit) {
+    val p = LocalSputnikColors.current
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(stringResource(R.string.chats_show_all), color = p.text2, style = TextStyle(fontFamily = Manrope, fontSize = 15.sp, fontWeight = FontWeight.Medium))
+        Icon(painterResource(R.drawable.ic_sym_chevron_right), contentDescription = null, tint = p.text2, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+internal fun SearchField(query: String, onChange: (String) -> Unit) {
     val p = LocalSputnikColors.current
     val hint = stringResource(R.string.menu_search)
     Row(
@@ -398,16 +433,19 @@ private fun MenuRow(item: MenuItem, onClick: () -> Unit) {
     }
 }
 
+/** Строка чата: нажатие — открыть, долгое нажатие — удалить (с подтверждением). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChatRow(chat: ChatEntry, onClick: () -> Unit) {
+internal fun ChatRow(chat: ChatEntry, onLongClick: () -> Unit, onClick: () -> Unit) {
     val p = LocalSputnikColors.current
+    val deleteLabel = stringResource(R.string.chat_delete)
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(12.dp))
             .then(if (chat.selected) Modifier.background(p.selected) else Modifier)
-            .clickable(role = Role.Button, onClick = onClick)
+            .combinedClickable(role = Role.Button, onLongClickLabel = deleteLabel, onLongClick = onLongClick, onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -461,12 +499,49 @@ private fun ModelChip(name: String, status: ModelStatus, onClick: () -> Unit) {
     }
 }
 
-/** Название чата — из первого вопроса, без запроса к модели: первая строка, не длиннее [TITLE_MAX] символов. */
-fun chatTitle(question: String): String {
-    val line = question.trim().lineSequence().firstOrNull().orEmpty().trim()
-    return if (line.length <= TITLE_MAX) line else line.take(TITLE_MAX).trimEnd() + "…"
+/**
+ * «Удалить чат «‹название›»?» — переписка удаляется безвозвратно, снимки и видео остаются в «Медиа».
+ * Кнопка «Удалить» — красная.
+ */
+@Composable
+fun DeleteChatDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val p = LocalSputnikColors.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.menu,
+        title = { Text(stringResource(R.string.chat_delete_title, title)) },
+        text = { Text(stringResource(R.string.chat_delete_text), color = p.text2) },
+        confirmButton = {
+            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = p.err)) {
+                Text(stringResource(R.string.delete), fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
 }
 
-private const val TITLE_MAX = 40
+/** «Показать все»: все чаты с поиском. */
+@Composable
+fun AllChatsScreen(chats: (String) -> List<ChatEntry>, onChat: (ChatEntry) -> Unit, onLongPress: (ChatEntry) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val found = chats(query)
+    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp)) {
+        SearchField(query, { query = it })
+        LazyColumn(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            items(found, key = { it.id }) { chat -> ChatRow(chat, onLongClick = { onLongPress(chat) }) { onChat(chat) } }
+        }
+        if (found.isEmpty()) {
+            Text(
+                stringResource(if (query.isBlank()) R.string.chats_empty else R.string.chats_not_found),
+                color = LocalSputnikColors.current.text2,
+                modifier = Modifier.padding(12.dp),
+            )
+        }
+    }
+}
+
+/** Название чата для шапки — по тем же правилам, что в истории ([ChatRules.title]). */
+fun chatTitle(question: String): String = ChatRules.title(question)
+
 private val MENU_WIDTH = 320.dp
 private const val RECENT_CHATS = 7

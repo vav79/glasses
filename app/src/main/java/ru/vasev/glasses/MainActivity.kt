@@ -63,6 +63,11 @@ import ru.vasev.glasses.ui.shell.MenuItem
 import ru.vasev.glasses.ui.shell.ModelStatus
 import ru.vasev.glasses.ui.shell.ShellHeader
 import ru.vasev.glasses.ui.shell.chatTitle
+import ru.vasev.glasses.ui.shell.AllChatsScreen
+import ru.vasev.glasses.ui.shell.DeleteChatDialog
+import ru.vasev.glasses.chats.ChatRules
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import ru.vasev.glasses.ui.SkillsScreen
 import ru.vasev.glasses.ui.CalendarPlaceholder
 import androidx.compose.runtime.Composable
@@ -103,6 +108,9 @@ class MainActivity : AppCompatActivity() {
 
     /** «Заметки» открыты поверх чата (меню ⋮ шапки). */
     private var notesOpen by mutableStateOf(false)
+
+    /** Чат, удаление которого ждёт подтверждения. */
+    private var chatToDelete by mutableStateOf<ChatEntry?>(null)
 
     /** Настройки открыты поверх вкладки (шестерёнка). */
     private var settingsOpen by mutableStateOf(false)
@@ -294,6 +302,26 @@ class MainActivity : AppCompatActivity() {
         val hasKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
         val chatTitle = chat.chat.firstOrNull()?.question?.let(::chatTitle) ?: stringResource(R.string.menu_new_chat)
         val notesLabel = stringResource(R.string.notes_open)
+        val deleteLabel = stringResource(R.string.chat_delete)
+        val chatMetas by viewModel.chats.collectAsStateWithLifecycle()
+        val currentChatId by viewModel.currentChatId.collectAsStateWithLifecycle()
+        val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+        // Ответ, пришедший, пока чат не на экране (приложение свёрнуто, другой экран), — непрочитанный.
+        val viewing = lifecycleState.isAtLeast(Lifecycle.State.RESUMED) && tab == AppTab.ASSISTANT && !settingsOpen && !notesOpen
+        LaunchedEffect(viewing) { viewModel.setViewing(viewing) }
+        fun entries(query: String) = ChatRules.search(chatMetas, query).map {
+            ChatEntry(it.id, it.title, selected = it.id == currentChatId && tab == AppTab.ASSISTANT, fromGlasses = it.fromGlasses, unread = it.unread)
+        }
+        val openChat: (ChatEntry) -> Unit = { entry ->
+            viewModel.openChat(entry.id)
+            selectTab(AppTab.ASSISTANT)
+        }
+        chatToDelete?.let { entry ->
+            DeleteChatDialog(entry.title, onConfirm = {
+                viewModel.deleteChat(entry.id)
+                chatToDelete = null
+            }, onDismiss = { chatToDelete = null })
+        }
         val header = when {
             settingsOpen -> ShellHeader.Title(stringResource(if (developerOpen) R.string.dev_journal_title else R.string.tab_settings))
             tab == AppTab.ASSISTANT -> ShellHeader.Chat(
@@ -306,13 +334,19 @@ class MainActivity : AppCompatActivity() {
                 // Кнопка перевода до этапа 4 открывает старый экран «Перевод».
                 onTranslate = { selectTab(AppTab.TRANSLATE) },
                 onGlasses = { selectTab(AppTab.CAMERA) },
-                chatMenu = listOf(notesLabel to { notesOpen = true }),
+                chatMenu = buildList {
+                    add(notesLabel to { notesOpen = true })
+                    // Удалить можно только сохранённый чат (новый, без обменов, ещё не в истории).
+                    currentChatId?.let { id -> add(deleteLabel to { chatToDelete = ChatEntry(id, chatTitle, selected = true) }) }
+                },
             )
             else -> ShellHeader.Title(stringResource(if (tab == AppTab.TRANSLATE) R.string.skill_translator else tab.titleRes))
         }
         AppShell(
             header = header,
-            chats = listOf(ChatEntry("current", chatTitle, selected = tab == AppTab.ASSISTANT && !settingsOpen)),
+            chats = ::entries,
+            onShowAllChats = { selectTab(AppTab.CHATS) },
+            onChatLongPress = { chatToDelete = it },
             modelName = when (model.provider) {
                 ProviderId.ANTHROPIC -> "Claude"
                 ProviderId.DEEPSEEK -> "DeepSeek"
@@ -335,7 +369,7 @@ class MainActivity : AppCompatActivity() {
                     MenuItem.CALENDAR -> selectTab(AppTab.CALENDAR)
                 }
             },
-            onChat = { selectTab(AppTab.ASSISTANT) },
+            onChat = openChat,
             onNotifications = { Toast.makeText(this, R.string.notifications_soon, Toast.LENGTH_SHORT).show() },
             onSettings = {
                 settingsOpen = true
@@ -399,6 +433,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 AppTab.SKILLS -> SkillsScreen(onOpen = { selectTab(it, stopOthers = false) })
                 AppTab.CALENDAR -> CalendarPlaceholder()
+                AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }
         }
     }
@@ -441,7 +476,7 @@ class MainActivity : AppCompatActivity() {
                 AppTab.TRANSLATE -> translation.stop()
                 AppTab.NAVIGATION -> navSession.cancel()
                 // Списки и заглушки — ни звука, ни микрофона.
-                AppTab.SKILLS, AppTab.CALENDAR -> Unit
+                AppTab.SKILLS, AppTab.CALENDAR, AppTab.CHATS -> Unit
             }
         }
         tab = newTab

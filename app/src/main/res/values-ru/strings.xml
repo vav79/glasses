@@ -860,4 +860,11 @@
     <string name="theme_dark">Тёмная</string>
     <string name="theme_light">Светлая</string>
     <string name="theme_system">Системная</string>
+    <string name="chats_show_all">Показать все</string>
+    <string name="chats_all">Все чаты</string>
+    <string name="chats_empty">Чатов пока нет.</string>
+    <string name="chats_not_found">Ничего не найдено.</string>
+    <string name="chat_delete">Удалить чат</string>
+    <string name="chat_delete_title">Удалить чат «%1$s»?</string>
+    <string name="chat_delete_text">Вся переписка будет удалена. Восстановить её будет нельзя. Фото и видео из этого чата останутся в «Медиа».</string>
 </resources>

@@ -40,7 +40,6 @@ import ru.vasev.glasses.GlassesApp.Companion.TAG
 import ru.vasev.glasses.R
 import ru.vasev.glasses.answer.SentenceSplitter
 import ru.vasev.glasses.answer.SpokenAnswer
-import ru.vasev.glasses.camera.ImagePrep
 import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.camera.Shot
 import ru.vasev.glasses.camera.PhoneCameraException
@@ -62,6 +61,15 @@ import ru.vasev.glasses.llm.Role
 import ru.vasev.glasses.llm.StreamedAnswer
 import ru.vasev.glasses.llm.TurnMetrics
 import ru.vasev.glasses.links.FoundLink
+import ru.vasev.glasses.links.LinkCheck
+import ru.vasev.glasses.camera.ImagePrep
+import ru.vasev.glasses.chats.ChatMeta
+import ru.vasev.glasses.chats.ChatRules
+import ru.vasev.glasses.chats.LinkRef
+import ru.vasev.glasses.chats.NoteRef
+import ru.vasev.glasses.chats.StoredExchange
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import ru.vasev.glasses.links.LinkInfo
 import ru.vasev.glasses.links.LinkScanner
 import ru.vasev.glasses.links.LinkTexts
@@ -211,7 +219,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Запрос разрешения на геопозицию (при первой заметке); подставляется из MainActivity. */
     var locationPermissionRequester: (suspend () -> Boolean)? = null
+    /** Время последнего обмена (часы телефона): после 2 часов тишины следующий вопрос начинает новый чат. */
     private var lastActivity = 0L
+
+    /** История чатов на телефоне. */
+    private val chatStore = (app as GlassesApp).chats
+    val chats: StateFlow<List<ChatMeta>> = chatStore.chats
+
+    /** Открытый чат. Новый объект — новый чат: сохранения уже начатых обменов уходят в свой чат. */
+    private class OpenChat(var id: String?)
+    private var chat = OpenChat(null)
+    private val _currentChatId = MutableStateFlow<String?>(null)
+    val currentChatId: StateFlow<String?> = _currentChatId.asStateFlow()
+
+    /** Сохранения — строго по очереди: первый обмен создаёт чат, следующие дописываются в него. */
+    private val saveLock = Mutex()
+
+    /** Чат на экране (приложение открыто, «Ассистент», не настройки): иначе ответ помечается непрочитанным. */
+    private var viewing = false
+
+    /** Следующий ход начат голосом через Meta AI — чат «с очков». */
+    private var nextFromGlasses = false
+    private var turnFromGlasses = false
 
     private val imageSources = (app as GlassesApp).imageSources
 
@@ -291,6 +320,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun voiceLaunch(): Boolean {
         if (hasApiKey.value) {
+            nextFromGlasses = true
             ask()
             return true
         }
@@ -471,10 +501,108 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(phase = Phase.IDLE, pendingQuestion = "", pendingFrame = null, pendingAnswer = "", pendingDetails = "") }
     }
 
-    /** Кнопка «Новый разговор». */
+    /** «Новый чат»: прежний остаётся в истории, следующий вопрос начнёт новый. */
     fun newConversation() {
         stop()
+        startNewChat()
+    }
+
+    private fun startNewChat() {
         resetConversation()
+        chat = OpenChat(null)
+        _currentChatId.value = null
+    }
+
+    /** Открыть чат из истории: переписка на экран, хвост — снова в память модели. */
+    fun openChat(id: String) {
+        if (id == chat.id) return
+        stop()
+        val meta = chatStore.chats.value.firstOrNull { it.id == id } ?: return
+        job = viewModelScope.launch {
+            val records = chatStore.load(id)
+            resetConversation()
+            chat = OpenChat(id)
+            _currentChatId.value = id
+            restore(records)
+            lastActivity = meta.updated
+            if (viewing) chatStore.markRead(id)
+            Log.d(TAG, "Chats: opened $id, exchanges=${records.size}")
+        }
+    }
+
+    /** Удалить чат (переписку; снимки остаются в «Медиа»). Открытый — сменяется новым. */
+    fun deleteChat(id: String) {
+        if (id == chat.id) newConversation()
+        viewModelScope.launch { chatStore.delete(id) }
+    }
+
+    /** Чат на экране или нет — для отметки «непрочитано». */
+    fun setViewing(value: Boolean) {
+        viewing = value
+        val id = chat.id ?: return
+        if (value) viewModelScope.launch { chatStore.markRead(id) }
+    }
+
+    /** Переписка из файла — в память модели (снимки — только у последних [RESTORE_PHOTOS] обменов) и на экран. */
+    private suspend fun restore(records: List<StoredExchange>) {
+        val notesById = noteStore.notes.value.associateBy { it.id }
+        records.forEachIndexed { index, r ->
+            val photo = r.photo?.let(chatStore::photoFile)?.takeIf { it.exists() }
+            val withJpeg = index >= records.size - RESTORE_PHOTOS
+            val jpeg = if (withJpeg && photo != null) withContext(Dispatchers.IO) { photo.readBytes() } else null
+            val exchange = conversation.add(r.asked, jpeg, r.answer)
+            if (photo != null) {
+                withContext(Dispatchers.IO) { decodePreview(photo) }?.let { frames[exchange.id] = it }
+            }
+            r.source?.let { name -> ImageSource.entries.firstOrNull { it.name == name } }?.let { frameSources[exchange.id] = it }
+            r.model?.let { labels[exchange.id] = it }
+            parts[exchange.id] = r.summary to r.details
+            r.shown?.let { shownQuestions[exchange.id] = it }
+            if (r.interrupted) interrupted += exchange.id
+            if (r.silent) silentIds += exchange.id
+            extras[exchange.id] = Extras(
+                sources = r.sources,
+                notes = r.notes.mapNotNull { ref ->
+                    notesById[ref.id]?.let { NoteCard(it, noteStore.photo(it, NOTE_PREVIEW_SIDE), ref.saved) }
+                },
+                deletedNotes = r.deletedNotes,
+                translation = r.translation,
+                ratesNote = r.ratesDate?.let { runCatching { RatesNote(LocalDate.parse(it), r.ratesOffline) }.getOrNull() },
+                links = r.links.map { FoundLink(LinkCheck.analyze(it.raw), it.fromQr) },
+            )
+        }
+        publishChat()
+    }
+
+    /** Снимок обмена для чата — уменьшенный (как превью заметок), чтобы длинная история не занимала память. */
+    private fun decodePreview(file: java.io.File): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= NOTE_PREVIEW_SIDE) sample *= 2
+        return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    /** Обмен — в файл чата (по очереди; первый создаёт чат). Снимок — в медиа чатов. */
+    private fun save(exchange: StoredExchange, jpeg: ByteArray?) {
+        val target = chat
+        val fromGlasses = turnFromGlasses
+        val unread = !viewing
+        viewModelScope.launch {
+            withContext(NonCancellable) {
+                saveLock.withLock {
+                    val record = exchange.copy(photo = jpeg?.let { chatStore.savePhoto(it) })
+                    val id = target.id
+                    if (id == null) {
+                        target.id = chatStore.create(record, fromGlasses, unread)
+                        if (target === chat) _currentChatId.value = target.id
+                        Log.d(TAG, "Chats: new chat ${target.id} fromGlasses=$fromGlasses")
+                    } else {
+                        chatStore.append(id, record, unread)
+                    }
+                }
+            }
+        }
     }
 
     private fun run(
@@ -493,9 +621,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             linkScan?.cancel()
             linkScan = null
             _state.update { it.copy(confirmLink = null) }
-            if (lastActivity != 0L && SystemClock.elapsedRealtime() - lastActivity >= IDLE_RESET_MS) {
-                resetConversation()
+            // После 2 часов тишины — новый чат; прежний остаётся в истории.
+            if (!conversation.isEmpty && ChatRules.expired(lastActivity, System.currentTimeMillis())) {
+                Log.d(TAG, "Chats: new chat after a long pause")
+                startNewChat()
             }
+            // Чат «с очков»: жест, «Hey Meta» или вопрос микрофоном очков.
+            turnFromGlasses = byGesture || nextFromGlasses || (presetQuestion == null && !silent && router.micHeadset()?.glasses == true)
+            nextFromGlasses = false
             _state.update {
                 it.copy(
                     pendingQuestion = "", pendingFrame = null, pendingFrameSource = null, pendingAnswer = "", pendingDetails = "", error = null,
@@ -534,7 +667,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(pendingQuestion = question) }
 
                 if (Conversation.isResetCommand(question, L.array(R.array.reset_commands))) {
-                    resetConversation()
+                    startNewChat()
                     setPhase(Phase.SPEAKING)
                     audio.speak(L.s(R.string.say_new_conversation), language.locale, AudioChannel.ME)
                     setPhase(Phase.IDLE)
@@ -1001,6 +1134,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         publishChat()
         touch()
+        save(
+            StoredExchange(
+                asked = asked,
+                shown = question.takeIf { it != asked },
+                summary = summary,
+                details = details,
+                model = tag,
+                source = _state.value.pendingFrameSource?.name ?: frameSources[exchange.id]?.name,
+                interrupted = wasInterrupted,
+                silent = silent,
+                translation = extra.translation,
+                sources = extra.sources,
+                notes = extra.notes.map { NoteRef(it.note.id, it.saved) },
+                deletedNotes = extra.deletedNotes,
+                ratesDate = extra.ratesNote?.date?.toString(),
+                ratesOffline = extra.ratesNote?.offline == true,
+                links = extra.links.map { LinkRef(it.info.raw, it.fromQr) },
+            ),
+            jpeg,
+        )
         return exchange.id
     }
 
@@ -1047,12 +1200,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Перезапускает таймер автосброса после 5 минут тишины. */
     private fun touch() {
-        lastActivity = SystemClock.elapsedRealtime()
-        idleJob?.cancel()
-        idleJob = viewModelScope.launch {
-            delay(IDLE_RESET_MS)
-            if (_state.value.phase == Phase.IDLE) resetConversation()
-        }
+        lastActivity = System.currentTimeMillis()
     }
 
     private fun publishChat() {
@@ -1089,8 +1237,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         gestures.answerDone()
     }
 
+    init {
+        // Приложение открывается в последнем чате, если с него не прошло 2 часа; иначе — новый чат.
+        chatStore.chats.value.firstOrNull()
+            ?.takeUnless { ChatRules.expired(it.updated, System.currentTimeMillis()) }
+            ?.let { openChat(it.id) }
+    }
+
     private companion object {
-        const val IDLE_RESET_MS = 5 * 60 * 1000L
+        /** Сколько последних обменов при открытии чата снова получают свой снимок картинкой (модель видит последний). */
+        const val RESTORE_PHOTOS = 10
         const val VOICE_CONFIRM_MS = 10_000L
         const val REMEMBER_LISTEN_MS = 12_000L
         const val ECHO_GUARD_MS = 1_000L

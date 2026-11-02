@@ -40,6 +40,8 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
     SKILLS(R.string.menu_skills, R.drawable.ic_sym_auto_awesome),
     CALENDAR(R.string.menu_calendar, R.drawable.ic_sym_calendar_month),
+    /** «Показать все» чаты. */
+    CHATS(R.string.chats_all, R.drawable.ic_sym_history),
 }
 
 /**

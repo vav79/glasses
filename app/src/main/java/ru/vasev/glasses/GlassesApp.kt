@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.camera.ShotStore
+import ru.vasev.glasses.chats.ChatStore
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.glasses.VoiceLaunch
 import ru.vasev.glasses.i18n.L
@@ -155,6 +156,10 @@ class GlassesApp : Application() {
     lateinit var style: StyleSettings
         private set
 
+    /** История чатов ассистента — только на телефоне. */
+    lateinit var chats: ChatStore
+        private set
+
     /** Тема и размер шрифта. */
     lateinit var appearance: AppearanceSettings
         private set
@@ -200,6 +205,7 @@ class GlassesApp : Application() {
             }
         }
         notes = NoteStore(this)
+        chats = ChatStore(this)
         location = DeviceLocation(this)
         places = PlaceStore(this)
         compass = CompassController(this, audioOutput)

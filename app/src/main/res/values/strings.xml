@@ -823,4 +823,11 @@
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
     <string name="theme_system">System</string>
+    <string name="chats_show_all">Show all</string>
+    <string name="chats_all">All chats</string>
+    <string name="chats_empty">No chats yet.</string>
+    <string name="chats_not_found">Nothing found.</string>
+    <string name="chat_delete">Delete chat</string>
+    <string name="chat_delete_title">Delete chat “%1$s”?</string>
+    <string name="chat_delete_text">The whole conversation will be deleted and can’t be restored. Photos and videos from this chat stay in Media.</string>
 </resources>
