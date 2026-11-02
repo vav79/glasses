@@ -1,0 +1,351 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+import { Font } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const W = 1080, H = 2400, DURATION = 3.6;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.VSMShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// ---------- Background: dark grey, light from the top right, film grain against banding
+function makeBackground() {
+  const c = document.createElement('canvas');
+  c.width = 540; c.height = 1200;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(c.width * 0.88, c.height * 0.04, 10, c.width * 0.88, c.height * 0.04, c.height * 1.05);
+  grad.addColorStop(0.0, '#5c5e66');
+  grad.addColorStop(0.18, '#3a3b41');
+  grad.addColorStop(0.45, '#232428');
+  grad.addColorStop(1.0, '#111113');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, c.width, c.height);
+  const img = g.getImageData(0, 0, c.width, c.height);
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rnd() - 0.5) * 5;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+scene.background = makeBackground();
+
+// ---------- Studio environment for reflections: softbox top right, fill strip left, front panel
+function makeEnvironment(forText) {
+  const env = new THREE.Scene();
+  const room = new THREE.Mesh(new THREE.BoxGeometry(900, 900, 900), new THREE.MeshBasicMaterial({ color: 0x1b1c1f, side: THREE.BackSide }));
+  env.add(room);
+  const panel = (w, h, c, pos, rz = 0) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+    m.position.set(...pos); m.lookAt(0, 0, 0); m.rotateZ(rz); env.add(m);
+  };
+  panel(70, 45, new THREE.Color(9, 9, 9.4), [80, 95, 60]);      // key softbox, top right
+  panel(18, 110, new THREE.Color(1.3, 1.35, 1.5), [-120, 10, 40]); // thin fill strip, left
+  if (forText) {
+    panel(460, 280, new THREE.Color(0.4, 0.4, 0.42), [0, 20, 320]);    // dim wall behind the camera: base for silver
+    panel(150, 80, new THREE.Color(4.2, 4.2, 4.4), [45, 2, 290]);     // front softbox at eye level, right: sheen on lettering
+  } else {
+    panel(460, 280, new THREE.Color(0.06, 0.06, 0.065), [0, 20, 320]); // nearly dark front: the frame stays black
+  }
+  panel(30, 230, new THREE.Color(5.0, 5.1, 5.4), [-75, 25, 280], 0.55); // diagonal strip: glint across the lenses
+  if (!forText) panel(20, 240, new THREE.Color(4.2, 4.3, 4.6), [34, 30, 285], 0.55); // second strip: glint mid-turn
+  panel(200, 36, new THREE.Color(4.0, 4.3, 5.2), [-50, 30, -300]); // cool rim from behind
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const rt = pmrem.fromScene(env, 0.015, 1, 3000);
+  return rt.texture;
+}
+scene.environment = makeEnvironment(false);
+const textEnv = makeEnvironment(true);
+
+// ---------- Camera
+const camera = new THREE.PerspectiveCamera(24, W / H, 10, 5000);
+camera.position.set(0, 58, 1000);
+camera.lookAt(0, -14, 0);
+
+// ---------- Lights
+const key = new THREE.DirectionalLight(0xffffff, 2.4);
+key.position.set(60, 420, 70);
+key.castShadow = true;
+key.shadow.mapSize.set(512, 512);
+key.shadow.camera.left = -160; key.shadow.camera.right = 160;
+key.shadow.camera.top = 160; key.shadow.camera.bottom = -160;
+key.shadow.camera.near = 10; key.shadow.camera.far = 800;
+key.shadow.radius = 30; key.shadow.blurSamples = 25;
+key.shadow.bias = -0.0005;
+scene.add(key);
+scene.add(new THREE.AmbientLight(0xffffff, 0.08));
+const sweep = new THREE.PointLight(0xffffff, 0, 0, 0);
+scene.add(sweep);
+
+// ---------- Dissolve: object-space value noise, glowing edge
+const NOISE = `
+float dHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float dNoise(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(dHash(i), dHash(i + vec3(1,0,0)), f.x), mix(dHash(i + vec3(0,1,0)), dHash(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(dHash(i + vec3(0,0,1)), dHash(i + vec3(1,0,1)), f.x), mix(dHash(i + vec3(0,1,1)), dHash(i + vec3(1,1,1)), f.x), f.y), f.z); }
+float dFbm(vec3 p){ return 0.55 * dNoise(p) + 0.3 * dNoise(p * 2.1) + 0.15 * dNoise(p * 4.3); }
+`;
+function dissolvable(material, uniforms) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uDissolve = uniforms.uDissolve;
+    shader.uniforms.uEdgeColor = uniforms.uEdgeColor;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vDPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDPos = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vDPos;\nuniform float uDissolve;\nuniform vec3 uEdgeColor;\n' + NOISE)
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nfloat dN = dFbm(vDPos * 0.075);\nfloat dEdge = dN - uDissolve;\nif (dEdge < 0.0) discard;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uEdgeColor * (1.0 - smoothstep(0.0, 0.045, dEdge)) * smoothstep(0.0, 0.03, uDissolve);');
+  };
+  material.customProgramCacheKey = () => 'dissolve';
+  return material;
+}
+const glassesU = { uDissolve: { value: 1.1 }, uEdgeColor: { value: new THREE.Color(0.75, 0.88, 1.6) } };
+const textU = { uDissolve: { value: 1.1 }, uEdgeColor: { value: new THREE.Color(0.9, 0.95, 1.4) } };
+
+// ---------- Materials
+const frameMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0x050506, roughness: 0.15, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.0, specularIntensity: 0.8 }), glassesU);
+const lensMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0x1b2230, roughness: 0.0, metalness: 0, transmission: 0.35, thickness: 1.6, ior: 1.52, clearcoat: 1, clearcoatRoughness: 0.0, envMapIntensity: 2.2, specularIntensity: 1 }), glassesU);
+const gunMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0x55585f, roughness: 0.24, metalness: 1, envMapIntensity: 1.4 }), glassesU);
+const camGlassMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0x0b1a3a, roughness: 0.02, metalness: 0.2, clearcoat: 1, envMapIntensity: 2.5 }), glassesU);
+const irisMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0x2a5bd0, emissive: 0x0d2a75, emissiveIntensity: 1.0, roughness: 0.25, metalness: 0.4 }), glassesU);
+const ledMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0xffffff, emissive: 0xdfe8ff, emissiveIntensity: 1.6, roughness: 0.3 }), glassesU);
+const silverMat = dissolvable(new THREE.MeshPhysicalMaterial({ color: 0xdde1e8, roughness: 0.22, metalness: 1, clearcoat: 0.3, envMapIntensity: 1.9, envMap: textEnv }), textU);
+
+// ---------- Geometry helpers
+const WRAP = 0.0009;   // frame front curvature
+function bend(geo) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) - WRAP * p.getX(i) * p.getX(i));
+  p.needsUpdate = true;
+  return smooth(geo);
+}
+function lensCurve(geo, cx) {
+  // base curve of a real lens: centre bulges forward, edges sit back in the rim
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const dx = p.getX(i) - cx, dy = p.getY(i) + 2;
+    p.setZ(i, p.getZ(i) - 0.0032 * (dx * dx + dy * dy) + 1.2);
+  }
+  p.needsUpdate = true;
+  return geo;
+}
+function smooth(geo) {
+  geo.deleteAttribute('normal');
+  geo.deleteAttribute('uv');
+  const m = mergeVertices(geo, 1e-3);
+  m.computeVertexNormals();
+  return m;
+}
+function lensHole(sign) {
+  const s = sign;
+  const p = new THREE.Path();
+  p.moveTo(s * 14, 15);
+  p.lineTo(s * 64, 15);
+  p.quadraticCurveTo(s * 67.5, 15, s * 66.5, 10.5);
+  p.lineTo(s * 62, -10);
+  p.quadraticCurveTo(s * 59.5, -19.5, s * 47, -19.5);
+  p.lineTo(s * 26, -19);
+  p.quadraticCurveTo(s * 16, -19, s * 14, -10);
+  p.closePath();
+  return p;
+}
+function frameShape() {
+  const sh = new THREE.Shape();
+  sh.moveTo(-72, 22.5);
+  sh.lineTo(72, 22.5);
+  sh.quadraticCurveTo(77, 22.5, 76, 16.5);
+  sh.lineTo(70.5, -12);
+  sh.quadraticCurveTo(67, -26, 49, -25.5);
+  sh.lineTo(24, -25.5);
+  sh.quadraticCurveTo(9.5, -24, 8.2, -8);
+  sh.lineTo(7.2, 3);
+  sh.quadraticCurveTo(0, 7.5, -7.2, 3);
+  sh.lineTo(-8.2, -8);
+  sh.quadraticCurveTo(-9.5, -24, -24, -25);
+  sh.lineTo(-49, -25.5);
+  sh.quadraticCurveTo(-67, -26, -70.5, -12);
+  sh.lineTo(-76, 16.5);
+  sh.quadraticCurveTo(-77, 22.5, -72, 22.5);
+  sh.holes.push(lensHole(1), lensHole(-1));
+  return sh;
+}
+function lensShape(sign) {
+  const s = sign;
+  const sh = new THREE.Shape();
+  sh.moveTo(s * 13, 16);
+  sh.lineTo(s * 64.8, 16);
+  sh.quadraticCurveTo(s * 68.5, 16, s * 67.5, 10.5);
+  sh.lineTo(s * 63, -10.5);
+  sh.quadraticCurveTo(s * 60.5, -20.5, s * 47, -20.5);
+  sh.lineTo(s * 26, -20);
+  sh.quadraticCurveTo(s * 15, -20, s * 13, -10);
+  sh.closePath();
+  return sh;
+}
+function templeShape() {
+  // side profile: u = backwards from the hinge, v = height
+  const sh = new THREE.Shape();
+  sh.moveTo(0, 21.5);
+  sh.lineTo(28, 21);
+  sh.quadraticCurveTo(60, 19.5, 98, 17.5);
+  sh.quadraticCurveTo(124, 16, 136, -2);
+  sh.lineTo(141, -13);
+  sh.quadraticCurveTo(143, -19, 137.5, -18);
+  sh.lineTo(129, -5);
+  sh.quadraticCurveTo(118, 9.5, 97, 10.5);
+  sh.quadraticCurveTo(60, 11.5, 28, 9);
+  sh.lineTo(0, 8.5);
+  sh.closePath();
+  return sh;
+}
+
+// ---------- Glasses
+const glasses = new THREE.Group();
+scene.add(glasses);
+
+const FRAME_DEPTH = 5.2, BEVEL = 1.3;
+const frameGeo = new THREE.ExtrudeGeometry(frameShape(), { depth: FRAME_DEPTH, bevelEnabled: true, bevelThickness: BEVEL, bevelSize: 1.1, bevelSegments: 6, curveSegments: 28 });
+frameGeo.translate(0, 0, -FRAME_DEPTH / 2);
+const frame = new THREE.Mesh(bend(frameGeo), frameMat);
+frame.castShadow = true;
+glasses.add(frame);
+
+for (const s of [1, -1]) {
+  const lg = new THREE.ExtrudeGeometry(lensShape(s), { depth: 1.6, bevelEnabled: true, bevelThickness: 0.3, bevelSize: 0.3, bevelSegments: 2, curveSegments: 28 });
+  lg.translate(0, 0, -0.8);
+  const lens = new THREE.Mesh(bend(lensCurve(lg, s * 40)), lensMat);
+  lens.castShadow = true;
+  glasses.add(lens);
+}
+
+const FRONT_Z = FRAME_DEPTH / 2 + BEVEL;
+const cornerZ = -WRAP * 74 * 74;   // the frame curves back at the corners
+for (const s of [1, -1]) {
+  const tg = new THREE.ExtrudeGeometry(templeShape(), { depth: 4.6, bevelEnabled: true, bevelThickness: 1.1, bevelSize: 1.0, bevelSegments: 5, curveSegments: 24 });
+  tg.translate(0, 0, -2.3);
+  tg.rotateY(Math.PI / 2);          // profile runs backwards, thickness along x
+  const t = new THREE.Mesh(smooth(tg), frameMat);
+  t.position.set(s * 71.5, 0, cornerZ - FRAME_DEPTH / 2 - 0.5);
+  t.rotation.y = -s * 0.07;         // temples splay out slightly
+  t.castShadow = true;
+  glasses.add(t);
+  // hinge block where the temple meets the frame
+  const hinge = new THREE.Mesh(new THREE.BoxGeometry(6.5, 13, 9, 2, 2, 2), frameMat);
+  hinge.position.set(s * 72.5, 15, cornerZ - FRAME_DEPTH / 2 - 3.5);
+  hinge.castShadow = true;
+  glasses.add(hinge);
+}
+
+// camera module: in the front end of the frame at the left hinge, looking forward
+const camX = -70.2, camY = 16.6, camZ = FRONT_Z - WRAP * camX * camX;
+const camGroup = new THREE.Group();
+camGroup.position.set(camX, camY, camZ);
+camGroup.rotation.y = -Math.atan(2 * WRAP * camX) * -1; // follow the frame curvature
+const ring = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 4.15, 1.3, 48), gunMat);
+ring.rotation.x = Math.PI / 2; ring.position.z = 0.35;
+const glassDome = new THREE.Mesh(new THREE.SphereGeometry(2.9, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2.6), camGlassMat);
+glassDome.rotation.x = Math.PI / 2; glassDome.position.z = 0.55;
+const iris = new THREE.Mesh(new THREE.CircleGeometry(1.35, 40), irisMat);
+iris.position.z = 1.0;
+camGroup.add(ring, iris, glassDome);
+glasses.add(camGroup);
+
+// capture LED: opposite corner
+const ledX = 70.2;
+const led = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.6, 32), ledMat);
+led.rotation.x = Math.PI / 2;
+led.position.set(ledX, 16.6, FRONT_Z - WRAP * ledX * ledX + 0.15);
+glasses.add(led);
+
+glasses.position.set(0, 40, 0);
+
+// ---------- Shadow catcher
+const floorMat = new THREE.ShadowMaterial({ opacity: 0.5, depthWrite: false });
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -10;
+floor.receiveShadow = true;
+floor.renderOrder = -1;
+scene.add(floor);
+
+// ---------- Silver lettering
+let text = null;
+async function buildText() {
+  const json = await new Promise((res, rej) => new TTFLoader().load('./node_modules/@fontsource/manrope/files/manrope-latin-600-normal.woff', res, undefined, rej));
+  const font = new Font(json);
+  const geo = new TextGeometry('Sputnik AI', { font, size: 19, depth: 3.2, curveSegments: 14, bevelEnabled: true, bevelThickness: 0.9, bevelSize: 0.55, bevelSegments: 5 });
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  geo.translate(-(bb.max.x + bb.min.x) / 2, -(bb.max.y + bb.min.y) / 2, -1.6);
+  text = new THREE.Mesh(geo, silverMat);
+  text.position.set(0, -82, 60);
+  scene.add(text);
+}
+
+// ---------- Timeline
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const easeIn = (x) => x * x * x;
+const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+function setTime(t) {
+  // background in from black, out to black at the very end
+  scene.backgroundIntensity = easeOut(seg(t, 0.0, 0.35)) * (1 - easeIn(seg(t, 3.3, 3.6)));
+
+  // glasses: materialize, rotate, dissolve
+  const rot = easeOut(seg(t, 0.0, 2.7));
+  glasses.rotation.y = -1.05 + 1.2 * rot + 0.05 * Math.max(0, t - 2.7);
+  glasses.rotation.x = 0.12 - 0.17 * rot;
+  glasses.rotation.z = -0.05 + 0.05 * rot;
+  glasses.position.y = 40 + 2.5 * Math.sin(t * 1.6);
+  const gIn = 1 - easeOut(seg(t, 0.05, 0.9));
+  const gOut = easeIn(seg(t, 2.75, 3.35));
+  glassesU.uDissolve.value = 1.1 * Math.max(gIn, gOut);
+  floorMat.opacity = 0.5 * (1 - Math.max(gIn, gOut));
+
+  // lettering: materialize, slow turn for the sheen, dissolve with the glasses
+  if (text) {
+    const tIn = 1 - easeOut(seg(t, 0.85, 1.6));
+    const tOut = easeIn(seg(t, 2.8, 3.38));
+    textU.uDissolve.value = 1.1 * Math.max(tIn, tOut);
+    text.rotation.y = -0.16 + 0.22 * easeInOut(seg(t, 0.85, 3.2));
+    text.rotation.x = -0.06;
+  }
+  const sw = easeInOut(seg(t, 1.25, 2.45));
+  sweep.position.set(-170 + 340 * sw, -45, 150);
+  sweep.intensity = 1.8 * Math.sin(Math.PI * sw);
+}
+
+window.DURATION = DURATION;
+window.renderAt = (t) => { setTime(t); renderer.render(scene, camera); return true; };
+buildText().then(() => { window.ready = true; }).catch((e) => { window.loadError = String(e); });
+</script>
+</body>
+</html>

@@ -253,5 +253,10 @@ class GlassesApp : Application() {
 
     companion object {
         const val TAG = "Glasses"
+
+        private var started = false
+
+        /** Первое создание экрана в этом процессе (холодный запуск) — true один раз: видеозаставка только тогда. */
+        fun firstScreenInProcess(): Boolean = !started.also { started = true }
     }
 }

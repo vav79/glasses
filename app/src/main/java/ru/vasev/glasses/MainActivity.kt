@@ -1,6 +1,7 @@
 package ru.vasev.glasses
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
@@ -96,6 +97,7 @@ import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
 import ru.vasev.glasses.ui.glass.GlassRoot
 import ru.vasev.glasses.ui.AgreementScreen
+import ru.vasev.glasses.ui.IntroVideo
 import ru.vasev.glasses.ui.ModelSetupScreen
 import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.ui.MainScreen
@@ -138,6 +140,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Настройки открыты поверх вкладки (шестерёнка). */
     private var settingsOpen by mutableStateOf(false)
+
+    /** Идёт стартовая видеозаставка (поверх приложения, которое под ней уже работает). */
+    private var introPlaying by mutableStateOf(false)
 
     /** Внутри настроек открыт раздел «Для разработчика» (журнал запросов). */
     private var developerOpen by mutableStateOf(false)
@@ -274,7 +279,11 @@ class MainActivity : AppCompatActivity() {
             handleVoiceIntent(intent)
             handleDebugIntent(intent)
         }
-        requestRuntimePermissions()
+        // Видеозаставка — только при холодном запуске с иконки и с включёнными анимациями. Запуск голосом, из Meta AI
+        // или debug-интентом её не показывает. Разрешения — после неё: системное окно поверх ролика неуместно.
+        introPlaying = GlassesApp.firstScreenInProcess() && savedInstanceState == null &&
+            intent?.action == Intent.ACTION_MAIN && !isVoiceInvocationsIntent(intent) && ValueAnimator.areAnimatorsEnabled()
+        if (!introPlaying) requestRuntimePermissions()
         // «Hey Meta, start …»: запуск ждёт, пока экран на виду, — тогда слушаем вопрос и отвечаем Meta AI.
         val voiceLaunch = (application as GlassesApp).voiceLaunch
         lifecycleScope.launch {
@@ -299,7 +308,6 @@ class MainActivity : AppCompatActivity() {
             val dark = themeMode.isDark()
             // Значки строки состояния — под тему приложения, а не системы (тёмная тема при светлой системе).
             LaunchedEffect(dark) { applySystemBars(dark) }
-            LaunchedEffect(themeMode) { rememberSplashTheme(themeMode) }
             GlassesTheme(dark = dark, fontScalePercent = fontScale) {
                 val app = application as GlassesApp
                 val agreed by app.agreement.acceptedVersion.collectAsStateWithLifecycle()
@@ -325,6 +333,12 @@ class MainActivity : AppCompatActivity() {
                     return@GlassesTheme
                 }
                 Shell()
+            }
+            if (introPlaying) {
+                IntroVideo(onDone = {
+                    introPlaying = false
+                    requestRuntimePermissions()
+                })
             }
         }
     }
@@ -638,21 +652,6 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
         window.setBackgroundDrawable(ColorDrawable(sputnikColorScheme(dark).surface.toArgb()))
     }
-    /**
-     * Тема следующей заставки — под тему из настроек, чтобы при запуске не мелькал чужой цвет. Система
-     * запоминает её сама (Android 13+); раньше — всегда тёмная, как тема по умолчанию.
-     */
-    private fun rememberSplashTheme(mode: ThemeMode) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        splashScreen.setSplashScreenTheme(
-            when (mode) {
-                ThemeMode.DARK -> R.style.Theme_Glasses_Starting
-                ThemeMode.LIGHT -> R.style.Theme_Glasses_Starting_Light
-                ThemeMode.SYSTEM -> R.style.Theme_Glasses_Starting_System
-            },
-        )
-    }
-
     /** Камера телефона — только после разрешения; остальные источники разрешений Android не требуют. */
     private fun selectImageSource(source: ImageSource) {
         val needsCamera = source == ImageSource.PHONE_CAMERA &&

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Заставка темы «Как в системе» в тёмной системе — как тёмная. -->
-    <style name="Theme.Glasses.Starting.System" parent="Theme.Glasses.Starting" />
-</resources>

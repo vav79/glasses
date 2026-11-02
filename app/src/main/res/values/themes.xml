@@ -9,9 +9,7 @@
     <!--
       Заставка при запуске (SplashScreen API). installSplashScreen() вызывается до super.onCreate и сразу
       ставит postSplashScreenTheme — проверка темы AppCompatActivity видит уже Theme.Glasses.
-      Фон — цвет экрана приложения (тёмная тема по умолчанию — чёрный), чтобы при запуске не мелькал другой
-      цвет. На Android 13+ MainActivity запоминает тему из настроек для следующей заставки
-      (SplashScreen.setSplashScreenTheme): Light — белый фон, System — по теме системы (values-night).
+      Фон всегда чёрный: следом идёт видеозаставка (начинается с чёрного кадра) и тёмная тема по умолчанию.
     -->
     <style name="Theme.Glasses.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_dark</item>
@@ -19,10 +17,4 @@
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.Glasses</item>
     </style>
-
-    <style name="Theme.Glasses.Starting.Light">
-        <item name="windowSplashScreenBackground">@color/splash_light</item>
-    </style>
-
-    <style name="Theme.Glasses.Starting.System" parent="Theme.Glasses.Starting.Light" />
 </resources>
