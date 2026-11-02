@@ -9,10 +9,21 @@
     <!--
       Заставка при запуске (SplashScreen API). installSplashScreen() вызывается до super.onCreate и сразу
       ставит postSplashScreenTheme — проверка темы AppCompatActivity видит уже Theme.Glasses.
+      Фон — цвет экрана приложения (тёмная тема по умолчанию — чёрный), чтобы при запуске не мелькал другой
+      цвет. На Android 13+ MainActivity запоминает тему из настроек для следующей заставки
+      (SplashScreen.setSplashScreenTheme): Light — белый фон, System — по теме системы (values-night).
     -->
     <style name="Theme.Glasses.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenBackground">@color/splash_dark</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
         <item name="postSplashScreenTheme">@style/Theme.Glasses</item>
     </style>
+
+    <!-- Белое облачко иконки на белом не видно — под иконкой круг цвета иконки приложения. -->
+    <style name="Theme.Glasses.Starting.Light">
+        <item name="windowSplashScreenBackground">@color/splash_light</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
+    </style>
+
+    <style name="Theme.Glasses.Starting.System" parent="Theme.Glasses.Starting.Light" />
 </resources>

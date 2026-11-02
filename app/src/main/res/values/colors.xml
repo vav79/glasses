@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Фон иконки приложения и заставки (бирюзовый, в тон запасной палитре темы). -->
+    <!-- Фон иконки приложения (бирюзовый). -->
     <color name="ic_launcher_background">#00696B</color>
+    <!-- Фон заставки — цвет экрана приложения (SputnikColors.screen). -->
+    <color name="splash_dark">#000000</color>
+    <color name="splash_light">#FFFFFF</color>
 </resources>

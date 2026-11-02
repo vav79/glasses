@@ -299,6 +299,7 @@ class MainActivity : AppCompatActivity() {
             val dark = themeMode.isDark()
             // Значки строки состояния — под тему приложения, а не системы (тёмная тема при светлой системе).
             LaunchedEffect(dark) { applySystemBars(dark) }
+            LaunchedEffect(themeMode) { rememberSplashTheme(themeMode) }
             GlassesTheme(dark = dark, fontScalePercent = fontScale) {
                 val app = application as GlassesApp
                 val agreed by app.agreement.acceptedVersion.collectAsStateWithLifecycle()
@@ -637,6 +638,21 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
         window.setBackgroundDrawable(ColorDrawable(sputnikColorScheme(dark).surface.toArgb()))
     }
+    /**
+     * Тема следующей заставки — под тему из настроек, чтобы при запуске не мелькал чужой цвет. Система
+     * запоминает её сама (Android 13+); раньше — всегда тёмная, как тема по умолчанию.
+     */
+    private fun rememberSplashTheme(mode: ThemeMode) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        splashScreen.setSplashScreenTheme(
+            when (mode) {
+                ThemeMode.DARK -> R.style.Theme_Glasses_Starting
+                ThemeMode.LIGHT -> R.style.Theme_Glasses_Starting_Light
+                ThemeMode.SYSTEM -> R.style.Theme_Glasses_Starting_System
+            },
+        )
+    }
+
     /** Камера телефона — только после разрешения; остальные источники разрешений Android не требуют. */
     private fun selectImageSource(source: ImageSource) {
         val needsCamera = source == ImageSource.PHONE_CAMERA &&
