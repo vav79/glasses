@@ -75,6 +75,7 @@
     <string name="glasses_registering">Регистрация в Meta AI…</string>
     <string name="glasses_not_registered">Приложение не подключено к Meta AI</string>
     <string name="glasses_not_found">Очки не найдены</string>
+    <string name="glasses_disconnected">Очки выключены или далеко</string>
     <string name="glasses_simulator_ready">Симулятор очков готов</string>
     <string name="glasses_connected">Очки подключены</string>
     <string name="glasses_err_not_registered">Приложение не подключено к Meta AI. Нажмите «Подключить очки».</string>

@@ -76,6 +76,7 @@
     <string name="glasses_registering">Registering with Meta AI…</string>
     <string name="glasses_not_registered">The app is not connected to Meta AI</string>
     <string name="glasses_not_found">Glasses not found</string>
+    <string name="glasses_disconnected">Glasses are off or out of range</string>
     <string name="glasses_simulator_ready">Glasses simulator is ready</string>
     <string name="glasses_connected">Glasses connected</string>
     <string name="glasses_err_not_registered">The app is not connected to Meta AI. Tap “Connect glasses”.</string>

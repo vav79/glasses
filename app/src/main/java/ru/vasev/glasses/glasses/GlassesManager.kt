@@ -16,6 +16,7 @@ import com.meta.wearable.dat.core.selectors.AutoDeviceSelector
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.session.DeviceSessionState
 import com.meta.wearable.dat.core.types.DeviceSessionError
+import com.meta.wearable.dat.core.types.LinkState
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationState
@@ -53,8 +54,11 @@ data class GlassesStatus(
     val mockMode: Boolean,
     val registration: RegistrationState,
     val deviceCount: Int,
+    /** Сколько из них сейчас на связи (`linkState == CONNECTED`): выключенные или далёкие очки в [deviceCount] остаются. */
+    val connectedCount: Int = deviceCount,
 ) {
-    val ready: Boolean get() = registration == RegistrationState.REGISTERED && deviceCount > 0
+    // Симулятор — всегда на связи.
+    val ready: Boolean get() = registration == RegistrationState.REGISTERED && deviceCount > 0 && (mockMode || connectedCount > 0)
 
     @get:StringRes
     val textRes: Int
@@ -62,6 +66,7 @@ data class GlassesStatus(
             registration == RegistrationState.REGISTERING -> R.string.glasses_registering
             registration != RegistrationState.REGISTERED -> R.string.glasses_not_registered
             deviceCount == 0 -> R.string.glasses_not_found
+            !mockMode && connectedCount == 0 -> R.string.glasses_disconnected
             mockMode -> R.string.glasses_simulator_ready
             else -> R.string.glasses_connected
         }
@@ -81,20 +86,27 @@ class GlassesManager(private val context: Context) {
     private val _mockMode = MutableStateFlow(BuildConfig.DEBUG && prefs.getBoolean(KEY_MOCK, false))
     val mockMode: StateFlow<Boolean> = _mockMode.asStateFlow()
 
+    /** Очки на связи: Meta AI знает и выключенные или далёкие очки — их нет в этом числе. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val connectedCount = Wearables.devices.flatMapLatest { ids ->
+        val flows = ids.mapNotNull { Wearables.devicesMetadata[it] }
+        if (flows.isEmpty()) flowOf(0) else combine(flows) { devices -> devices.count { it.linkState == LinkState.CONNECTED } }
+    }
+
     val status: StateFlow<GlassesStatus> =
-        combine(_mockMode, Wearables.registrationState, Wearables.devices) { mockMode, registration, devices ->
-            GlassesStatus(mockMode, registration, devices.size)
+        combine(_mockMode, Wearables.registrationState, Wearables.devices, connectedCount) { mockMode, registration, devices, connected ->
+            GlassesStatus(mockMode, registration, devices.size, connected)
         }.stateIn(
             scope,
             SharingStarted.Eagerly,
-            GlassesStatus(_mockMode.value, Wearables.registrationState.value, Wearables.devices.value.size),
+            GlassesStatus(_mockMode.value, Wearables.registrationState.value, Wearables.devices.value.size, connectedCount = 0),
         )
 
-    /** Заряд подключённых очков в процентах; null — очков нет или они ещё не прислали значение. */
+    /** Заряд очков на связи в процентах; null — очков нет, они не на связи или заряд неизвестен (DAT отдаёт 0). */
     @OptIn(ExperimentalCoroutinesApi::class)
     val battery: StateFlow<Int?> = Wearables.devices
         .flatMapLatest { ids ->
-            ids.firstOrNull()?.let { Wearables.devicesMetadata[it] }?.map { device -> device.batteryLevel.takeIf { it in 0..100 } }
+            ids.firstOrNull()?.let { Wearables.devicesMetadata[it] }?.map { device -> device.batteryLevel.takeIf { device.linkState == LinkState.CONNECTED && it in 1..100 } }
                 ?: flowOf(null)
         }
         .stateIn(scope, SharingStarted.Eagerly, null)
