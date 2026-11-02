@@ -13,6 +13,11 @@
             android:name=".debug.InputsProbeActivity"
             android:exported="true"
             android:theme="@style/Theme.Glasses" />
+        <!-- Проба: слышит ли микрофон очков собеседника на 1–2 м: adb shell am start -n ru.vasev.glasses/.debug.MicProbeActivity -->
+        <activity
+            android:name=".debug.MicProbeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Glasses" />
         <activity
             android:name=".debug.SpeechProbeActivity"
             android:exported="true"
