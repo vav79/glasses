@@ -107,6 +107,8 @@ sealed interface ShellHeader {
         /** Быстрый выбор профиля из чипа. */
         val profileOptions: List<ProfileOption>,
         val translateOn: Boolean,
+        /** Кнопка перевода скрыта, когда выбран профиль «Переводчик» или умение выключено. */
+        val showTranslate: Boolean,
         val glassesReady: Boolean,
         val glassesBattery: Int?,
         val onTranslate: () -> Unit,
@@ -209,7 +211,7 @@ private fun Header(header: ShellHeader, onMenu: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 ) {
                     ProfileChip(header.profileTitle, header.profileIcon, header.profileOptions, Modifier.weight(1f, fill = false))
-                    TranslateButton(header.translateOn, header.onTranslate)
+                    if (header.showTranslate) TranslateButton(header.translateOn, header.onTranslate)
                 }
                 GlassesBadge(header.glassesReady, header.glassesBattery, header.onGlasses)
                 ChatMenu(header.chatMenu)

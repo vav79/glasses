@@ -890,4 +890,25 @@
     <string name="skills_prompt_hint">Added before every request while this profile is active. The assistant’s service rules still apply.</string>
     <string name="skills_prompt_reset">Default</string>
     <string name="divider_profile">Profile: %1$s</string>
+    <!-- Переводчик в чате. -->
+    <string name="translate_line_partner">Partner</string>
+    <string name="translate_line_me">Me</string>
+    <string name="translate_show">Show</string>
+    <string name="translate_paused">Not listening to the partner — tap the ear to resume</string>
+    <string name="translate_waiting">Listening to the partner…</string>
+    <string name="translate_pause">Pause listening to the partner</string>
+    <string name="translate_resume">Resume listening to the partner</string>
+    <string name="translate_my_phrase_hint">My phrase</string>
+    <string name="translate_me_speak">Say my phrase</string>
+    <string name="divider_translate_on">%1$s · translation on</string>
+    <string name="divider_translate_off">%1$s · translation off</string>
+    <string name="translator_partner_language">Partner’s language</string>
+    <string name="translator_my_language">Translation into my language: %1$s (the app language).</string>
+    <string name="translator_auto_detect_soon">Detecting the partner’s language automatically — coming after a check on the phone.</string>
+    <string name="translator_partner_mic">Listen to the partner with</string>
+    <string name="translator_partner_mic_hint">The glasses microphone is aimed at your voice: in a test it didn’t recognize a partner 1–2 m away. The phone hears them well.</string>
+    <string name="translator_speak_mine">Speak my phrase through the phone speaker</string>
+    <string name="translator_speak_mine_hint">Off: your phrase is translated as text only — “Show” it to the partner.</string>
+    <string name="translator_formality">Addressing the partner</string>
+    <string name="translator_gender">My gender</string>
 </resources>

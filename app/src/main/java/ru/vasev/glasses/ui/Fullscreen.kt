@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -56,7 +57,7 @@ fun FullscreenPhoto(bitmap: Bitmap, label: String?, onClose: () -> Unit) {
  * Размер шрифта подбирается по длине фразы, чтобы короткие реплики читались издалека.
  */
 @Composable
-fun FullscreenText(text: String, caption: String, onClose: () -> Unit) {
+fun FullscreenText(text: String, caption: String, facingPartner: Boolean = false, onClose: () -> Unit) {
     val size = when {
         text.length <= 30 -> 56.sp
         text.length <= 80 -> 44.sp
@@ -70,8 +71,9 @@ fun FullscreenText(text: String, caption: String, onClose: () -> Unit) {
                 .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClickLabel = stringResource(R.string.close), onClick = onClose),
         ) {
+            // «Показать» собеседнику: текст развёрнут к тому, кто сидит напротив.
             Column(
-                Modifier.align(Alignment.Center).padding(24.dp),
+                Modifier.align(Alignment.Center).rotate(if (facingPartner) 180f else 0f).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(caption, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

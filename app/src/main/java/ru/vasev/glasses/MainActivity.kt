@@ -63,6 +63,9 @@ import ru.vasev.glasses.ui.shell.MenuItem
 import ru.vasev.glasses.ui.shell.ModelStatus
 import ru.vasev.glasses.ui.shell.ShellHeader
 import ru.vasev.glasses.ui.shell.ProfileOption
+import ru.vasev.glasses.ui.TranslateBar
+import ru.vasev.glasses.ui.TranslatorSettingsScreen
+import ru.vasev.glasses.ui.needsGenderHint
 import ru.vasev.glasses.profile.AssistantProfile
 import ru.vasev.glasses.profile.Skill
 import ru.vasev.glasses.ui.shell.chatTitle
@@ -113,6 +116,9 @@ class MainActivity : AppCompatActivity() {
 
     /** «Заметки» открыты поверх чата (меню ⋮ шапки). */
     private var notesOpen by mutableStateOf(false)
+
+    /** Прослушивание собеседника в переводе поставлено на паузу. */
+    private var translatePaused by mutableStateOf(false)
 
     /** Чат, удаление которого ждёт подтверждения. */
     private var chatToDelete by mutableStateOf<ChatEntry?>(null)
@@ -236,6 +242,8 @@ class MainActivity : AppCompatActivity() {
         val navVoice = (application as GlassesApp).navVoice
         viewModel.navVocabulary = navVoice::vocabulary
         viewModel.navCommandHandler = navVoice::handle
+        // Реплики «Переводчика» — в ленту чата и в его историю.
+        translation.onLine = { line -> viewModel.addTranslatedLine(line.line, line.model) }
         // Вкладка «Навигация» — когда ход ассистента закончен, следующим кадром: иначе размытие (Haze) получает
         // обновление уже убранного с экрана элемента и падает.
         viewModel.navCommandDone = { command ->
@@ -333,6 +341,15 @@ class MainActivity : AppCompatActivity() {
         val chatMetas by viewModel.chats.collectAsStateWithLifecycle()
         val activeProfile by app.skills.active.collectAsStateWithLifecycle()
         val disabledSkills by app.skills.disabled.collectAsStateWithLifecycle()
+        val translateHeaderOn by app.translator.headerOn.collectAsStateWithLifecycle()
+        val translatorProfile by app.translator.profile.collectAsStateWithLifecycle()
+        val translatorEnabled = Skill.TRANSLATOR.name !in disabledSkills
+        // Перевод в чате: кнопкой в шапке (к любому профилю) или профилем «Переводчик».
+        val translateActive = translatorEnabled && (translateHeaderOn || translatorProfile)
+        LaunchedEffect(translateActive) {
+            translatePaused = false
+            if (translateActive) translation.startConversation() else translation.stopConversation()
+        }
         val currentChatId by viewModel.currentChatId.collectAsStateWithLifecycle()
         val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
         // Ответ, пришедший, пока чат не на экране (приложение свёрнуто, другой экран), — непрочитанный.
@@ -354,19 +371,30 @@ class MainActivity : AppCompatActivity() {
         val header = when {
             settingsOpen -> ShellHeader.Title(stringResource(if (developerOpen) R.string.dev_journal_title else R.string.tab_settings))
             tab == AppTab.ASSISTANT -> ShellHeader.Chat(
-                profileTitle = activeProfile?.let { stringResource(it.titleRes) } ?: stringResource(R.string.profile_none),
-                profileIcon = activeProfile?.icon,
+                profileTitle = when {
+                    translatorProfile && translatorEnabled -> stringResource(R.string.skill_translator)
+                    else -> activeProfile?.let { stringResource(it.titleRes) } ?: stringResource(R.string.profile_none)
+                },
+                profileIcon = if (translatorProfile && translatorEnabled) Skill.TRANSLATOR.icon else activeProfile?.icon,
                 profileOptions = buildList {
-                    add(ProfileOption(stringResource(R.string.profile_none), null, activeProfile == null) { viewModel.setProfile(null) })
+                    val plain = activeProfile == null && !(translatorProfile && translatorEnabled)
+                    add(ProfileOption(stringResource(R.string.profile_none), null, plain) { viewModel.setProfile(null) })
                     AssistantProfile.entries.filter { it.name !in disabledSkills }.forEach { profile ->
-                        add(ProfileOption(stringResource(profile.titleRes), profile.icon, profile == activeProfile) { viewModel.setProfile(profile) })
+                        add(ProfileOption(stringResource(profile.titleRes), profile.icon, profile == activeProfile && !translatorProfile) { viewModel.setProfile(profile) })
+                    }
+                    if (translatorEnabled) {
+                        add(ProfileOption(stringResource(R.string.skill_translator), Skill.TRANSLATOR.icon, translatorProfile, viewModel::setTranslatorProfile))
                     }
                 },
-                translateOn = false,
+                translateOn = translateHeaderOn,
+                showTranslate = translatorEnabled && !translatorProfile,
                 glassesReady = glassesStatus.ready,
                 glassesBattery = battery,
-                // Кнопка перевода до этапа 4 открывает старый экран «Перевод».
-                onTranslate = { selectTab(AppTab.TRANSLATE) },
+                onTranslate = {
+                    val on = !translateHeaderOn
+                    app.translator.setHeaderOn(on)
+                    viewModel.translationToggled(on)
+                },
                 onGlasses = { selectTab(AppTab.CAMERA) },
                 chatMenu = buildList {
                     add(notesLabel to { notesOpen = true })
@@ -437,6 +465,7 @@ class MainActivity : AppCompatActivity() {
                     requestPhoneCamera = ::requestPhoneCamera,
                     notesOpen = notesOpen,
                     onCloseNotes = { notesOpen = false },
+                    translateBar = if (!translateActive) null else ({ ChatTranslateBar() }),
                 )
                 AppTab.CAMERA -> {
                     CameraScreen(
@@ -452,13 +481,22 @@ class MainActivity : AppCompatActivity() {
                     )
                     AssistantOverlays(viewModel)
                 }
-                AppTab.TRANSLATE -> TranslationScreen(
-                    viewModel = translation,
-                    onPartnerSpeaks = { withMic(translation::partnerSpeaks) },
-                    onMeReplies = { withMic(translation::meReplies) },
-                    onInstallVoice = ::openVoiceInstaller,
-                    onOpenSettings = { settingsOpen = true },
-                )
+                AppTab.TRANSLATE -> {
+                    val tState by translation.state.collectAsStateWithLifecycle()
+                    val partnerMic by app.translator.partnerMic.collectAsStateWithLifecycle()
+                    val speakMine by app.translator.speakMine.collectAsStateWithLifecycle()
+                    val style by app.style.current.collectAsStateWithLifecycle()
+                    TranslatorSettingsScreen(
+                        state = tState,
+                        partnerMic = partnerMic,
+                        speakMine = speakMine,
+                        style = style,
+                        onLanguage = ::setPartnerLanguage,
+                        onPartnerMic = app.translator::setPartnerMic,
+                        onSpeakMine = app.translator::setSpeakMine,
+                        onStyle = app.style::save,
+                    )
+                }
                 AppTab.NAVIGATION -> NavigationScreen(
                     vms = NavViewModels(navSession, addressSearch, navTarget, taxi, places),
                     onMic = { withMic(addressSearch::listenQuery) },
@@ -466,13 +504,44 @@ class MainActivity : AppCompatActivity() {
                     onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
                 )
                 AppTab.SKILLS -> SkillsScreen(app.skills, onOpenSkill = { skill ->
-                    // Настройки умений — этап 4б; пока «Переводчик» и «Навигация» открывают свои прежние экраны.
+                    // «Переводчик» — его настройки, «Навигация» — её экран (места, цель, компас, такси).
                     selectTab(if (skill == Skill.TRANSLATOR) AppTab.TRANSLATE else AppTab.NAVIGATION, stopOthers = false)
                 })
                 AppTab.CALENDAR -> CalendarPlaceholder()
                 AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }
         }
+    }
+
+    /** Низ чата, пока идёт перевод: язык, пауза собеседника, моя фраза. */
+    @Composable
+    private fun ChatTranslateBar() {
+        val app = application as GlassesApp
+        val tState by translation.state.collectAsStateWithLifecycle()
+        val hasKey by translation.hasApiKey.collectAsStateWithLifecycle()
+        val style by app.style.current.collectAsStateWithLifecycle()
+        TranslateBar(
+            state = tState,
+            hasKey = hasKey,
+            listeningPaused = translatePaused,
+            showGenderHint = needsGenderHint(tState.language, style),
+            onLanguage = ::setPartnerLanguage,
+            onPauseToggle = {
+                translatePaused = !translatePaused
+                if (translatePaused) translation.pauseListening() else withMic(translation::startConversation)
+            },
+            onMeSpeak = { withMic(translation::meReplies) },
+            onMeType = translation::typedReply,
+            onInstallVoice = ::openVoiceInstaller,
+            onOpenSettings = { selectTab(AppTab.TRANSLATE, stopOthers = false) },
+        )
+    }
+
+    /** Язык собеседника сменили — перевод в чате продолжает слушать на новом языке. */
+    private fun setPartnerLanguage(language: PartnerLanguage) {
+        val wasListening = (application as GlassesApp).translator.let { it.headerOn.value || it.profile.value } && !translatePaused
+        translation.setLanguage(language)
+        if (wasListening) translation.startConversation()
     }
 
     /** Строка состояния и навигации: прозрачные, значки — светлые в тёмной теме и тёмные в светлой. */
@@ -785,8 +854,15 @@ class MainActivity : AppCompatActivity() {
         if (partner != null || me != null) {
             intent.removeExtra("translate_partner")
             intent.removeExtra("translate_me")
-            selectTab(AppTab.TRANSLATE)
-            if (partner != null) translation.debugTurn(Who.PARTNER, partner) else translation.debugTurn(Who.ME, me!!)
+            // Перевод в чате: включить кнопкой шапки (если выключен) и подать реплику, когда он запустится.
+            selectTab(AppTab.ASSISTANT)
+            if (!app.translator.headerOn.value && !app.translator.profile.value) {
+                app.translator.setHeaderOn(true)
+                viewModel.translationToggled(true)
+            }
+            window.decorView.postDelayed({
+                if (partner != null) translation.debugTurn(Who.PARTNER, partner) else translation.debugTurn(Who.ME, me!!)
+            }, 800)
         }
     }
 

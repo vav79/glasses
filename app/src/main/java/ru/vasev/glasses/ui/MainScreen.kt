@@ -106,6 +106,8 @@ fun MainScreen(
     /** «Заметки» — из меню ⋮ шапки. */
     notesOpen: Boolean,
     onCloseNotes: () -> Unit,
+    /** Пока идёт перевод — низ экрана «Переводчика» вместо поля ввода. */
+    translateBar: (@Composable () -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
@@ -115,6 +117,7 @@ fun MainScreen(
     val busy = state.phase != Phase.IDLE
     var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
     var fullText by remember { mutableStateOf<String?>(null) }
+    var partnerText by remember { mutableStateOf<String?>(null) }
     val attachment by viewModel.attachment.collectAsStateWithLifecycle()
     var viewfinder by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -143,10 +146,11 @@ fun MainScreen(
                 onLinkClick = viewModel::requestLink,
                 onRoute = { openRoute(context, it) },
                 onSpeak = viewModel::speakAnswer,
+                onShowPartner = { partnerText = it },
             )
         }
 
-        Composer(
+        if (translateBar != null) translateBar() else Composer(
             phase = state.phase,
             micLevel = micLevel,
             hasApiKey = hasApiKey,
@@ -188,6 +192,7 @@ fun MainScreen(
     }
     photo?.let { (bitmap, label) -> FullscreenPhoto(bitmap, label) { photo = null } }
     fullText?.let { text -> FullscreenText(text, stringResource(R.string.translate_what_i_see)) { fullText = null } }
+    partnerText?.let { text -> FullscreenText(text, "", facingPartner = true) { partnerText = null } }
 }
 
 /**
@@ -228,6 +233,7 @@ private fun Chat(
     onLinkClick: (FoundLink) -> Unit,
     onRoute: (Note) -> Unit,
     onSpeak: (Long) -> Unit,
+    onShowPartner: (String) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val hasPending = state.pendingQuestion.isNotEmpty() || state.pendingFrame != null
@@ -267,6 +273,10 @@ private fun Chat(
         itemsIndexed(state.chat, key = { _, item -> item.id }) { index, item ->
             if (item.divider != null) {
                 ChatDivider(item.divider)
+                return@itemsIndexed
+            }
+            if (item.translated != null) {
+                TranslatedBubble(item.translated, onShowPartner)
                 return@itemsIndexed
             }
             if (index == firstRemembered && firstRemembered > 0) {

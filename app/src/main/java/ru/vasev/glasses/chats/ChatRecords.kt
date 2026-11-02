@@ -50,6 +50,8 @@ data class StoredExchange(
     val links: List<LinkRef> = emptyList(),
     /** Не обмен, а разделитель в ленте («— Профиль: Инженер —»); в память модели не идёт. */
     val divider: String? = null,
+    /** Реплика «Переводчика»: чья ([ru.vasev.glasses.translate.Who.name]); [asked] — сказанное, [summary] — перевод. В память модели не идёт. */
+    val lineWho: String? = null,
 ) {
     /** Ответ целиком — как его помнит модель. */
     val answer: String get() = listOf(summary, details).filter { it.isNotEmpty() }.joinToString("\n\n")
@@ -100,6 +102,7 @@ object ChatJson {
         e.ratesDate?.let { put("rates_date", it).put("rates_offline", e.ratesOffline) }
         if (e.links.isNotEmpty()) put("links", JSONArray(e.links.map { JSONObject().put("raw", it.raw).put("qr", it.fromQr) }))
         e.divider?.let { put("divider", it) }
+        e.lineWho?.let { put("line_who", it) }
     }
 
     fun exchange(o: JSONObject): StoredExchange = StoredExchange(
@@ -122,6 +125,7 @@ object ChatJson {
         ratesOffline = o.optBoolean("rates_offline"),
         links = o.optJSONArray("links").objects().map { LinkRef(it.optString("raw"), it.optBoolean("qr")) },
         divider = o.optStringOrNull("divider"),
+        lineWho = o.optStringOrNull("line_who"),
     )
 
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null

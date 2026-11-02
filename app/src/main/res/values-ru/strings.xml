@@ -927,4 +927,25 @@
     <string name="skills_prompt_hint">Добавляется перед каждым запросом, пока профиль активен. Служебные правила ассистента он не меняет.</string>
     <string name="skills_prompt_reset">По умолчанию</string>
     <string name="divider_profile">Профиль: %1$s</string>
+    <!-- Переводчик в чате. -->
+    <string name="translate_line_partner">Собеседник</string>
+    <string name="translate_line_me">Я</string>
+    <string name="translate_show">Показать</string>
+    <string name="translate_paused">Собеседника не слушаю — нажмите на ухо, чтобы продолжить</string>
+    <string name="translate_waiting">Слушаю собеседника…</string>
+    <string name="translate_pause">Пауза: не слушать собеседника</string>
+    <string name="translate_resume">Снова слушать собеседника</string>
+    <string name="translate_my_phrase_hint">Моя фраза</string>
+    <string name="translate_me_speak">Сказать мою фразу</string>
+    <string name="divider_translate_on">%1$s · перевод вкл</string>
+    <string name="divider_translate_off">%1$s · перевод выкл</string>
+    <string name="translator_partner_language">Язык собеседника</string>
+    <string name="translator_my_language">Перевод на мой язык: %1$s (язык приложения).</string>
+    <string name="translator_auto_detect_soon">Автоопределение языка собеседника — после проверки на телефоне.</string>
+    <string name="translator_partner_mic">Слушать собеседника</string>
+    <string name="translator_partner_mic_hint">Микрофон очков направлен на ваш голос: в пробе он не распознал собеседника на 1–2 м. Телефон слышит его хорошо.</string>
+    <string name="translator_speak_mine">Озвучивать мою фразу через динамик телефона</string>
+    <string name="translator_speak_mine_hint">Выключено: моя фраза переводится только текстом — «Показать» её собеседнику.</string>
+    <string name="translator_formality">Обращение к собеседнику</string>
+    <string name="translator_gender">Мой пол</string>
 </resources>

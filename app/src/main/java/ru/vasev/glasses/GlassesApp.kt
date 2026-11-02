@@ -32,6 +32,7 @@ import ru.vasev.glasses.places.PlaceStore
 import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.profile.ProfileSettings
 import ru.vasev.glasses.profile.SkillsSettings
+import ru.vasev.glasses.translate.TranslatorSettings
 import ru.vasev.glasses.profile.StyleSettings
 import ru.vasev.glasses.rates.CbrRates
 import ru.vasev.glasses.rates.CurrencySettings
@@ -166,6 +167,10 @@ class GlassesApp : Application() {
     lateinit var skills: SkillsSettings
         private set
 
+    /** Настройки «Переводчика» и включён ли перевод в чате. */
+    lateinit var translator: TranslatorSettings
+        private set
+
     /** Принятая редакция пользовательского соглашения. */
     lateinit var agreement: AgreementSettings
         private set
@@ -186,6 +191,7 @@ class GlassesApp : Application() {
         appearance = AppearanceSettings(this)
         agreement = AgreementSettings(this)
         skills = SkillsSettings(this)
+        translator = TranslatorSettings(this)
         style = StyleSettings(this)
         journal = RequestJournal(this)
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }

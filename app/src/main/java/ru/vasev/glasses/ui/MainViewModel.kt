@@ -83,6 +83,8 @@ import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.profile.AssistantProfile
 import ru.vasev.glasses.profile.Skill
+import ru.vasev.glasses.translate.Line
+import ru.vasev.glasses.translate.Who
 import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Beeps
 import ru.vasev.glasses.speech.Headset
@@ -135,7 +137,18 @@ data class ChatItem(
     val silent: Boolean = false,
     /** Не обмен, а тонкий разделитель в ленте: «— Профиль: Инженер —». */
     val divider: String? = null,
+    /** Не обмен, а реплика «Переводчика». */
+    val translated: TranslatedLine? = null,
 )
+
+/** Реплика «Переводчика» в ленте: [who] — собеседник или я; [translation] null — перевод недоступен. */
+data class TranslatedLine(val who: Who, val original: String, val translation: String?, val model: ModelTag?)
+
+/** Вставка в ленту между обменами: разделитель или реплика перевода. */
+private sealed interface ChatInsert {
+    data class Divider(val text: String) : ChatInsert
+    data class Translated(val line: TranslatedLine) : ChatInsert
+}
 
 /** Заметка в чате: [saved] — только что сохранена, иначе найдена. */
 data class NoteCard(val note: Note, val photo: Bitmap?, val saved: Boolean)
@@ -181,6 +194,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val llm = (app as GlassesApp).llm
     private val styleSettings = (app as GlassesApp).style
     private val skills = (app as GlassesApp).skills
+    private val translatorSettings = (app as GlassesApp).translator
     private val assistant = AssistantClient(llm)
     private val abbreviations = SentenceSplitter.loadAbbreviations(app)
 
@@ -195,8 +209,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val shownQuestions = mutableMapOf<Long, String>()
     private val silentIds = mutableSetOf<Long>()
 
-    /** Разделители ленты: сколько обменов перед ним — текст. */
-    private val dividers = mutableListOf<Pair<Int, String>>()
+    /** Вставки в ленту (разделители и реплики перевода): сколько обменов перед ней — вставка. */
+    private val inserts = mutableListOf<Pair<Int, ChatInsert>>()
 
     /** Поиск ссылок и QR-кодов на текущем снимке (на телефоне, ML Kit). */
     private val linkScanner = LinkScanner()
@@ -409,19 +423,43 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Активный профиль из чипа шапки; смена — разделитель в ленте («— Профиль: Инженер —»). */
     fun setProfile(profile: AssistantProfile?) {
-        if (skills.active.value == profile) return
+        if (skills.active.value == profile && !translatorSettings.profile.value) return
+        translatorSettings.setProfile(false)
         skills.setActive(profile)
         val title = profile?.let { L.s(it.titleRes) } ?: L.s(R.string.profile_none)
         Log.d(TAG, "Profile: ${profile?.name ?: "none"}")
         addDivider(L.s(R.string.divider_profile, title))
     }
 
+    /** Профиль «Переводчик» в чипе: перевод включён, кнопка перевода в шапке скрыта. */
+    fun setTranslatorProfile() {
+        if (translatorSettings.profile.value) return
+        skills.setActive(null)
+        translatorSettings.setProfile(true)
+        Log.d(TAG, "Profile: TRANSLATOR")
+        addDivider(L.s(R.string.divider_profile, L.s(R.string.skill_translator)))
+    }
+
     /** Разделитель в ленте и в истории чата; в пустом чате не нужен. */
     private fun addDivider(text: String) {
-        if (conversation.isEmpty) return
-        dividers += conversation.exchanges.size to text
+        if (conversation.isEmpty && inserts.isEmpty()) return
+        inserts += conversation.exchanges.size to ChatInsert.Divider(text)
         publishChat()
         save(StoredExchange(asked = "", summary = "", divider = text), null)
+    }
+
+    /** Реплика «Переводчика» — в ленту и в историю чата (в память модели не идёт). */
+    fun addTranslatedLine(line: Line, model: ModelTag?) {
+        inserts += conversation.exchanges.size to ChatInsert.Translated(TranslatedLine(line.who, line.original, line.translation, model))
+        publishChat()
+        touch()
+        save(StoredExchange(asked = line.original, summary = line.translation.orEmpty(), model = model, lineWho = line.who.name), null)
+    }
+
+    /** Перевод включили или выключили (кнопкой или профилем) — разделитель в ленте. */
+    fun translationToggled(on: Boolean) {
+        val profile = skills.active.value?.let { L.s(it.titleRes) } ?: L.s(R.string.profile_none)
+        addDivider(L.s(if (on) R.string.divider_translate_on else R.string.divider_translate_off, profile))
     }
 
     /** «Снять очками»: очки, а в debug с выбранным симулятором — симулятор. */
@@ -633,7 +671,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val notesById = noteStore.notes.value.associateBy { it.id }
         records.forEachIndexed { index, r ->
             if (r.divider != null) {
-                dividers += conversation.exchanges.size to r.divider
+                inserts += conversation.exchanges.size to ChatInsert.Divider(r.divider)
+                return@forEachIndexed
+            }
+            if (r.lineWho != null) {
+                val who = Who.entries.firstOrNull { it.name == r.lineWho } ?: Who.PARTNER
+                inserts += conversation.exchanges.size to ChatInsert.Translated(TranslatedLine(who, r.asked, r.summary.ifEmpty { null }, r.model))
                 return@forEachIndexed
             }
             val photo = r.photo?.let(chatStore::photoFile)?.takeIf { it.exists() }
@@ -1316,7 +1359,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         extras.clear()
         shownQuestions.clear()
         silentIds.clear()
-        dividers.clear()
+        inserts.clear()
         lastActivity = 0L
         _state.update { UiState(phase = it.phase) }
     }
@@ -1350,10 +1393,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 silent = exchange.id in silentIds,
             )
         }.toMutableList()
-        // Разделители — на свои места, начиная с конца, чтобы индексы впереди не сдвигались.
-        dividers.withIndex().reversed().forEach { (i, d) ->
-            val (position, text) = d
-            chat.add(position.coerceIn(0, chat.size), ChatItem(-(i + 1L), "", "", null, remembered = true, model = null, divider = text))
+        // Вставки — на свои места, начиная с конца, чтобы индексы впереди не сдвигались.
+        inserts.withIndex().reversed().forEach { (i, entry) ->
+            val (position, insert) = entry
+            val item = ChatItem(
+                -(i + 1L), "", "", null, remembered = true, model = null,
+                divider = (insert as? ChatInsert.Divider)?.text,
+                translated = (insert as? ChatInsert.Translated)?.line,
+            )
+            chat.add(position.coerceIn(0, chat.size), item)
         }
         _state.update { it.copy(chat = chat) }
     }

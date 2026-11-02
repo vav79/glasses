@@ -69,6 +69,17 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     private val translator = Translator(llm)
     private val prefs = app.getSharedPreferences("translate", Context.MODE_PRIVATE)
     private val noiseFilter = NoiseFilter.load(app)
+    private val settings = (app as GlassesApp).translator
+    private val router = (app as GlassesApp).audioRouter
+
+    /** Каждая готовая реплика — ещё и в ленту чата (Переводчик в чате). */
+    var onLine: ((FeedLine) -> Unit)? = null
+
+    /** Перевод в чате включён: правила чата (моя фраза — текстом, собеседник — голосом только в гарнитуру). */
+    private var chatMode = false
+
+    /** Собеседника слушаем по кругу (в чате — пока не нажата пауза). */
+    private var partnerLoop = false
 
     private fun savedPartner(): PartnerLanguage? =
         prefs.getString(KEY_LANGUAGE, null)?.let { name -> PartnerLanguage.entries.firstOrNull { it.name == name } }
@@ -126,6 +137,31 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
     /** «Я отвечаю»: моя речь → язык собеседника → озвучка ему. В непрерывном режиме затем слушаю собеседника. */
     fun meReplies() = launch { turn(Who.ME, preset = null, quietNoSpeech = false) }
 
+    /** Перевод в чате включили: сразу слушаем собеседника и дальше по кругу. */
+    fun startConversation() {
+        chatMode = true
+        partnerLoop = true
+        partnerSpeaks()
+    }
+
+    /** Пауза: собеседника больше не слушаем, перевод в чате остаётся включённым. */
+    fun pauseListening() {
+        partnerLoop = false
+        stop()
+    }
+
+    fun stopConversation() {
+        chatMode = false
+        partnerLoop = false
+        stop()
+    }
+
+    /** Моя фраза текстом из поля ввода: перевод — текстом (и голосом, если включено), затем снова слушаем собеседника. */
+    fun typedReply(text: String) {
+        if (text.isBlank()) return
+        launch { turn(Who.ME, preset = text.trim(), quietNoSpeech = false) }
+    }
+
     /** Только для debug-сборок: реплика с готовым текстом вместо распознавания. */
     fun debugTurn(who: Who, text: String) = launch { turn(who, preset = text, quietNoSpeech = false) }
 
@@ -150,7 +186,7 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 first()
                 // Непрерывный режим: снова слушаем собеседника, пока не нажат «Стоп».
-                while (_state.value.continuous) {
+                while (_state.value.continuous || partnerLoop) {
                     turn(Who.PARTNER, preset = null, quietNoSpeech = true)
                 }
             } catch (e: CancellationException) {
@@ -196,7 +232,8 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 speech.listen(
                     sourceTag,
-                    if (who == Who.PARTNER) Talker.PARTNER else Talker.USER,
+                    // Собеседника — микрофоном из настроек «Переводчика» (по умолчанию телефон), меня — моим микрофоном.
+                    if (who == Who.PARTNER && settings.partnerMic.value == PartnerMic.PHONE) Talker.PARTNER else Talker.USER,
                     onPartial = { partial -> _state.update { it.copy(pending = partial) } },
                 )
             }
@@ -229,8 +266,14 @@ class TranslationViewModel(app: Application) : AndroidViewModel(app) {
         val line = Line(who, heard.text, translation)
         lines += line
         // Запасная модель в переводе — только меткой: лишняя фраза вслух сломала бы разговор.
-        _state.update { it.copy(feed = it.feed + FeedLine(nextId++, line, answer.tag), pending = "", pendingWho = null) }
+        val feedLine = FeedLine(nextId++, line, answer.tag)
+        _state.update { it.copy(feed = it.feed + feedLine, pending = "", pendingWho = null) }
+        onLine?.invoke(feedLine)
         if (translation == null) return
+        // Моя фраза — только текстом («Показать» к собеседнику), если озвучка не включена в настройках «Переводчика».
+        if (who == Who.ME && chatMode && !settings.speakMine.value) return
+        // Перевод собеседника — голосом только в очки или гарнитуру; без них — только текстом (В14).
+        if (who == Who.PARTNER && chatMode && router.headset.value?.output == null) return
 
         val targetLocale: Locale = if (who == Who.PARTNER) my.locale else language.locale
         if (who == Who.ME && audio.voiceStatus(targetLocale) != VoiceStatus.READY) {
