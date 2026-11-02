@@ -77,7 +77,7 @@ fun LinkChip(link: FoundLink, onClick: () -> Unit) {
 /**
  * Проверка перед открытием: настоящий домен крупно, полный адрес, предупреждения, для оплаты — сумма, получатель
  * и «проверьте получателя в банке», для .apk — строгое предупреждение. Открыть — только кнопкой (голосом —
- * пока карточка на экране и ссылка без предупреждений, см. [MainViewModel.requestLink]).
+ * пока карточка на экране и ссылка без предупреждений, см. [AssistantEngine.requestLink]).
  */
 @Composable
 fun LinkConfirmDialog(link: FoundLink, onOpen: () -> Unit, onDismiss: () -> Unit) {

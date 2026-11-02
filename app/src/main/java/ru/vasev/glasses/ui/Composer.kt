@@ -66,7 +66,7 @@ fun Composer(
     phase: Phase,
     micLevel: Float,
     hasApiKey: Boolean,
-    attachment: MainViewModel.Attachment?,
+    attachment: AssistantEngine.Attachment?,
     onAsk: () -> Unit,
     onStop: () -> Unit,
     onSend: (String) -> Unit,
@@ -182,7 +182,7 @@ private fun CameraMenu(enabled: Boolean, onPhoneCamera: () -> Unit, onGallery: (
 /** Прикреплённый снимок: миниатюра (нажатие — на весь экран, ✕ — убрать) и действия над ним. */
 @Composable
 private fun AttachmentRow(
-    attachment: MainViewModel.Attachment,
+    attachment: AssistantEngine.Attachment,
     enabled: Boolean,
     onRemove: () -> Unit,
     onDescribe: () -> Unit,

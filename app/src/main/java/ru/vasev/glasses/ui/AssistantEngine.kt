@@ -7,13 +7,12 @@ import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -173,7 +172,15 @@ data class UiState(
     val error: String? = null,
 )
 
-class MainViewModel(app: Application) : AndroidViewModel(app) {
+/**
+ * Ход ассистента на всё приложение (не экран): разговор, запросы к модели, озвучка, заметки, ссылки, история чатов.
+ * Живёт, пока жив процесс, — экран только подключается и показывает состояние ([attachScreen] / [detachScreen]).
+ * Что умеет только открытый экран (камера телефона с видоискателем, разрешения, галерея, окно календаря),
+ * приходит зацепками от MainActivity; без экрана их нет.
+ */
+class AssistantEngine(private val app: Application) {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val glasses = (app as GlassesApp).glasses
     private val speech = (app as GlassesApp).speechSource
@@ -283,7 +290,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Модель «Ассистента» и есть ли для неё ключ. */
     val model: StateFlow<ModelSpec> = llm.model(Role.ASSISTANT)
     val hasApiKey: StateFlow<Boolean> = llm.ready(Role.ASSISTANT)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, (app as GlassesApp).apiKeys.has(model.value.provider))
+        .stateIn(scope, SharingStarted.Eagerly, (app as GlassesApp).apiKeys.has(model.value.provider))
 
     /** Запрос DAT-разрешения на камеру; подставляется из MainActivity. */
     var cameraPermissionRequester: (suspend () -> Boolean)? = null
@@ -295,6 +302,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var navCommandHandler: (suspend (NavCommand) -> Unit)? = null
     var navVocabulary: (() -> NavVocabulary)? = null
     var navCommandDone: ((NavCommand) -> Unit)? = null
+
+    /** Экран, чьи зацепки сейчас подключены; при повороте новый экран подключается раньше, чем старый закрывается. */
+    private var screen: Any? = null
+
+    /** Экран открыт: его зацепки (выше) подставлены. */
+    fun attachScreen(owner: Any) {
+        screen = owner
+    }
+
+    /** Экран закрыт: всё, что умеет только он, отключается; ход ассистента продолжается без него. */
+    fun detachScreen(owner: Any) {
+        if (screen !== owner) return
+        screen = null
+        cameraOwner = null
+        cameraPermissionRequester = null
+        locationPermissionRequester = null
+        galleryPicker = null
+        navCommandHandler = null
+        navVocabulary = null
+        navCommandDone = null
+        setViewing(false)
+    }
 
     /** Лента последних снимков «Камеры». */
     private val shotStore = (app as GlassesApp).shots
@@ -355,7 +384,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun noKeyAloud() {
         job?.cancel()
         audio.stop()
-        job = viewModelScope.launch { failAloud(L.s(R.string.say_voice_launch_no_key)) }
+        job = scope.launch { failAloud(L.s(R.string.say_voice_launch_no_key)) }
     }
 
     /** «Что я вижу»: снимок из выбранного источника и описание — голосом вопрос задавать не нужно. */
@@ -383,14 +412,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun attach(source: ImageSource): Job {
         job?.cancel()
         audio.stop()
-        return viewModelScope.launch {
+        return scope.launch {
             setPhase(Phase.CAPTURING)
             try {
                 val jpeg = when (source) {
                     ImageSource.PHONE_CAMERA -> phoneCamera.capture()
                     ImageSource.GALLERY -> {
                         val uri = galleryPicker?.invoke() ?: return@launch setPhase(Phase.IDLE)
-                        val resolver = getApplication<Application>().contentResolver
+                        val resolver = app.contentResolver
                         withContext(Dispatchers.Default) { ImagePrep.fromUri(resolver, uri) }
                     }
                     ImageSource.GLASSES, ImageSource.SIMULATOR -> {
@@ -481,7 +510,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val summary = parts[id]?.first ?: return
         job?.cancel()
         audio.stop()
-        job = viewModelScope.launch {
+        job = scope.launch {
             setPhase(Phase.SPEAKING)
             try {
                 audio.speak(summary, LanguageSettings.current.value.locale, AudioChannel.ME)
@@ -499,12 +528,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         linkOffer?.cancel()
         job?.cancel()
         audio.stop()
-        job = viewModelScope.launch {
+        job = scope.launch {
             val language = LanguageSettings.current.value
             _state.update { it.copy(pendingQuestion = "", pendingAnswer = "", pendingDetails = "", error = null) }
             try {
                 val jpeg = captureFrame() ?: return@launch
-                val place = viewModelScope.async { noteLocation() }
+                val place = scope.async { noteLocation() }
                 setPhase(Phase.SPEAKING)
                 audio.speak(L.s(R.string.say_what_to_remember), language.locale, AudioChannel.ME)
                 // Защита от эха, как у «Открыть?»: вопрос не должен попасть в текст заметки.
@@ -553,7 +582,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Экран «Заметки»: удалить заметку вместе со снимком. */
     fun deleteNote(id: String) {
-        viewModelScope.launch { noteStore.delete(listOf(id)) }
+        scope.launch { noteStore.delete(listOf(id)) }
     }
 
     /** Снимок заметки для экрана «Заметки» и полноэкранного просмотра. */
@@ -582,7 +611,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (id == chat.id) return
         stop()
         val meta = chatStore.chats.value.firstOrNull { it.id == id } ?: return
-        job = viewModelScope.launch {
+        job = scope.launch {
             val records = chatStore.load(id)
             resetConversation()
             chat = OpenChat(id)
@@ -597,14 +626,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Удалить чат (переписку; снимки остаются в «Медиа»). Открытый — сменяется новым. */
     fun deleteChat(id: String) {
         if (id == chat.id) newConversation()
-        viewModelScope.launch { chatStore.delete(id) }
+        scope.launch { chatStore.delete(id) }
     }
 
     /** Чат на экране или нет — для отметки «непрочитано». */
     fun setViewing(value: Boolean) {
         viewing = value
         val id = chat.id ?: return
-        if (value) viewModelScope.launch { chatStore.markRead(id) }
+        if (value) scope.launch { chatStore.markRead(id) }
     }
 
     /** Переписка из файла — в память модели (снимки — только у последних [RESTORE_PHOTOS] обменов) и на экран. */
@@ -661,7 +690,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val target = chat
         val fromGlasses = turnFromGlasses
         val unread = !viewing
-        viewModelScope.launch {
+        scope.launch {
             withContext(NonCancellable) {
                 saveLock.withLock {
                     val record = exchange.copy(photo = jpeg?.let { chatStore.savePhoto(it) })
@@ -691,7 +720,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         audio.stop()
         // Без очков и гарнитуры ответ — только текстом (решение В14): «Озвучить» — по кнопке.
         val quiet = silent || !hasVoiceOutput()
-        job = viewModelScope.launch {
+        job = scope.launch {
             linkScan?.cancel()
             linkScan = null
             _state.update { it.copy(confirmLink = null) }
@@ -805,24 +834,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun listenAfterGesture(language: AppLanguage, onEnd: (Long) -> Unit): String? = coroutineScope {
         val spoke = CompletableDeferred<Unit>()
+        // «Нет речи» ловится внутри async: упавший async отменил бы весь coroutineScope, и исключение ушло бы мимо
+        // этой функции — на экран «Не расслышал» вместо «отбоя» (в тишине распознаватель сдаётся за ~3 с, раньше 5 с).
         val listening = async {
-            speech.listen(
-                language.speechTag,
-                onPartial = { partial ->
-                    if (partial.isNotBlank()) spoke.complete(Unit)
-                    _state.update { it.copy(pendingQuestion = partial) }
-                },
-                onLevel = { _micLevel.value = it },
-            )
+            try {
+                speech.listen(
+                    language.speechTag,
+                    onPartial = { partial ->
+                        if (partial.isNotBlank()) spoke.complete(Unit)
+                        _state.update { it.copy(pendingQuestion = partial) }
+                    },
+                    onLevel = { _micLevel.value = it },
+                )
+            } catch (e: SpeechException) {
+                if (e.noSpeech) null else throw e
+            }
         }
         val watchdog = launch {
             delay(GESTURE_SILENCE_MS)
             if (!spoke.isCompleted) listening.cancel()
         }
         try {
-            listening.await().also { onEnd(it.endOfSpeechAt) }.text
-        } catch (e: SpeechException) {
-            if (e.noSpeech) null else throw e
+            listening.await()?.also { onEnd(it.endOfSpeechAt) }?.text
         } catch (e: CancellationException) {
             // Отменил сторожевой таймер (сам ход не отменён) — тишина; иначе отмена хода, пробрасываем.
             if (isActive && !spoke.isCompleted) null else throw e
@@ -849,7 +882,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _attachment.value?.let { attached ->
             _attachment.value = null
             _state.update { it.copy(pendingFrame = attached.preview, pendingFrameSource = attached.source) }
-            linkScan = viewModelScope.async { linkScanner.scan(attached.jpeg) }
+            linkScan = scope.async { linkScanner.scan(attached.jpeg) }
             return attached.jpeg
         }
         val jpeg = takeFrame() ?: return null
@@ -862,10 +895,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         debugFrameFile?.let { file ->
             debugFrameFile = null
             setPhase(Phase.CAPTURING)
-            val resolver = getApplication<Application>().contentResolver
+            val resolver = app.contentResolver
             val jpeg = withContext(Dispatchers.Default) { ImagePrep.fromUri(resolver, Uri.fromFile(file)) }
             _state.update { it.copy(pendingFrame = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size), pendingFrameSource = ImageSource.GALLERY) }
-            linkScan = viewModelScope.async { linkScanner.scan(jpeg) }
+            linkScan = scope.async { linkScanner.scan(jpeg) }
             return jpeg
         }
         val source = imageSources.source.value
@@ -887,14 +920,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     setPhase(Phase.IDLE)
                     return null
                 }
-                val resolver = getApplication<Application>().contentResolver
+                val resolver = app.contentResolver
                 withContext(Dispatchers.Default) { ImagePrep.fromUri(resolver, uri) }
             }
         }
         val preview = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
         _state.update { it.copy(pendingFrame = preview, pendingFrameSource = source) }
         // QR-коды и напечатанные адреса — на телефоне, пока пользователь договаривает вопрос.
-        linkScan = viewModelScope.async { linkScanner.scan(jpeg) }
+        linkScan = scope.async { linkScanner.scan(jpeg) }
         return jpeg
     }
 
@@ -1108,7 +1141,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         linkOffer?.cancel()
         _state.update { it.copy(confirmLink = link) }
-        linkOffer = viewModelScope.launch {
+        linkOffer = scope.launch {
             try {
                 speakAboutLink(listOf(link), LanguageSettings.current.value)
             } finally {
@@ -1336,11 +1369,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun setPhase(phase: Phase) = _state.update { it.copy(phase = phase) }
-
-    override fun onCleared() {
-        audio.stop()
-        gestures.answerDone()
-    }
 
     init {
         // Приложение открывается в последнем чате, если с него не прошло 2 часа; иначе — новый чат.

@@ -98,7 +98,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel,
+    viewModel: AssistantEngine,
     onAsk: () -> Unit,
     onOpenSettings: () -> Unit,
     /** Разрешение на камеру телефона (спрашивает Activity); true — можно открыть видоискатель. */
@@ -200,7 +200,7 @@ fun MainScreen(
  * подтверждения на карточке (кнопкой или голосом).
  */
 @Composable
-fun AssistantOverlays(viewModel: MainViewModel) {
+fun AssistantOverlays(viewModel: AssistantEngine) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LaunchedEffect(Unit) { viewModel.openLink.collect { LinkOpener.open(context, it) } }

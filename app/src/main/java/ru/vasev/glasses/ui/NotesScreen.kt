@@ -50,7 +50,7 @@ import ru.vasev.glasses.ui.glass.glassContentSource
  * поиск (тот же, что у модели, — без учёта окончаний) и удаление вместе со снимком.
  */
 @Composable
-fun NotesScreen(viewModel: MainViewModel, onClose: () -> Unit, onOpenPhoto: (Bitmap) -> Unit, onRoute: (Note) -> Unit, embedded: Boolean = false) {
+fun NotesScreen(viewModel: AssistantEngine, onClose: () -> Unit, onOpenPhoto: (Bitmap) -> Unit, onRoute: (Note) -> Unit, embedded: Boolean = false) {
     // Вкладкой в «Медиа» — без своего заголовка и «Закрыть»: «Назад» обрабатывает экран «Медиа».
     if (!embedded) BackHandler(onBack = onClose)
     val all by viewModel.notes.collectAsStateWithLifecycle()

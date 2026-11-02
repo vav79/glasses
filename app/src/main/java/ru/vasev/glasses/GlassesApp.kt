@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import ru.vasev.glasses.ui.AssistantEngine
 import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.camera.ShotStore
@@ -183,6 +184,9 @@ class GlassesApp : Application() {
     /** Тема и размер шрифта. */
     lateinit var appearance: AppearanceSettings
         private set
+
+    /** Ход ассистента — на всё приложение: живёт и без экрана (жест на дужке при закрытом приложении). */
+    val assistant: AssistantEngine by lazy { AssistantEngine(this) }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

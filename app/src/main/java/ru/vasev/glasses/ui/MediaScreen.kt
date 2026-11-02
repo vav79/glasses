@@ -70,7 +70,7 @@ import java.time.format.FormatStyle
 @Composable
 fun MediaScreen(
     library: MediaLibrary,
-    viewModel: MainViewModel,
+    viewModel: AssistantEngine,
     onToChat: (MediaItem) -> Unit,
     onRoute: (Note) -> Unit,
 ) {

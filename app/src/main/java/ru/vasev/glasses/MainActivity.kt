@@ -102,7 +102,7 @@ import ru.vasev.glasses.ui.ModelSetupScreen
 import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.AssistantOverlays
-import ru.vasev.glasses.ui.MainViewModel
+import ru.vasev.glasses.ui.AssistantEngine
 import ru.vasev.glasses.ui.NavigationScreen
 import ru.vasev.glasses.ui.openMapsLink
 import ru.vasev.glasses.ui.SettingsScreen
@@ -111,7 +111,8 @@ import ru.vasev.glasses.ui.theme.GlassesTheme
 
 class MainActivity : AppCompatActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    // Ход ассистента живёт на всё приложение; экран к нему подключается (attachScreen) и отключается (detachScreen).
+    private val viewModel: AssistantEngine get() = (application as GlassesApp).assistant
     private val translation: TranslationViewModel by viewModels()
     private val settings: SettingsViewModel by viewModels()
     private val addressSearch: AddressSearchViewModel by viewModels()
@@ -243,6 +244,7 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.SYSTEM -> night
             },
         )
+        viewModel.attachScreen(this)
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
         viewModel.cameraOwner = this
@@ -784,16 +786,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        viewModel.cameraPermissionRequester = null
-        viewModel.galleryPicker = null
-        viewModel.cameraOwner = null
-        viewModel.locationPermissionRequester = null
+        viewModel.detachScreen(this)
         navSession.detach(this)
         // Открытая цель и экраны «Навигации» живут до закрытия приложения, как и состояние остальных вкладок.
         if (isFinishing) navSession.closeScreens()
-        viewModel.navCommandHandler = null
-        viewModel.navCommandDone = null
-        viewModel.navVocabulary = null
         // Без экрана жест скажет «откройте приложение» (GlassesApp); при повороте новая Activity поставит своё.
         (application as GlassesApp).gestures.onAsk = null
         // Поворот: открытый системный диалог или галерея ответит новой Activity — запросы не отменяем.
@@ -886,6 +882,18 @@ class MainActivity : AppCompatActivity() {
         intent.getStringExtra("frame_file")?.let { name ->
             intent.removeExtra("frame_file")
             viewModel.debugFrameFile = java.io.File(filesDir, name)
+        }
+        // Прогон сценариев (scripts/assistant-smoke.ps1): свой чат на прогон, после — удалить его.
+        if (intent.getBooleanExtra("new_chat", false)) {
+            intent.removeExtra("new_chat")
+            viewModel.newConversation()
+        }
+        if (intent.getBooleanExtra("delete_current_chat", false)) {
+            intent.removeExtra("delete_current_chat")
+            viewModel.currentChatId.value?.let { id ->
+                Log.d(TAG, "debug: delete chat $id")
+                viewModel.deleteChat(id)
+            }
         }
         intent.getStringExtra("question")?.let { question ->
             intent.removeExtra("question")
