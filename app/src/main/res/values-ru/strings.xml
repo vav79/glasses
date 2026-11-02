@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Очки</string>
+    <string name="app_name">Sputnik</string>
 
     <!-- Вкладки -->
     <string name="tab_assistant">Ассистент</string>
@@ -828,4 +828,36 @@
     <string name="gesture_state_call">Сейчас: идёт звонок</string>
     <string name="gesture_state_off">Выключено</string>
     <string name="say_gesture_open_app">Чтобы спрашивать касанием, откройте приложение на телефоне.</string>
+    <!-- Каркас «Классика»: боковое меню и шапка. -->
+    <string name="app_full_name">Sputnik — AI для очков</string>
+    <string name="menu_open">Меню</string>
+    <string name="menu_search">Поиск</string>
+    <string name="menu_new_chat">Новый чат</string>
+    <string name="menu_media">Медиа</string>
+    <string name="menu_skills">Умения</string>
+    <string name="menu_calendar">Календарь</string>
+    <string name="menu_glasses">Очки</string>
+    <string name="menu_chats">Чаты</string>
+    <string name="menu_notifications">Оповещения</string>
+    <string name="chat_menu">Меню чата</string>
+    <string name="chat_from_glasses">Чат с очков</string>
+    <string name="chat_unread">Непрочитано</string>
+    <string name="header_translate_off">Перевод выключен</string>
+    <string name="header_translate_on">Перевод включён</string>
+    <string name="model_status_available">Доступна</string>
+    <string name="model_status_slow">Задержки</string>
+    <string name="model_status_unavailable">Недоступна</string>
+    <string name="model_status_no_key">Нет ключа</string>
+    <string name="model_chip_cd">Активная модель %1$s: %2$s</string>
+    <string name="profile_none">Обычный чат</string>
+    <string name="profiles_soon">Профили появятся в следующей версии.</string>
+    <string name="notifications_soon">Оповещения появятся позже.</string>
+    <string name="skills_interim_hint">Пока умения открывают прежние вкладки.</string>
+    <string name="skill_translator">Переводчик</string>
+    <string name="calendar_soon">Календарь появится в следующей версии.</string>
+    <string name="settings_theme">Тема</string>
+    <string name="settings_font_scale">Размер шрифта, %</string>
+    <string name="theme_dark">Тёмная</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_system">Системная</string>
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- English is the default language; Russian is in values-ru/. -->
 <resources>
-    <string name="app_name">Glasses</string>
+    <string name="app_name">Sputnik</string>
 
     <!-- Tabs -->
     <string name="tab_assistant">Assistant</string>
@@ -791,4 +791,36 @@
     <string name="gesture_state_call">Now: a call is in progress</string>
     <string name="gesture_state_off">Off</string>
     <string name="say_gesture_open_app">Open the app on the phone to ask by tapping.</string>
+    <!-- Каркас «Классика»: боковое меню и шапка. -->
+    <string name="app_full_name">Sputnik — AI for glasses</string>
+    <string name="menu_open">Menu</string>
+    <string name="menu_search">Search</string>
+    <string name="menu_new_chat">New chat</string>
+    <string name="menu_media">Media</string>
+    <string name="menu_skills">Skills</string>
+    <string name="menu_calendar">Calendar</string>
+    <string name="menu_glasses">Glasses</string>
+    <string name="menu_chats">Chats</string>
+    <string name="menu_notifications">Notifications</string>
+    <string name="chat_menu">Chat menu</string>
+    <string name="chat_from_glasses">Chat from the glasses</string>
+    <string name="chat_unread">Unread</string>
+    <string name="header_translate_off">Translation off</string>
+    <string name="header_translate_on">Translation on</string>
+    <string name="model_status_available">Available</string>
+    <string name="model_status_slow">Delays</string>
+    <string name="model_status_unavailable">Unavailable</string>
+    <string name="model_status_no_key">No key</string>
+    <string name="model_chip_cd">Active model %1$s: %2$s</string>
+    <string name="profile_none">Plain chat</string>
+    <string name="profiles_soon">Profiles are coming in a later version.</string>
+    <string name="notifications_soon">Notifications are coming later.</string>
+    <string name="skills_interim_hint">For now, skills open the former tabs.</string>
+    <string name="skill_translator">Translator</string>
+    <string name="calendar_soon">The calendar is coming in a later version.</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_font_scale">Font size, %</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_system">System</string>
 </resources>

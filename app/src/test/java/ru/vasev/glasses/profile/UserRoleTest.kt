@@ -18,7 +18,8 @@ class UserRoleTest {
     @Test
     fun `every role has the same four tabs, at most four - development lives in settings`() {
         for (role in UserRole.entries) {
-            assertEquals(AppTab.entries.toSet(), role.tabs.toSet())
+            // Вкладок больше нет (боковое меню), но порядок прежних экранов у роли пока остаётся — до профилей (этап 4).
+            assertEquals(setOf(AppTab.ASSISTANT, AppTab.CAMERA, AppTab.TRANSLATE, AppTab.NAVIGATION), role.tabs.toSet())
             assertTrue(role.tabs.size <= 4)
             assertEquals(role == UserRole.DEVELOPER, role.advancedAlwaysVisible)
         }

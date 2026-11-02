@@ -99,14 +99,12 @@ fun MainScreen(
     viewModel: MainViewModel,
     onAsk: () -> Unit,
     onWhatDoISee: () -> Unit,
-    onOpenCamera: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** «Заметки» — из меню ⋮ шапки. */
+    notesOpen: Boolean,
+    onCloseNotes: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val status by viewModel.glassesStatus.collectAsStateWithLifecycle()
-    val battery by viewModel.glassesBattery.collectAsStateWithLifecycle()
-    val everConnected by viewModel.glassesEverConnected.collectAsStateWithLifecycle()
-    val source by viewModel.imageSource.collectAsStateWithLifecycle()
     val hasApiKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
     val model by viewModel.model.collectAsStateWithLifecycle()
     val micLevel by viewModel.micLevel.collectAsStateWithLifecycle()
@@ -114,7 +112,6 @@ fun MainScreen(
     val busy = state.phase != Phase.IDLE
     var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
     var fullText by remember { mutableStateOf<String?>(null) }
-    var showNotes by rememberSaveable { mutableStateOf(false) }
     var typing by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -122,24 +119,10 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = LocalTabBarInset.current)
+                .padding(top = 8.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Индикатор очков; пока очки ни разу не подключались и снимки с телефона — не показываем вовсе.
-                if (everConnected || source.usesGlasses) GlassesIndicator(status.ready, battery, onOpenCamera)
-                Spacer(Modifier.weight(1f))
-                GlassIconButton(R.drawable.ic_sym_sticky_note_2, stringResource(R.string.notes_open), onClick = { showNotes = true }, size = 48.dp)
-                GlassIconButton(
-                    R.drawable.ic_sym_add_comment,
-                    stringResource(R.string.new_conversation),
-                    onClick = viewModel::newConversation,
-                    size = 48.dp,
-                    enabled = state.chat.isNotEmpty() || state.pendingQuestion.isNotEmpty(),
-                )
-            }
-
             if (!hasApiKey) MissingKeyNotice(model, onOpenSettings)
 
             // Чат уходит под нижнюю стеклянную панель — она его размывает.
@@ -196,10 +179,10 @@ fun MainScreen(
 
     AssistantOverlays(viewModel)
     if (typing) TypeQuestionSheet(onSend = { viewModel.askText(it); typing = false }, onDismiss = { typing = false })
-    if (showNotes) {
+    if (notesOpen) {
         NotesScreen(
             viewModel = viewModel,
-            onClose = { showNotes = false },
+            onClose = onCloseNotes,
             onOpenPhoto = { bitmap -> photo = bitmap to null },
             onRoute = { openRoute(context, it) },
         )
@@ -219,34 +202,6 @@ fun AssistantOverlays(viewModel: MainViewModel) {
     LaunchedEffect(Unit) { viewModel.openLink.collect { LinkOpener.open(context, it) } }
     state.confirmLink?.let { link ->
         LinkConfirmDialog(link, onOpen = { viewModel.confirmLink(link) }, onDismiss = viewModel::dismissLink)
-    }
-}
-
-/** Индикатор очков: «● Очки · 76 %» или серое «Не подключены»; нажатие — вкладка «Камера» с подключением. */
-@Composable
-private fun GlassesIndicator(ready: Boolean, battery: Int?, onClick: () -> Unit) {
-    val text = when {
-        !ready -> stringResource(R.string.glasses_off)
-        battery != null -> stringResource(R.string.glasses_on_battery, battery)
-        else -> stringResource(R.string.glasses_on)
-    }
-    val label = stringResource(R.string.glasses_indicator_label, text)
-    val c = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .heightIn(min = 44.dp)
-            .glass(GlassShapes.pill)
-            .clip(GlassShapes.pill)
-            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = label }
-            .padding(start = 10.dp, end = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(painterResource(R.drawable.ic_sym_eyeglasses), contentDescription = null, modifier = Modifier.size(22.dp))
-        // «Не подключены» — нейтральный серый, не тревожный красный: это обычное состояние, а не ошибка.
-        Box(Modifier.size(8.dp).clip(CircleShape).background(if (ready) glassAccent(accent = Color(0xFF2E9D57)) else c.outline))
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (ready) c.onSurface else glassBackgroundText())
     }
 }
 

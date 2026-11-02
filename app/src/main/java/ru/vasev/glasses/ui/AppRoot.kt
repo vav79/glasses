@@ -2,165 +2,84 @@ package ru.vasev.glasses.ui
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import ru.vasev.glasses.R
-import ru.vasev.glasses.ui.glass.GlassButtonKind
-import ru.vasev.glasses.ui.glass.GlassIconButton
-import ru.vasev.glasses.ui.glass.GlassRoot
-import ru.vasev.glasses.ui.glass.GlassShapes
-import ru.vasev.glasses.ui.glass.glass
-import ru.vasev.glasses.ui.glass.glassAccent
+import ru.vasev.glasses.ui.glass.GlassCard
+import ru.vasev.glasses.ui.glass.glassBackgroundText
 
+/**
+ * Экраны приложения. Главный — [ASSISTANT] (чат). [CAMERA], [TRANSLATE], [NAVIGATION] — старые вкладки:
+ * пока не перенесены на новые места, открываются из бокового меню («Медиа», «Очки», «Умения»).
+ */
 enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     ASSISTANT(R.string.tab_assistant, R.drawable.ic_sym_assistant),
     CAMERA(R.string.tab_camera, R.drawable.ic_sym_photo_camera),
     TRANSLATE(R.string.tab_translate, R.drawable.ic_sym_g_translate),
     NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
+    SKILLS(R.string.menu_skills, R.drawable.ic_sym_auto_awesome),
+    CALENDAR(R.string.menu_calendar, R.drawable.ic_sym_calendar_month),
 }
 
 /**
- * Высота плавающей панели вкладок с отступами: прокручиваемое содержимое начинается ниже неё,
- * а при прокрутке уходит под неё (панель его размывает).
+ * Отступ сверху для содержимого экранов. Была высота плавающей панели вкладок; шапка теперь стоит над
+ * экраном, а не поверх него, поэтому отступ — небольшой.
  */
-val LocalTabBarInset = compositionLocalOf { 0.dp }
+val LocalTabBarInset = compositionLocalOf { 8.dp }
 
-private val TAB_BAR_HEIGHT = 64.dp
-private val TAB_BAR_MARGIN = 8.dp
-private const val SELECTED_ALPHA = 0.16f
-
+/** «Умения» до этапа 4: старые экраны, которые станут умениями. */
 @Composable
-fun AppRoot(
-    /** Вкладки по порядку — задаёт роль. */
-    tabs: List<AppTab>,
-    tab: AppTab,
-    onTabChange: (AppTab) -> Unit,
-    /** «Меньше прозрачности» из настроек. */
-    denserGlass: Boolean,
-    /** Настройки открыты поверх вкладки (шестерёнка справа от вкладок). */
-    settingsOpen: Boolean,
-    onToggleSettings: () -> Unit,
-    assistant: @Composable () -> Unit,
-    camera: @Composable () -> Unit,
-    translation: @Composable () -> Unit,
-    navigation: @Composable () -> Unit,
-    settings: @Composable () -> Unit,
-) {
-    // В режиме перевода фон застывает: телефон держат перед собеседником, лишняя анимация ни к чему.
-    GlassRoot(denser = denserGlass, animate = tab != AppTab.TRANSLATE) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            val inset: Dp = TAB_BAR_HEIGHT + TAB_BAR_MARGIN * 2
-            CompositionLocalProvider(LocalTabBarInset provides inset) {
-                Box(Modifier.fillMaxSize()) {
-                    if (settingsOpen) {
-                        BackHandler(onBack = onToggleSettings)
-                        settings()
-                    } else {
-                        when (tab) {
-                            AppTab.ASSISTANT -> assistant()
-                            AppTab.CAMERA -> camera()
-                            AppTab.TRANSLATE -> translation()
-                            AppTab.NAVIGATION -> navigation()
-                        }
-                    }
-                }
-            }
-            Row(
-                Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(TAB_BAR_MARGIN),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+fun SkillsScreen(onOpen: (AppTab) -> Unit) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(stringResource(R.string.skills_interim_hint), style = MaterialTheme.typography.bodyMedium, color = glassBackgroundText())
+        for (tab in listOf(AppTab.TRANSLATE, AppTab.NAVIGATION, AppTab.CAMERA)) {
+            GlassCard(
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { onOpen(tab) },
             ) {
-                // Пока открыты настройки, ни одна вкладка не выбрана: нажатие на вкладку их закрывает.
-                GlassTabBar(tabs, tab.takeUnless { settingsOpen }, onTabChange, Modifier.weight(1f))
-                GlassIconButton(
-                    R.drawable.ic_sym_settings,
-                    stringResource(if (settingsOpen) R.string.settings_close else R.string.tab_settings),
-                    onClick = onToggleSettings,
-                    size = 52.dp,
-                    blur = true,
-                    kind = if (settingsOpen) GlassButtonKind.PRIMARY else GlassButtonKind.NORMAL,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(painterResource(tab.icon), contentDescription = null, modifier = Modifier.size(24.dp))
+                    Text(
+                        stringResource(if (tab == AppTab.TRANSLATE) R.string.skill_translator else tab.titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 16.dp).weight(1f),
+                    )
+                    Icon(painterResource(R.drawable.ic_sym_chevron_right), contentDescription = null)
+                }
             }
         }
     }
 }
 
-/** Плавающая стеклянная панель-пилюля; выбранная вкладка — внутренняя пилюля акцентного цвета. */
+/** «Календарь» — до этапа 5. */
 @Composable
-private fun GlassTabBar(tabs: List<AppTab>, tab: AppTab?, onTabChange: (AppTab) -> Unit, modifier: Modifier) {
-    val c = MaterialTheme.colorScheme
-    // Подпись выбранной вкладки лежит ещё и на пилюле акцентного цвета — контраст считается с её учётом.
-    val selectedTint = c.primary.copy(alpha = SELECTED_ALPHA).compositeOver(c.surface)
-    val accent = glassAccent(tint = selectedTint, overContent = true)
-    // При четырёх вкладках и крупном шрифте подпись уменьшается до ширины вкладки, одинаково для всех.
-    val maxLabel = if (tabs.size > 3) MaterialTheme.typography.labelMedium.fontSize else MaterialTheme.typography.labelLarge.fontSize
-    Row(
-        modifier
-            .height(TAB_BAR_HEIGHT)
-            .glass(GlassShapes.pill, blur = true)
-            .padding(5.dp)
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        tabs.forEach { item ->
-            val selected = item == tab
-            Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .clip(GlassShapes.pill)
-                    .then(if (selected) Modifier.background(c.primary.copy(alpha = SELECTED_ALPHA)) else Modifier)
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onTabChange(item) }),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                // Подпись — всегда основным цветом текста: под панелью проезжает содержимое любой яркости, и акцентный
-                // цвет мог бы опуститься ниже 4.5:1. Выбор видно по пилюле, жирному шрифту и акцентной иконке (ей хватает 3:1).
-                val iconColor = if (selected) accent else c.onSurface
-                // Подпись вкладки озвучивает TalkBack, иконка — декоративная.
-                Icon(painterResource(item.icon), contentDescription = null, tint = iconColor, modifier = Modifier.size(22.dp))
-                Text(
-                    stringResource(item.titleRes),
-                    color = c.onSurface,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    // С переносом, но в одну строку: так autoSize видит, что слово не влезло, и уменьшает шрифт
-                    // (с softWrap = false текст просто обрезался краем вкладки — панель стала уже из-за шестерёнки).
-                    softWrap = true,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = maxLabel),
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
-            }
-        }
+fun CalendarPlaceholder() {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(painterResource(R.drawable.ic_sym_calendar_month), contentDescription = null, modifier = Modifier.size(48.dp), tint = glassBackgroundText())
+        Text(stringResource(R.string.calendar_soon), style = MaterialTheme.typography.bodyLarge, color = glassBackgroundText(), modifier = Modifier.padding(top = 12.dp))
     }
 }

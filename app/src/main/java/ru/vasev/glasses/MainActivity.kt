@@ -54,12 +54,25 @@ import ru.vasev.glasses.translate.PartnerLanguage
 import ru.vasev.glasses.translate.TranslationViewModel
 import ru.vasev.glasses.translate.Who
 import androidx.compose.ui.graphics.toArgb
-import ru.vasev.glasses.ui.theme.glassesColorScheme
+import ru.vasev.glasses.ui.theme.sputnikColorScheme
+import ru.vasev.glasses.ui.theme.ThemeMode
+import ru.vasev.glasses.ui.theme.isDark
+import ru.vasev.glasses.ui.shell.AppShell
+import ru.vasev.glasses.ui.shell.ChatEntry
+import ru.vasev.glasses.ui.shell.MenuItem
+import ru.vasev.glasses.ui.shell.ModelStatus
+import ru.vasev.glasses.ui.shell.ShellHeader
+import ru.vasev.glasses.ui.shell.chatTitle
+import ru.vasev.glasses.ui.SkillsScreen
+import ru.vasev.glasses.ui.CalendarPlaceholder
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import androidx.activity.SystemBarStyle
+import android.graphics.Color as AndroidColor
 import ru.vasev.glasses.profile.AnswerStyle
 import ru.vasev.glasses.profile.Formality
 import ru.vasev.glasses.profile.SpeakerGender
 import ru.vasev.glasses.profile.SpeechPace
-import ru.vasev.glasses.ui.AppRoot
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
 import ru.vasev.glasses.ui.glass.GlassRoot
@@ -87,6 +100,9 @@ class MainActivity : AppCompatActivity() {
     private val navSession get() = (application as GlassesApp).navSession
 
     private var tab by mutableStateOf(AppTab.ASSISTANT)
+
+    /** «Заметки» открыты поверх чата (меню ⋮ шапки). */
+    private var notesOpen by mutableStateOf(false)
 
     /** Настройки открыты поверх вкладки (шестерёнка). */
     private var settingsOpen by mutableStateOf(false)
@@ -176,15 +192,20 @@ class MainActivity : AppCompatActivity() {
         // Activity пересоздаётся при смене языка приложения или системы; ViewModel и история разговора остаются.
         LanguageSettings.refresh()
         val profile = (application as GlassesApp).profile
-        // Первый показ — стартовая вкладка роли; после пересоздания — та, что была открыта.
+        // Приложение открывается сразу в чат; после пересоздания — тот экран, что был открыт.
         tab = savedInstanceState?.getString(STATE_TAB)?.let { name -> AppTab.entries.firstOrNull { it.name == name } }
-            ?: profile.role.value.startTab
+            ?: AppTab.ASSISTANT
         settingsOpen = savedInstanceState?.getBoolean(STATE_SETTINGS) ?: false
         developerOpen = settingsOpen && savedInstanceState?.getBoolean(STATE_DEVELOPER) == true
-        enableEdgeToEdge()
-        // До первого кадра Compose система показывает фон окна: пусть он будет цвета нашего градиента, а не чёрный/белый.
+        // До первого кадра Compose система показывает фон окна: пусть он будет цвета темы приложения.
         val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        window.setBackgroundDrawable(ColorDrawable(glassesColorScheme(this, night).surface.toArgb()))
+        applySystemBars(
+            when ((application as GlassesApp).appearance.theme.value) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> night
+            },
+        )
         viewModel.cameraPermissionRequester = ::requestGlassesCamera
         viewModel.galleryPicker = ::pickPhoto
         viewModel.cameraOwner = this
@@ -232,13 +253,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContent {
-            GlassesTheme {
+            val appearance = (application as GlassesApp).appearance
+            val themeMode by appearance.theme.collectAsStateWithLifecycle()
+            val fontScale by appearance.fontScale.collectAsStateWithLifecycle()
+            val dark = themeMode.isDark()
+            // Значки строки состояния — под тему приложения, а не системы (тёмная тема при светлой системе).
+            LaunchedEffect(dark) { applySystemBars(dark) }
+            GlassesTheme(dark = dark, fontScalePercent = fontScale) {
                 val onboarded by profile.onboarded.collectAsStateWithLifecycle()
-                val role by profile.role.collectAsStateWithLifecycle()
-                val lessTransparency by profile.lessTransparency.collectAsStateWithLifecycle()
                 if (!onboarded) {
                     val language by settings.language.collectAsStateWithLifecycle()
-                    GlassRoot(denser = lessTransparency, animate = true) {
+                    val role by profile.role.collectAsStateWithLifecycle()
+                    GlassRoot {
                         OnboardingScreen(
                             language = language,
                             systemLanguage = LanguageSettings.system(),
@@ -246,77 +272,143 @@ class MainActivity : AppCompatActivity() {
                             initialRole = role,
                             onFinish = { chosen ->
                                 profile.completeOnboarding(chosen)
-                                selectTab(chosen.startTab)
+                                selectTab(AppTab.ASSISTANT)
                             },
                         )
                     }
                     return@GlassesTheme
                 }
-                // Роль сменили в настройках, а открытой вкладки у новой роли нет — на стартовую.
-                LaunchedEffect(role) { if (tab !in role.tabs) selectTab(role.startTab) }
-                AppRoot(
-                    tabs = role.tabs,
-                    tab = role.keep(tab),
-                    onTabChange = ::selectTab,
-                    denserGlass = lessTransparency,
-                    settingsOpen = settingsOpen,
-                    onToggleSettings = {
-                        settingsOpen = !settingsOpen
-                        developerOpen = false
-                    },
-                    assistant = {
-                        MainScreen(
-                            viewModel = viewModel,
-                            onAsk = { withMic(viewModel::ask) },
-                            onWhatDoISee = viewModel::whatDoISee,
-                            onOpenCamera = { selectTab(AppTab.CAMERA) },
-                            onOpenSettings = { settingsOpen = true },
-                        )
-                    },
-                    camera = {
-                        CameraScreen(
-                            viewModel = viewModel,
-                            cameraGranted = cameraGranted,
-                            onSelectSource = ::selectImageSource,
-                            onConnectGlasses = { (application as GlassesApp).glasses.connect(this) },
-                            onDescribe = viewModel::cameraDescribe,
-                            onAsk = { withMic(viewModel::cameraAsk) },
-                            onTranslate = viewModel::cameraTranslate,
-                            onRemember = { withMic(viewModel::cameraRemember) },
-                            onFollowUp = { withMic(viewModel::cameraFollowUp) },
-                        )
-                        AssistantOverlays(viewModel)
-                    },
-                    translation = {
-                        TranslationScreen(
-                            viewModel = translation,
-                            onPartnerSpeaks = { withMic(translation::partnerSpeaks) },
-                            onMeReplies = { withMic(translation::meReplies) },
-                            onInstallVoice = ::openVoiceInstaller,
-                            onOpenSettings = { settingsOpen = true },
-                        )
-                    },
-                    navigation = {
-                        NavigationScreen(
-                            vms = NavViewModels(navSession, addressSearch, navTarget, taxi, places),
-                            onMic = { withMic(addressSearch::listenQuery) },
-                            onOpenLink = { openMapsLink(this, it) },
-                            onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
-                        )
-                    },
-                    settings = {
-                        if (developerOpen) {
-                            val journal = (application as GlassesApp).journal
-                            DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear, onClose = { developerOpen = false })
-                        } else {
-                            SettingsScreen(settings, onOpenDeveloper = { developerOpen = true })
-                        }
-                    },
-                )
+                Shell()
             }
         }
     }
 
+    /** Каркас «Классики»: боковое меню, шапка и текущий экран. */
+    @Composable
+    private fun Shell() {
+        val app = application as GlassesApp
+        val chat by viewModel.state.collectAsStateWithLifecycle()
+        val glassesStatus by viewModel.glassesStatus.collectAsStateWithLifecycle()
+        val battery by viewModel.glassesBattery.collectAsStateWithLifecycle()
+        val model by viewModel.model.collectAsStateWithLifecycle()
+        val hasKey by viewModel.hasApiKey.collectAsStateWithLifecycle()
+        val chatTitle = chat.chat.firstOrNull()?.question?.let(::chatTitle) ?: stringResource(R.string.menu_new_chat)
+        val notesLabel = stringResource(R.string.notes_open)
+        val header = when {
+            settingsOpen -> ShellHeader.Title(stringResource(if (developerOpen) R.string.dev_journal_title else R.string.tab_settings))
+            tab == AppTab.ASSISTANT -> ShellHeader.Chat(
+                profileTitle = stringResource(R.string.profile_none),
+                translateOn = false,
+                glassesReady = glassesStatus.ready,
+                glassesBattery = battery,
+                // Профили — этап 4; пока чип показывает «Обычный чат».
+                onProfile = { Toast.makeText(this, R.string.profiles_soon, Toast.LENGTH_SHORT).show() },
+                // Кнопка перевода до этапа 4 открывает старый экран «Перевод».
+                onTranslate = { selectTab(AppTab.TRANSLATE) },
+                onGlasses = { selectTab(AppTab.CAMERA) },
+                chatMenu = listOf(notesLabel to { notesOpen = true }),
+            )
+            else -> ShellHeader.Title(stringResource(if (tab == AppTab.TRANSLATE) R.string.skill_translator else tab.titleRes))
+        }
+        AppShell(
+            header = header,
+            chats = listOf(ChatEntry("current", chatTitle, selected = tab == AppTab.ASSISTANT && !settingsOpen)),
+            modelName = when (model.provider) {
+                ProviderId.ANTHROPIC -> "Claude"
+                ProviderId.DEEPSEEK -> "DeepSeek"
+                ProviderId.OPENAI -> "ChatGPT"
+            },
+            modelStatus = when {
+                !hasKey -> ModelStatus.NO_KEY
+                !app.llm.isOnline() -> ModelStatus.UNAVAILABLE
+                else -> ModelStatus.AVAILABLE
+            },
+            onMenuItem = { item ->
+                when (item) {
+                    MenuItem.NEW_CHAT -> {
+                        viewModel.newConversation()
+                        selectTab(AppTab.ASSISTANT)
+                    }
+                    // «Медиа» и «Очки» до этапов 5–6 — старая «Камера»: лента снимков, подключение очков.
+                    MenuItem.MEDIA, MenuItem.GLASSES -> selectTab(AppTab.CAMERA)
+                    MenuItem.SKILLS -> selectTab(AppTab.SKILLS)
+                    MenuItem.CALENDAR -> selectTab(AppTab.CALENDAR)
+                }
+            },
+            onChat = { selectTab(AppTab.ASSISTANT) },
+            onNotifications = { Toast.makeText(this, R.string.notifications_soon, Toast.LENGTH_SHORT).show() },
+            onSettings = {
+                settingsOpen = true
+                developerOpen = false
+            },
+            onModel = {
+                settingsOpen = true
+                developerOpen = false
+            },
+            onBack = when {
+                developerOpen -> ({ developerOpen = false })
+                settingsOpen -> ({ settingsOpen = false })
+                tab != AppTab.ASSISTANT -> ({ selectTab(AppTab.ASSISTANT) })
+                else -> null
+            },
+        ) {
+            if (settingsOpen) {
+                if (developerOpen) {
+                    val journal = app.journal
+                    DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear, onClose = { developerOpen = false })
+                } else {
+                    SettingsScreen(settings, onOpenDeveloper = { developerOpen = true })
+                }
+                return@AppShell
+            }
+            when (tab) {
+                AppTab.ASSISTANT -> MainScreen(
+                    viewModel = viewModel,
+                    onAsk = { withMic(viewModel::ask) },
+                    onWhatDoISee = viewModel::whatDoISee,
+                    onOpenSettings = { settingsOpen = true },
+                    notesOpen = notesOpen,
+                    onCloseNotes = { notesOpen = false },
+                )
+                AppTab.CAMERA -> {
+                    CameraScreen(
+                        viewModel = viewModel,
+                        cameraGranted = cameraGranted,
+                        onSelectSource = ::selectImageSource,
+                        onConnectGlasses = { app.glasses.connect(this) },
+                        onDescribe = viewModel::cameraDescribe,
+                        onAsk = { withMic(viewModel::cameraAsk) },
+                        onTranslate = viewModel::cameraTranslate,
+                        onRemember = { withMic(viewModel::cameraRemember) },
+                        onFollowUp = { withMic(viewModel::cameraFollowUp) },
+                    )
+                    AssistantOverlays(viewModel)
+                }
+                AppTab.TRANSLATE -> TranslationScreen(
+                    viewModel = translation,
+                    onPartnerSpeaks = { withMic(translation::partnerSpeaks) },
+                    onMeReplies = { withMic(translation::meReplies) },
+                    onInstallVoice = ::openVoiceInstaller,
+                    onOpenSettings = { settingsOpen = true },
+                )
+                AppTab.NAVIGATION -> NavigationScreen(
+                    vms = NavViewModels(navSession, addressSearch, navTarget, taxi, places),
+                    onMic = { withMic(addressSearch::listenQuery) },
+                    onOpenLink = { openMapsLink(this, it) },
+                    onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
+                )
+                AppTab.SKILLS -> SkillsScreen(onOpen = { selectTab(it, stopOthers = false) })
+                AppTab.CALENDAR -> CalendarPlaceholder()
+            }
+        }
+    }
+
+    /** Строка состояния и навигации: прозрачные, значки — светлые в тёмной теме и тёмные в светлой. */
+    private fun applySystemBars(dark: Boolean) {
+        val style = if (dark) SystemBarStyle.dark(AndroidColor.TRANSPARENT) else SystemBarStyle.light(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+        window.setBackgroundDrawable(ColorDrawable(sputnikColorScheme(dark).surface.toArgb()))
+    }
     /** Камера телефона — только после разрешения; остальные источники разрешений Android не требуют. */
     private fun selectImageSource(source: ImageSource) {
         val needsCamera = source == ImageSource.PHONE_CAMERA &&
@@ -348,6 +440,8 @@ class MainActivity : AppCompatActivity() {
                 AppTab.ASSISTANT, AppTab.CAMERA -> viewModel.stop()
                 AppTab.TRANSLATE -> translation.stop()
                 AppTab.NAVIGATION -> navSession.cancel()
+                // Списки и заглушки — ни звука, ни микрофона.
+                AppTab.SKILLS, AppTab.CALENDAR -> Unit
             }
         }
         tab = newTab
@@ -569,6 +663,15 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra("dat_register", false)) {
             intent.removeExtra("dat_register")
             Wearables.startRegistration(this)
+        }
+        // Оформление без настроек: --es theme dark|light|system --ei font_scale 80|90|100|110|120 (сохраняется).
+        intent.getStringExtra("theme")?.let { value ->
+            intent.removeExtra("theme")
+            ThemeMode.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }?.let(app.appearance::setTheme)
+        }
+        if (intent.hasExtra("font_scale")) {
+            app.appearance.setFontScale(intent.getIntExtra("font_scale", 100))
+            intent.removeExtra("font_scale")
         }
         // «Жест на дужке» без настроек: --es gesture double|single|off (сохраняется).
         intent.getStringExtra("gesture")?.let { value ->

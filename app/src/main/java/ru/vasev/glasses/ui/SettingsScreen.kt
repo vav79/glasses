@@ -1,5 +1,7 @@
 package ru.vasev.glasses.ui
 
+import ru.vasev.glasses.ui.theme.AppearanceSettings
+import ru.vasev.glasses.ui.theme.ThemeMode
 import ru.vasev.glasses.speech.GesturesService
 import ru.vasev.glasses.speech.Tap
 import androidx.annotation.DrawableRes
@@ -99,7 +101,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val gestureEnabled by viewModel.gestureEnabled.collectAsStateWithLifecycle()
     val gestureTap by viewModel.gestureTap.collectAsStateWithLifecycle()
     val gestureState by viewModel.gestureState.collectAsStateWithLifecycle()
-    val lessTransparency by viewModel.lessTransparency.collectAsStateWithLifecycle()
+    val themeMode by viewModel.theme.collectAsStateWithLifecycle()
+    val fontScale by viewModel.fontScale.collectAsStateWithLifecycle()
     val currency by viewModel.currency.collectAsStateWithLifecycle()
     val rates by viewModel.rates.collectAsStateWithLifecycle()
     val navigator by viewModel.navigator.collectAsStateWithLifecycle()
@@ -146,12 +149,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
         }
 
         Section(stringResource(R.string.settings_appearance)) {
-            SwitchRow(
-                title = stringResource(R.string.settings_less_transparency_title),
-                subtitle = stringResource(R.string.settings_less_transparency_subtitle),
-                checked = lessTransparency,
-                onChange = viewModel::setLessTransparency,
-            )
+            Text(stringResource(R.string.settings_theme), style = MaterialTheme.typography.bodyLarge)
+            ThemePicker(themeMode, viewModel::setTheme)
+            Text(stringResource(R.string.settings_font_scale), style = MaterialTheme.typography.bodyLarge)
+            FontScalePicker(fontScale, viewModel::setFontScale)
         }
 
         Section(stringResource(R.string.settings_currency_title)) {
@@ -483,6 +484,56 @@ private fun TaxiLanguagePicker(selected: String?, onSelect: (String?) -> Unit) {
 }
 
 /** Навигатор: Авто / Яндекс / Google. */
+@Composable
+private fun ThemePicker(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val choices = ThemeMode.entries
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == selected,
+                onClick = { if (choice != selected) onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
+                icon = {},
+            ) {
+                Text(
+                    stringResource(
+                        when (choice) {
+                            ThemeMode.DARK -> R.string.theme_dark
+                            ThemeMode.LIGHT -> R.string.theme_light
+                            ThemeMode.SYSTEM -> R.string.theme_system
+                        },
+                    ),
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FontScalePicker(selected: Int, onSelect: (Int) -> Unit) {
+    val choices = AppearanceSettings.FONT_SCALES
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = choice == selected,
+                onClick = { if (choice != selected) onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index, choices.size),
+                icon = {},
+            ) {
+                Text(
+                    "$choice",
+                    maxLines = 1,
+                    softWrap = false,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun TapPicker(selected: Tap, onSelect: (Tap) -> Unit) {
     // Двойное — первым: оно по умолчанию (одиночное срабатывает, когда поправляешь очки).

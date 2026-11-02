@@ -90,12 +90,6 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     // Per-app language (setApplicationLocales) на Android 10–12 и AppCompatActivity.
     implementation(libs.androidx.appcompat)
-    // «Стеклянный» интерфейс: размытие и стекло. Backdrop (преломление) — пока только в debug-витрине.
-    implementation(libs.haze)
-    implementation(libs.haze.glass)
-    implementation(libs.haze.blur)
-    implementation(libs.haze.blur.materials)
-    debugImplementation(libs.backdrop)
     // DAT Speech (экспериментальный, только dev/beta) — пока только debug-проба SpeechProbeActivity.
     debugImplementation(libs.mwdat.speech)
     // DAT Inputs (сенсорная панель и кнопки очков, только dev/beta) — пока только debug-проба InputsProbeActivity.

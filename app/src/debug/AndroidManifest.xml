@@ -7,11 +7,6 @@
             android:exported="true"
             android:label="Витрина иконок"
             android:theme="@style/Theme.Glasses" />
-        <!-- Варианты «стеклянного» интерфейса: adb shell am start -n ru.vasev.glasses/.debug.GlassShowcaseActivity -->
-        <activity
-            android:name=".debug.GlassShowcaseActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Glasses" />
         <!-- Проба DAT Speech на очках: adb shell am start -n ru.vasev.glasses/.debug.SpeechProbeActivity -->
         <!-- Проба жестов очков (DAT Inputs и медиакнопки): adb shell am start -n ru.vasev.glasses/.debug.InputsProbeActivity -->
         <activity

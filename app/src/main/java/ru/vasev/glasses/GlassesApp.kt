@@ -46,6 +46,7 @@ import ru.vasev.glasses.speech.RoutedSpeechSource
 import ru.vasev.glasses.speech.PhoneSpeakerOutput
 import ru.vasev.glasses.speech.Speaker
 import ru.vasev.glasses.speech.SpeechSource
+import ru.vasev.glasses.ui.theme.AppearanceSettings
 
 class GlassesApp : Application() {
 
@@ -154,6 +155,10 @@ class GlassesApp : Application() {
     lateinit var style: StyleSettings
         private set
 
+    /** Тема и размер шрифта. */
+    lateinit var appearance: AppearanceSettings
+        private set
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
@@ -163,6 +168,7 @@ class GlassesApp : Application() {
         apiKeys = ApiKeyStore(this)
         aiSettings = AiSettings(this)
         profile = ProfileSettings(this)
+        appearance = AppearanceSettings(this)
         style = StyleSettings(this)
         journal = RequestJournal(this)
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }

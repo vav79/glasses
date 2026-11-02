@@ -13,9 +13,6 @@ okhttp = "4.12.0"
 camerax = "1.6.2"
 splashscreen = "1.2.0"
 appcompat = "1.8.0"
-# Стекло: Haze — размытие и стекло (2.0.1 от 29.09.2026), Backdrop — преломление (2.0.1 от 26.08.2026, пока только debug-витрина)
-haze = "2.0.1"
-backdrop = "2.0.1"
 orgJson = "20260814"
 # Ссылки и QR: распознавание на телефоне (встроенные модели ML Kit, без сети) и Custom Tabs
 mlkitBarcode = "17.3.0"
@@ -45,11 +42,6 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
-haze-glass = { group = "dev.chrisbanes.haze", name = "haze-glass", version.ref = "haze" }
-haze-blur = { group = "dev.chrisbanes.haze", name = "haze-blur", version.ref = "haze" }
-haze-blur-materials = { group = "dev.chrisbanes.haze", name = "haze-blur-materials", version.ref = "haze" }
-backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }

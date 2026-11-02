@@ -1,5 +1,6 @@
 package ru.vasev.glasses.ui
 
+import ru.vasev.glasses.ui.theme.ThemeMode
 import ru.vasev.glasses.speech.GestureState
 import ru.vasev.glasses.speech.Tap
 import android.app.Application
@@ -97,10 +98,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setGestureEnabled(enabled: Boolean) = gestureSettings.setEnabled(enabled)
     fun setGestureTap(tap: Tap) = gestureSettings.setTap(tap)
 
-    /** «Меньше прозрачности» — стекло плотнее. */
-    val lessTransparency: StateFlow<Boolean> = profile.lessTransparency
+    /** Тема и размер шрифта приложения. */
+    private val appearance = (app as GlassesApp).appearance
+    val theme: StateFlow<ThemeMode> = appearance.theme
+    val fontScale: StateFlow<Int> = appearance.fontScale
 
-    fun setLessTransparency(enabled: Boolean) = profile.setLessTransparency(enabled)
+    fun setTheme(mode: ThemeMode) = appearance.setTheme(mode)
+    fun setFontScale(percent: Int) = appearance.setFontScale(percent)
 
     /** «Моя валюта» и последние сохранённые курсы ЦБ. */
     private val currencySettings = (app as GlassesApp).currency
