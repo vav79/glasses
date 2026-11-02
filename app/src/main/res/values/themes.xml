@@ -15,14 +15,13 @@
     -->
     <style name="Theme.Glasses.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_dark</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- Иконка целиком, с её тёмным фоном: чёрные очки переднего слоя на чёрной заставке не видны. -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.Glasses</item>
     </style>
 
-    <!-- Белое облачко иконки на белом не видно — под иконкой круг цвета иконки приложения. -->
     <style name="Theme.Glasses.Starting.Light">
         <item name="windowSplashScreenBackground">@color/splash_light</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
     </style>
 
     <style name="Theme.Glasses.Starting.System" parent="Theme.Glasses.Starting.Light" />
