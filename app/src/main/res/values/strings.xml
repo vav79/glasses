@@ -870,4 +870,24 @@
     <string name="about_developer">Developer: %1$s</string>
     <string name="about_developer_name">vav79</string>
     <string name="about_agreement_accepted">Agreement version %1$s accepted on %2$s</string>
+    <!-- Профили и умения. -->
+    <string name="profile_traveler">Traveler</string>
+    <string name="profile_traveler_desc">Directions, transport, prices and local tips on the go</string>
+    <string name="profile_researcher">Researcher</string>
+    <string name="profile_researcher_desc">Names things precisely and explains context</string>
+    <string name="profile_engineer">Builder / Engineer</string>
+    <string name="profile_engineer_desc">Construction, defects, materials and rough quantities</string>
+    <string name="profile_developer">Developer</string>
+    <string name="profile_developer_desc">Code, errors and logs — precise and technical</string>
+    <string name="skill_translator_desc">Conversation translation with the person in front of you</string>
+    <string name="skill_navigation">Navigation</string>
+    <string name="skill_navigation_desc">My places, compass, taxi and transit tips; voice commands</string>
+    <string name="skills_profiles">Profiles</string>
+    <string name="skills_profiles_hint">One profile is active: its prompt is added before every request. Choose it in the chip at the top of the chat.</string>
+    <string name="skills_skills">Skills</string>
+    <string name="skills_active">Active now</string>
+    <string name="skills_prompt">System prompt</string>
+    <string name="skills_prompt_hint">Added before every request while this profile is active. The assistant’s service rules still apply.</string>
+    <string name="skills_prompt_reset">Default</string>
+    <string name="divider_profile">Profile: %1$s</string>
 </resources>

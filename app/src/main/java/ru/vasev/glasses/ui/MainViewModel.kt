@@ -81,6 +81,8 @@ import ru.vasev.glasses.nav.NavVocabulary
 import ru.vasev.glasses.notes.Note
 import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
+import ru.vasev.glasses.profile.AssistantProfile
+import ru.vasev.glasses.profile.Skill
 import ru.vasev.glasses.speech.AudioChannel
 import ru.vasev.glasses.speech.Beeps
 import ru.vasev.glasses.speech.Headset
@@ -131,6 +133,8 @@ data class ChatItem(
     val links: List<FoundLink> = emptyList(),
     /** Вопрос был текстом: ответ не звучал, на нём кнопка «Озвучить». */
     val silent: Boolean = false,
+    /** Не обмен, а тонкий разделитель в ленте: «— Профиль: Инженер —». */
+    val divider: String? = null,
 )
 
 /** Заметка в чате: [saved] — только что сохранена, иначе найдена. */
@@ -176,6 +180,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val profile = (app as GlassesApp).profile
     private val llm = (app as GlassesApp).llm
     private val styleSettings = (app as GlassesApp).style
+    private val skills = (app as GlassesApp).skills
     private val assistant = AssistantClient(llm)
     private val abbreviations = SentenceSplitter.loadAbbreviations(app)
 
@@ -189,6 +194,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val extras = mutableMapOf<Long, Extras>()
     private val shownQuestions = mutableMapOf<Long, String>()
     private val silentIds = mutableSetOf<Long>()
+
+    /** Разделители ленты: сколько обменов перед ним — текст. */
+    private val dividers = mutableListOf<Pair<Int, String>>()
 
     /** Поиск ссылок и QR-кодов на текущем снимке (на телефоне, ML Kit). */
     private val linkScanner = LinkScanner()
@@ -399,6 +407,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }.also { job = it }
     }
 
+    /** Активный профиль из чипа шапки; смена — разделитель в ленте («— Профиль: Инженер —»). */
+    fun setProfile(profile: AssistantProfile?) {
+        if (skills.active.value == profile) return
+        skills.setActive(profile)
+        val title = profile?.let { L.s(it.titleRes) } ?: L.s(R.string.profile_none)
+        Log.d(TAG, "Profile: ${profile?.name ?: "none"}")
+        addDivider(L.s(R.string.divider_profile, title))
+    }
+
+    /** Разделитель в ленте и в истории чата; в пустом чате не нужен. */
+    private fun addDivider(text: String) {
+        if (conversation.isEmpty) return
+        dividers += conversation.exchanges.size to text
+        publishChat()
+        save(StoredExchange(asked = "", summary = "", divider = text), null)
+    }
+
     /** «Снять очками»: очки, а в debug с выбранным симулятором — симулятор. */
     fun glassesSource(): ImageSource = if (imageSources.source.value == ImageSource.SIMULATOR) ImageSource.SIMULATOR else ImageSource.GLASSES
 
@@ -607,6 +632,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun restore(records: List<StoredExchange>) {
         val notesById = noteStore.notes.value.associateBy { it.id }
         records.forEachIndexed { index, r ->
+            if (r.divider != null) {
+                dividers += conversation.exchanges.size to r.divider
+                return@forEachIndexed
+            }
             val photo = r.photo?.let(chatStore::photoFile)?.takeIf { it.exists() }
             val withJpeg = index >= records.size - RESTORE_PHOTOS
             val jpeg = if (withJpeg && photo != null) withContext(Dispatchers.IO) { photo.readBytes() } else null
@@ -739,7 +768,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 // Команды навигации («веди в отель», «как вернуться», «запомни, это мой отель»…) — до модели.
-                val navCommand = navCommandHandler?.let { NavCommands.parse(question, navVocabulary?.invoke() ?: return@let null) }
+                // Только пока умение «Навигация» включено; выключено — фраза уходит модели как обычный вопрос.
+                val navCommand = navCommandHandler?.takeIf { skills.isEnabled(Skill.NAVIGATION.name) }
+                    ?.let { NavCommands.parse(question, navVocabulary?.invoke() ?: return@let null) }
                 if (navCommand != null) {
                     setPhase(Phase.SPEAKING)
                     navCommandHandler?.invoke(navCommand)
@@ -953,6 +984,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val myCurrency = currency.currency.value
         val where = whereabouts(mode)
         Log.d(TAG, "Assistant: mode=$mode web=${plan.webSearch} notes=${plan.notes} delete=${plan.deleteNotes} country=${where.country}")
+        // Какой промпт профиля ушёл в запрос (сам текст — не в лог): свой или по умолчанию.
+        skills.active.value?.let { profile ->
+            Log.d(TAG, "Assistant: profile=${profile.name} prompt=${if (skills.hasCustomPrompt(profile)) "custom" else "default"} chars=${skills.prompt(profile).length} applied=${mode == AssistantMode.CHAT}")
+        }
         // Ссылки на снимке ищутся на телефоне параллельно с прослушиванием вопроса; модели — только тип и домен.
         val found = linkScan?.await().orEmpty()
         val asked = LinkTexts.forModel(found)?.let { "$question\n\n$it" } ?: question
@@ -1016,7 +1051,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     language,
                     myCurrency,
                     where,
-                    styleSettings.current.value,
+                    // Стиль — только к ответам голосом (В5); профиль — ко всем ответам чата.
+                    styleSettings.current.value.takeUnless { silent },
+                    skills.active.value?.let(skills::prompt),
                     metrics,
                     onFallback = { sentences.trySend(L.s(R.string.say_fallback_intro)) },
                     onText = { delta ->
@@ -1279,6 +1316,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         extras.clear()
         shownQuestions.clear()
         silentIds.clear()
+        dividers.clear()
         lastActivity = 0L
         _state.update { UiState(phase = it.phase) }
     }
@@ -1311,6 +1349,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 links = extra.links,
                 silent = exchange.id in silentIds,
             )
+        }.toMutableList()
+        // Разделители — на свои места, начиная с конца, чтобы индексы впереди не сдвигались.
+        dividers.withIndex().reversed().forEach { (i, d) ->
+            val (position, text) = d
+            chat.add(position.coerceIn(0, chat.size), ChatItem(-(i + 1L), "", "", null, remembered = true, model = null, divider = text))
         }
         _state.update { it.copy(chat = chat) }
     }

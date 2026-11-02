@@ -62,6 +62,9 @@ import ru.vasev.glasses.ui.shell.ChatEntry
 import ru.vasev.glasses.ui.shell.MenuItem
 import ru.vasev.glasses.ui.shell.ModelStatus
 import ru.vasev.glasses.ui.shell.ShellHeader
+import ru.vasev.glasses.ui.shell.ProfileOption
+import ru.vasev.glasses.profile.AssistantProfile
+import ru.vasev.glasses.profile.Skill
 import ru.vasev.glasses.ui.shell.chatTitle
 import ru.vasev.glasses.ui.shell.AllChatsScreen
 import ru.vasev.glasses.ui.shell.DeleteChatDialog
@@ -328,6 +331,8 @@ class MainActivity : AppCompatActivity() {
         val notesLabel = stringResource(R.string.notes_open)
         val deleteLabel = stringResource(R.string.chat_delete)
         val chatMetas by viewModel.chats.collectAsStateWithLifecycle()
+        val activeProfile by app.skills.active.collectAsStateWithLifecycle()
+        val disabledSkills by app.skills.disabled.collectAsStateWithLifecycle()
         val currentChatId by viewModel.currentChatId.collectAsStateWithLifecycle()
         val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
         // Ответ, пришедший, пока чат не на экране (приложение свёрнуто, другой экран), — непрочитанный.
@@ -349,12 +354,17 @@ class MainActivity : AppCompatActivity() {
         val header = when {
             settingsOpen -> ShellHeader.Title(stringResource(if (developerOpen) R.string.dev_journal_title else R.string.tab_settings))
             tab == AppTab.ASSISTANT -> ShellHeader.Chat(
-                profileTitle = stringResource(R.string.profile_none),
+                profileTitle = activeProfile?.let { stringResource(it.titleRes) } ?: stringResource(R.string.profile_none),
+                profileIcon = activeProfile?.icon,
+                profileOptions = buildList {
+                    add(ProfileOption(stringResource(R.string.profile_none), null, activeProfile == null) { viewModel.setProfile(null) })
+                    AssistantProfile.entries.filter { it.name !in disabledSkills }.forEach { profile ->
+                        add(ProfileOption(stringResource(profile.titleRes), profile.icon, profile == activeProfile) { viewModel.setProfile(profile) })
+                    }
+                },
                 translateOn = false,
                 glassesReady = glassesStatus.ready,
                 glassesBattery = battery,
-                // Профили — этап 4; пока чип показывает «Обычный чат».
-                onProfile = { Toast.makeText(this, R.string.profiles_soon, Toast.LENGTH_SHORT).show() },
                 // Кнопка перевода до этапа 4 открывает старый экран «Перевод».
                 onTranslate = { selectTab(AppTab.TRANSLATE) },
                 onGlasses = { selectTab(AppTab.CAMERA) },
@@ -455,7 +465,10 @@ class MainActivity : AppCompatActivity() {
                     onOpenLink = { openMapsLink(this, it) },
                     onLaunchApp = { pkg -> packageManager.getLaunchIntentForPackage(pkg)?.let(::startActivity) },
                 )
-                AppTab.SKILLS -> SkillsScreen(onOpen = { selectTab(it, stopOthers = false) })
+                AppTab.SKILLS -> SkillsScreen(app.skills, onOpenSkill = { skill ->
+                    // Настройки умений — этап 4б; пока «Переводчик» и «Навигация» открывают свои прежние экраны.
+                    selectTab(if (skill == Skill.TRANSLATOR) AppTab.TRANSLATE else AppTab.NAVIGATION, stopOthers = false)
+                })
                 AppTab.CALENDAR -> CalendarPlaceholder()
                 AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }

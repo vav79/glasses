@@ -907,4 +907,24 @@
     <string name="about_developer">Разработчик: %1$s</string>
     <string name="about_developer_name">vav79</string>
     <string name="about_agreement_accepted">Соглашение (редакция %1$s) принято %2$s</string>
+    <!-- Профили и умения. -->
+    <string name="profile_traveler">Путешественник</string>
+    <string name="profile_traveler_desc">Дорога, транспорт, цены и местные советы в пути</string>
+    <string name="profile_researcher">Исследователь</string>
+    <string name="profile_researcher_desc">Точно называет увиденное и объясняет контекст</string>
+    <string name="profile_engineer">Строитель / Инженер</string>
+    <string name="profile_engineer_desc">Конструкции, дефекты, материалы и объёмы</string>
+    <string name="profile_developer">Разработчик</string>
+    <string name="profile_developer_desc">Код, ошибки и логи — точно и технично</string>
+    <string name="skill_translator_desc">Перевод разговора с собеседником</string>
+    <string name="skill_navigation">Навигация</string>
+    <string name="skill_navigation_desc">Мои места, компас, такси и советы по транспорту; голосовые команды</string>
+    <string name="skills_profiles">Профили</string>
+    <string name="skills_profiles_hint">Активен один профиль: его промпт добавляется перед каждым запросом. Выбирается в чипе вверху чата.</string>
+    <string name="skills_skills">Умения</string>
+    <string name="skills_active">Активен сейчас</string>
+    <string name="skills_prompt">Системный промпт</string>
+    <string name="skills_prompt_hint">Добавляется перед каждым запросом, пока профиль активен. Служебные правила ассистента он не меняет.</string>
+    <string name="skills_prompt_reset">По умолчанию</string>
+    <string name="divider_profile">Профиль: %1$s</string>
 </resources>

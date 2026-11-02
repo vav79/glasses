@@ -93,6 +93,9 @@ enum class ModelStatus(val labelRes: Int) {
     NO_KEY(R.string.model_status_no_key),
 }
 
+/** Пункт быстрого выбора профиля в чипе шапки. */
+data class ProfileOption(val title: String, @DrawableRes val icon: Int?, val selected: Boolean, val onClick: () -> Unit)
+
 /** Строка списка «Чаты». */
 data class ChatEntry(val id: String, val title: String, val selected: Boolean, val fromGlasses: Boolean = false, val unread: Boolean = false)
 
@@ -100,10 +103,12 @@ data class ChatEntry(val id: String, val title: String, val selected: Boolean, v
 sealed interface ShellHeader {
     data class Chat(
         val profileTitle: String,
+        @DrawableRes val profileIcon: Int?,
+        /** Быстрый выбор профиля из чипа. */
+        val profileOptions: List<ProfileOption>,
         val translateOn: Boolean,
         val glassesReady: Boolean,
         val glassesBattery: Int?,
-        val onProfile: () -> Unit,
         val onTranslate: () -> Unit,
         val onGlasses: () -> Unit,
         /** Пункты меню ⋮: подпись → действие. */
@@ -203,7 +208,7 @@ private fun Header(header: ShellHeader, onMenu: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 ) {
-                    ProfileChip(header.profileTitle, header.onProfile, Modifier.weight(1f, fill = false))
+                    ProfileChip(header.profileTitle, header.profileIcon, header.profileOptions, Modifier.weight(1f, fill = false))
                     TranslateButton(header.translateOn, header.onTranslate)
                 }
                 GlassesBadge(header.glassesReady, header.glassesBattery, header.onGlasses)
@@ -214,36 +219,51 @@ private fun Header(header: ShellHeader, onMenu: () -> Unit) {
     HorizontalDivider(color = p.divider)
 }
 
-/** Чип профиля: иконка, название, ▾. */
+/** Чип профиля: иконка, название, ▾; нажатие — быстрый выбор профиля. */
 @Composable
-private fun ProfileChip(title: String, onClick: () -> Unit, modifier: Modifier = Modifier, @DrawableRes icon: Int? = null) {
+private fun ProfileChip(title: String, @DrawableRes icon: Int?, options: List<ProfileOption>, modifier: Modifier = Modifier) {
     val p = LocalSputnikColors.current
-    Row(
-        modifier
-            .heightIn(min = 48.dp)
-            .widthIn(max = 200.dp)
-            .clip(CircleShape)
-            .background(p.surface)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        // Иконка — только у выбранного профиля (этап 4); «Обычный чат» без иконки — так название помещается
-        // и при крупном системном шрифте.
-        if (icon != null) Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
-        // При крупном шрифте название сначала уменьшается (до 11 sp) и только потом обрезается.
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            softWrap = true,
-            overflow = TextOverflow.Ellipsis,
-            autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Icon(painterResource(R.drawable.ic_sym_expand_more), contentDescription = null, modifier = Modifier.size(18.dp))
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier
+                .heightIn(min = 48.dp)
+                .widthIn(max = 200.dp)
+                .clip(CircleShape)
+                .background(p.surface)
+                .clickable(role = Role.Button) { open = true }
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Иконка — только у выбранного профиля: «Обычный чат» без неё помещается и при крупном шрифте.
+            if (icon != null) Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+            // При крупном шрифте название сначала уменьшается (до 11 sp) и только потом обрезается.
+            Text(
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = true,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = MaterialTheme.typography.labelLarge.fontSize),
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(painterResource(R.drawable.ic_sym_expand_more), contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.title, fontWeight = if (option.selected) FontWeight.SemiBold else FontWeight.Normal) },
+                    leadingIcon = option.icon?.let { { Icon(painterResource(it), contentDescription = null) } },
+                    trailingIcon = if (option.selected) ({ Icon(painterResource(R.drawable.ic_sym_check), contentDescription = null) }) else null,
+                    onClick = {
+                        open = false
+                        option.onClick()
+                    },
+                )
+            }
+        }
     }
 }
 

@@ -50,33 +50,6 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
  */
 val LocalTabBarInset = compositionLocalOf { 8.dp }
 
-/** «Умения» до этапа 4: старые экраны, которые станут умениями. */
-@Composable
-fun SkillsScreen(onOpen: (AppTab) -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(stringResource(R.string.skills_interim_hint), style = MaterialTheme.typography.bodyMedium, color = glassBackgroundText())
-        for (tab in listOf(AppTab.TRANSLATE, AppTab.NAVIGATION, AppTab.CAMERA)) {
-            GlassCard(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { onOpen(tab) },
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(painterResource(tab.icon), contentDescription = null, modifier = Modifier.size(24.dp))
-                    Text(
-                        stringResource(if (tab == AppTab.TRANSLATE) R.string.skill_translator else tab.titleRes),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 16.dp).weight(1f),
-                    )
-                    Icon(painterResource(R.drawable.ic_sym_chevron_right), contentDescription = null)
-                }
-            }
-        }
-    }
-}
-
 /** «Календарь» — до этапа 5. */
 @Composable
 fun CalendarPlaceholder() {

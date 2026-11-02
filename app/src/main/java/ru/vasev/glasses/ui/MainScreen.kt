@@ -204,6 +204,17 @@ fun AssistantOverlays(viewModel: MainViewModel) {
     }
 }
 
+/** Тонкий разделитель в ленте: смена профиля или перевода. */
+@Composable
+private fun ChatDivider(text: String) {
+    val p = ru.vasev.glasses.ui.theme.LocalSputnikColors.current
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(Modifier.weight(1f), color = p.divider)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = p.text2, modifier = Modifier.padding(horizontal = 10.dp))
+        HorizontalDivider(Modifier.weight(1f), color = p.divider)
+    }
+}
+
 @Composable
 private fun Chat(
     state: UiState,
@@ -254,6 +265,10 @@ private fun Chat(
             }
         }
         itemsIndexed(state.chat, key = { _, item -> item.id }) { index, item ->
+            if (item.divider != null) {
+                ChatDivider(item.divider)
+                return@itemsIndexed
+            }
             if (index == firstRemembered && firstRemembered > 0) {
                 ForgottenDivider()
             }

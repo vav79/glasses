@@ -10,6 +10,7 @@ import ru.vasev.glasses.llm.ToolSet
 import ru.vasev.glasses.llm.TurnMetrics
 import ru.vasev.glasses.llm.WebSearch
 import ru.vasev.glasses.profile.CommunicationStyle
+import ru.vasev.glasses.profile.ProfilePrompt
 import ru.vasev.glasses.profile.StylePrompt
 
 /** Где пользователь сейчас — для веб-поиска и валюты на ценниках. */
@@ -32,14 +33,17 @@ class AssistantClient(private val llm: LlmService) {
         language: AppLanguage,
         myCurrency: String,
         where: Whereabouts,
-        style: CommunicationStyle,
+        /** «Стиль общения» — только к ответам голосом (на вопрос текстом — null). */
+        style: CommunicationStyle?,
+        /** Промпт активного профиля («Умения»); null — «Обычный чат». */
+        profilePrompt: String?,
         metrics: TurnMetrics,
         onFallback: () -> Unit,
         onText: (String) -> Unit,
     ): StreamedAnswer = llm.stream(
         role = Role.ASSISTANT,
         system = when (mode) {
-            AssistantMode.CHAT -> systemPrompt(language, plan, myCurrency, style)
+            AssistantMode.CHAT -> systemPrompt(language, plan, myCurrency, style, profilePrompt)
             AssistantMode.TRANSLATE_VIEW -> translateViewPrompt(language, myCurrency, where)
         },
         turns = turns,
@@ -61,7 +65,13 @@ class AssistantClient(private val llm: LlmService) {
          * Промпт на английском; язык ответа — язык приложения. Меняется вместе с языком и набором инструментов
          * (удаление заметок — только по явной просьбе), тогда кэш начнётся заново.
          */
-        fun systemPrompt(language: AppLanguage, plan: ToolPlan, myCurrency: String, style: CommunicationStyle? = null): String = buildString {
+        fun systemPrompt(
+            language: AppLanguage,
+            plan: ToolPlan,
+            myCurrency: String,
+            style: CommunicationStyle? = null,
+            profilePrompt: String? = null,
+        ): String = buildString {
             appendLine(
                 """
                 You are a voice assistant built into Ray-Ban Meta smart glasses. Always answer in ${language.englishName}.
@@ -96,6 +106,8 @@ class AssistantClient(private val llm: LlmService) {
             if (plan.rates) {
                 appendLine("To convert money into the user's currency ($myCurrency), use convert_prices: it has the official Bank of Russia rates.")
             }
+            // Профиль — после служебных правил: на чём сосредоточиться, правила он не меняет.
+            profilePrompt?.let(ProfilePrompt::block)?.let(::appendLine)
             // «Стиль общения» — последним и с меньшим приоритетом: служебные правила выше он не меняет.
             style?.let(StylePrompt::block)?.let(::appendLine)
         }.trim()

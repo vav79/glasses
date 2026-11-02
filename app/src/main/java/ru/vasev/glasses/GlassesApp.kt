@@ -31,6 +31,7 @@ import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.places.PlaceStore
 import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.profile.ProfileSettings
+import ru.vasev.glasses.profile.SkillsSettings
 import ru.vasev.glasses.profile.StyleSettings
 import ru.vasev.glasses.rates.CbrRates
 import ru.vasev.glasses.rates.CurrencySettings
@@ -161,6 +162,10 @@ class GlassesApp : Application() {
     lateinit var chats: ChatStore
         private set
 
+    /** Профили ассистента и умения: активный профиль, включённые, свои промпты. */
+    lateinit var skills: SkillsSettings
+        private set
+
     /** Принятая редакция пользовательского соглашения. */
     lateinit var agreement: AgreementSettings
         private set
@@ -180,6 +185,7 @@ class GlassesApp : Application() {
         profile = ProfileSettings(this)
         appearance = AppearanceSettings(this)
         agreement = AgreementSettings(this)
+        skills = SkillsSettings(this)
         style = StyleSettings(this)
         journal = RequestJournal(this)
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }
