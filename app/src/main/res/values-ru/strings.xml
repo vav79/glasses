@@ -829,7 +829,6 @@
     <string name="gesture_state_cooldown">Сейчас: ждём минуту после остановки музыки</string>
     <string name="gesture_state_call">Сейчас: идёт звонок</string>
     <string name="gesture_state_off">Выключено</string>
-    <string name="say_gesture_open_app">Чтобы спрашивать касанием, откройте приложение на телефоне.</string>
     <!-- Каркас «Классика»: боковое меню и шапка. -->
     <string name="app_full_name">Sputnik — AI для очков</string>
     <string name="menu_open">Меню</string>
@@ -1020,4 +1019,15 @@
     <string name="costs_total">Всего в журнале: %1$s · запросов: %2$d</string>
     <string name="costs_month_all">За месяц всего: %1$s</string>
     <string name="costs_hint">Оценка: токены из ответов API × цены (у DeepSeek — пиковые). Точный баланс — в кабинете провайдера. Журнал хранит последние 1000 запросов.</string>
+    <string name="say_link_in_notification">Открыть — кнопкой в уведомлении на телефоне.</string>
+    <string name="say_needs_screen">Это работает с открытым приложением на телефоне.</string>
+    <string name="phone_camera_needs_screen">Камера телефона снимает, когда приложение открыто. Без него — снимок очками.</string>
+    <string name="assistant_notif_ready_double">Ассистент готов · двойное касание — вопрос</string>
+    <string name="assistant_notif_ready_single">Ассистент готов · касание — вопрос</string>
+    <string name="assistant_notif_listening">Слушаю…</string>
+    <string name="assistant_notif_thinking">Думаю…</string>
+    <string name="assistant_notif_speaking">Отвечаю…</string>
+    <string name="assistant_notif_link_open">Открыть %1$s</string>
+    <string name="assistant_notif_link_check">Проверить ссылку</string>
+    <string name="assistant_notif_links_show">Показать ссылки</string>
 </resources>

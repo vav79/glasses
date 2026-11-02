@@ -1,5 +1,8 @@
 package ru.vasev.glasses
 
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.Manifest
 import android.app.Application
 import android.net.ConnectivityManager
 import android.net.Network
@@ -186,7 +189,7 @@ class GlassesApp : Application() {
         private set
 
     /** Ход ассистента — на всё приложение: живёт и без экрана (жест на дужке при закрытом приложении). */
-    val assistant: AssistantEngine by lazy { AssistantEngine(this) }
+    val assistant: AssistantEngine by lazy { AssistantEngine(this).also { it.navVocabulary = navVoice::vocabulary } }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -225,11 +228,18 @@ class GlassesApp : Application() {
         audioOutput = PhoneSpeakerOutput(speaker, audioRouter, AudioFocus(this), navigatorVoice) { style.current.value.pace }
         gestureSettings = GestureSettings(this)
         gestures = GlassesGestures(this, audioRouter, gestureSettings) { speaker.playingToPartner }
-        // Жест есть, а экрана нет (приложение закрыто): вопрос задать нечем — говорим, что нужно открыть приложение.
+        // Жест, а экрана нет (приложение закрыто «Назад» или смахнуто): вопрос задаёт ассистент на всё приложение,
+        // его держит служба (GesturesService). Проверки — те же, что у экрана (MainActivity.handleGestureAsk).
         gestures.onNoScreen = {
-            Log.d(TAG, "gesture: no screen, asking to open the app")
-            scope.launch(Dispatchers.Main) {
-                runCatching { audioOutput.speak(L.s(R.string.say_gesture_open_app), LanguageSettings.current.value.locale, AudioChannel.ME) }
+            when {
+                !AgreementSettings.isCurrent(agreement.acceptedVersion.value) || !profile.onboarded.value ->
+                    Log.d(TAG, "gesture: ignored without screen, first-run setup is not finished")
+                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
+                    Log.d(TAG, "gesture: ignored without screen, no microphone permission")
+                else -> {
+                    Log.d(TAG, "gesture: ask without screen")
+                    assistant.gestureAsk()
+                }
             }
         }
         notes = NoteStore(this)

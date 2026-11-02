@@ -792,7 +792,6 @@
     <string name="gesture_state_cooldown">Now: waiting a minute after the music stopped</string>
     <string name="gesture_state_call">Now: a call is in progress</string>
     <string name="gesture_state_off">Off</string>
-    <string name="say_gesture_open_app">Open the app on the phone to ask by tapping.</string>
     <!-- Каркас «Классика»: боковое меню и шапка. -->
     <string name="app_full_name">Sputnik — AI for glasses</string>
     <string name="menu_open">Menu</string>
@@ -981,4 +980,15 @@
     <string name="costs_total">All time in the log: %1$s · requests: %2$d</string>
     <string name="costs_month_all">This month in total: %1$s</string>
     <string name="costs_hint">An estimate: tokens from API answers × prices (for DeepSeek — peak prices). The exact balance is in the provider’s account. The log keeps the last 1000 requests.</string>
+    <string name="say_link_in_notification">To open it, use the button in the phone notification.</string>
+    <string name="say_needs_screen">That works with the app open on the phone.</string>
+    <string name="phone_camera_needs_screen">The phone camera works when the app is open. Without it, take the photo with the glasses.</string>
+    <string name="assistant_notif_ready_double">Assistant ready · double tap to ask</string>
+    <string name="assistant_notif_ready_single">Assistant ready · tap to ask</string>
+    <string name="assistant_notif_listening">Listening…</string>
+    <string name="assistant_notif_thinking">Thinking…</string>
+    <string name="assistant_notif_speaking">Answering…</string>
+    <string name="assistant_notif_link_open">Open %1$s</string>
+    <string name="assistant_notif_link_check">Check the link</string>
+    <string name="assistant_notif_links_show">Show links</string>
 </resources>

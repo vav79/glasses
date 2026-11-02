@@ -36,6 +36,17 @@ object LinkTexts {
     }
 
     /**
+     * То же, но без экрана (ход в службе): из фона приложение не открыть, поэтому вместо «Открыть?» — «кнопкой
+     * в уведомлении». Ссылки с предупреждениями, оплата и прочее — как обычно: «только кнопкой на телефоне».
+     */
+    fun spokenInBackground(context: Context, links: List<FoundLink>): String {
+        val link = links.singleOrNull()
+        if (link == null || !link.info.voiceConfirmAllowed) return spoken(context, links)
+        val prefix = context.getString(if (link.fromQr) R.string.say_link_qr_prefix else R.string.say_link_text_prefix)
+        return "$prefix " + context.getString(R.string.say_link_to_site, link.info.domain.orEmpty()) + " " +
+            context.getString(R.string.say_link_in_notification)
+    }
+    /**
      * Что сказать о ссылках на снимке после ответа. Вопрос «Открыть?» — только если ссылка одна и без единого
      * предупреждения ([LinkInfo.voiceConfirmAllowed]); иначе — предупреждения и «только кнопкой на телефоне».
      */

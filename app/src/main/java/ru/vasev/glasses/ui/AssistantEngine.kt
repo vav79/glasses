@@ -306,9 +306,30 @@ class AssistantEngine(private val app: Application) {
     /** Экран, чьи зацепки сейчас подключены; при повороте новый экран подключается раньше, чем старый закрывается. */
     private var screen: Any? = null
 
+    /** Открыт ли экран: без него нет камеры телефона, календаря и навигации (ход ассистента — в службе). */
+    val hasScreen: Boolean get() = screen != null
+
     /** Экран открыт: его зацепки (выше) подставлены. */
     fun attachScreen(owner: Any) {
         screen = owner
+    }
+
+    /**
+     * Ссылки, найденные, пока экрана нет: служба показывает их кнопкой в уведомлении (открыть приложение из фона
+     * Android не даёт, поэтому голосом их не открыть). Сбрасываются следующим ходом.
+     */
+    private val _backgroundLinks = MutableStateFlow<List<FoundLink>>(emptyList())
+    val backgroundLinks: StateFlow<List<FoundLink>> = _backgroundLinks.asStateFlow()
+
+    /** Кнопка в уведомлении «Проверить ссылку»: окно проверки на экране, без вопроса голосом. */
+    fun showLink(link: FoundLink) {
+        _backgroundLinks.value = emptyList()
+        _state.update { it.copy(confirmLink = link) }
+    }
+
+    /** Ссылку из уведомления открыли — кнопка больше не нужна. */
+    fun clearBackgroundLinks() {
+        _backgroundLinks.value = emptyList()
     }
 
     /** Экран закрыт: всё, что умеет только он, отключается; ход ассистента продолжается без него. */
@@ -320,7 +341,6 @@ class AssistantEngine(private val app: Application) {
         locationPermissionRequester = null
         galleryPicker = null
         navCommandHandler = null
-        navVocabulary = null
         navCommandDone = null
         setViewing(false)
     }
@@ -723,6 +743,7 @@ class AssistantEngine(private val app: Application) {
         job = scope.launch {
             linkScan?.cancel()
             linkScan = null
+            _backgroundLinks.value = emptyList()
             _state.update { it.copy(confirmLink = null) }
             // После 2 часов тишины — новый чат; прежний остаётся в истории.
             if (!conversation.isEmpty && ChatRules.expired(lastActivity, System.currentTimeMillis())) {
@@ -780,11 +801,18 @@ class AssistantEngine(private val app: Application) {
 
                 // Команды навигации («веди в отель», «как вернуться», «запомни, это мой отель»…) — до модели.
                 // Только пока умение «Навигация» включено; выключено — фраза уходит модели как обычный вопрос.
-                val navCommand = navCommandHandler?.takeIf { skills.isEnabled(Skill.NAVIGATION.name) }
-                    ?.let { NavCommands.parse(question, navVocabulary?.invoke() ?: return@let null) }
+                val navCommand = navVocabulary?.takeIf { skills.isEnabled(Skill.NAVIGATION.name) }
+                    ?.let { NavCommands.parse(question, it()) }
                 if (navCommand != null) {
                     setPhase(Phase.SPEAKING)
-                    navCommandHandler?.invoke(navCommand)
+                    val handler = navCommandHandler
+                    if (handler != null) {
+                        handler(navCommand)
+                    } else {
+                        // Без экрана навигации нет: карточка цели, компас и такси — на нём.
+                        Log.d(TAG, "Assistant: navigation command without screen")
+                        audio.speak(L.s(R.string.say_needs_screen), language.locale, AudioChannel.ME)
+                    }
                     _state.update { it.copy(pendingQuestion = "") }
                     setPhase(Phase.IDLE)
                     // Вкладка — только после хода: смена вкладки в одном кадре с изменением фазы роняла размытие (Haze).
@@ -864,6 +892,9 @@ class AssistantEngine(private val app: Application) {
         }
     }
 
+    /** Без экрана камеру телефона не включить (ей нужен его жизненный цикл): снимок — очками или с открытым приложением. */
+    private fun phoneCameraWithoutScreen(): Nothing = throw PhoneCameraException(L.s(R.string.phone_camera_needs_screen))
+
     /** Ложное срабатывание жеста: «отбой» в очки, без ошибки на экране и без запроса. */
     private suspend fun cancelGestureQuestion() {
         Log.d(TAG, "Assistant: gesture question cancelled, no speech in ${GESTURE_SILENCE_MS} ms")
@@ -913,7 +944,7 @@ class AssistantEngine(private val app: Application) {
                 glasses.captureJpeg(cameraPermissionRequester ?: { false })
             }
             // Видоискателя на экране нет («Ассистент») — камера включается на один снимок.
-            ImageSource.PHONE_CAMERA -> cameraOwner?.let { phoneCamera.captureWithoutPreview(it) } ?: phoneCamera.capture()
+            ImageSource.PHONE_CAMERA -> cameraOwner?.let { phoneCamera.captureWithoutPreview(it) } ?: phoneCameraWithoutScreen()
             ImageSource.GALLERY -> {
                 val uri = galleryPicker?.invoke()
                 if (uri == null) {
@@ -941,7 +972,7 @@ class AssistantEngine(private val app: Application) {
             when (imageSources.source.value) {
                 ImageSource.GLASSES, ImageSource.SIMULATOR ->
                     if (glasses.status.value.ready) glasses.captureJpeg(cameraPermissionRequester ?: { false }) else null
-                ImageSource.PHONE_CAMERA -> (cameraOwner?.let { phoneCamera.captureWithoutPreview(it) } ?: phoneCamera.capture()).takeUnless { jpeg ->
+                ImageSource.PHONE_CAMERA -> (cameraOwner?.let { phoneCamera.captureWithoutPreview(it) } ?: phoneCameraWithoutScreen()).takeUnless { jpeg ->
                     ImagePrep.isDark(jpeg).also { if (it) Log.d(TAG, "Notes: phone camera frame is almost black, not attached") }
                 }
                 ImageSource.GALLERY -> null
@@ -986,7 +1017,7 @@ class AssistantEngine(private val app: Application) {
         _state.update { it.copy(phase = Phase.THINKING, pendingTranslation = mode == AssistantMode.TRANSLATE_VIEW) }
         // Календарь — только если я сам о нём попросил (слово из calendar_triggers в моей фразе), как и удаление заметок.
         val plan = ToolPlan.of(mode, question, L.array(R.array.delete_note_triggers)).let {
-            if (mode == AssistantMode.CHAT && ToolPlan.asksToDelete(question, L.array(R.array.calendar_triggers))) it.copy(calendar = true) else it
+            if (mode == AssistantMode.CHAT && hasScreen && ToolPlan.asksToDelete(question, L.array(R.array.calendar_triggers))) it.copy(calendar = true) else it
         }
         val myCurrency = currency.currency.value
         val where = whereabouts(mode)
@@ -1128,6 +1159,14 @@ class AssistantEngine(private val app: Application) {
      * выбор на телефоне. Голосом («открыть», 10 с) — только ссылка без единого предупреждения, остальное — кнопкой.
      */
     private suspend fun offerLinks(links: List<FoundLink>, language: AppLanguage) {
+        if (!hasScreen) {
+            // Без экрана ничего не открываем: ссылка — кнопкой в уведомлении службы, голосом — только сказать об этом.
+            _backgroundLinks.value = links
+            Log.d(TAG, "Links: offered in notification count=${links.size}")
+            setPhase(Phase.SPEAKING)
+            audio.speak(LinkTexts.spokenInBackground(L.context(language), links), language.locale, AudioChannel.ME)
+            return
+        }
         val single = links.singleOrNull()
         if (single != null) _state.update { it.copy(confirmLink = single) }
         speakAboutLink(links, language)

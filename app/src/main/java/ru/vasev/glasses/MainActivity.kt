@@ -36,6 +36,9 @@ import com.meta.wearable.dat.core.Wearables
 import com.meta.wearable.dat.core.types.Permission
 import com.meta.wearable.dat.core.types.PermissionStatus
 import kotlinx.coroutines.CompletableDeferred
+import ru.vasev.glasses.links.LinkOpener
+import ru.vasev.glasses.links.LinkCheck
+import ru.vasev.glasses.links.FoundLink
 import ru.vasev.glasses.GlassesApp.Companion.TAG
 import ru.vasev.glasses.camera.ImageSource
 import ru.vasev.glasses.i18n.LanguageSettings
@@ -279,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             handleRegistrationIntent(intent)
             handleVoiceIntent(intent)
+            handleLinkIntent(intent)
             handleDebugIntent(intent)
         }
         // Видеозаставка — только при холодном запуске с иконки и с включёнными анимациями. Запуск голосом, из Meta AI
@@ -718,7 +722,35 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         handleRegistrationIntent(intent)
         handleVoiceIntent(intent)
+        handleLinkIntent(intent)
         handleDebugIntent(intent)
+    }
+
+    /**
+     * Кнопка ссылки из уведомления службы (ссылка найдена, пока экрана не было). Только с ключом этой службы —
+     * чужой интент ничего не откроет. Сайт без предупреждений — сразу (нажатие и есть подтверждение), остальное —
+     * окно проверки, как у карточки в чате.
+     */
+    private fun handleLinkIntent(intent: Intent) {
+        val raw = intent.getStringExtra(GesturesService.EXTRA_LINK)
+        val token = intent.getStringExtra(GesturesService.EXTRA_LINK_TOKEN)
+        val open = intent.getBooleanExtra(GesturesService.EXTRA_LINK_OPEN, false)
+        val fromQr = intent.getBooleanExtra(GesturesService.EXTRA_LINK_QR, false)
+        listOf(GesturesService.EXTRA_LINK, GesturesService.EXTRA_LINK_TOKEN, GesturesService.EXTRA_LINK_OPEN, GesturesService.EXTRA_LINK_QR).forEach(intent::removeExtra)
+        if (raw == null) return
+        if (token != GesturesService.linkToken) {
+            Log.w(TAG, "Links: notification link ignored, stale or foreign")
+            return
+        }
+        selectTab(AppTab.ASSISTANT)
+        val link = FoundLink(LinkCheck.analyze(raw), fromQr)
+        if (open && link.info.voiceConfirmAllowed) {
+            Log.d(TAG, "Links: opened from notification")
+            viewModel.clearBackgroundLinks()
+            LinkOpener.open(this, link.info)
+        } else {
+            viewModel.showLink(link)
+        }
     }
 
     /** Запущены голосом через Meta AI: сразу «Ассистент». Слушать начнём по событию из потока ([handleVoiceLaunch]). */
@@ -790,7 +822,7 @@ class MainActivity : AppCompatActivity() {
         navSession.detach(this)
         // Открытая цель и экраны «Навигации» живут до закрытия приложения, как и состояние остальных вкладок.
         if (isFinishing) navSession.closeScreens()
-        // Без экрана жест скажет «откройте приложение» (GlassesApp); при повороте новая Activity поставит своё.
+        // Без экрана вопрос жестом задаёт GlassesApp (ассистент в службе); при повороте новая Activity поставит своё.
         (application as GlassesApp).gestures.onAsk = null
         // Поворот: открытый системный диалог или галерея ответит новой Activity — запросы не отменяем.
         if (!isChangingConfigurations) requests.cancelAll()

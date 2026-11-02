@@ -53,7 +53,7 @@ class GlassesGestures(
     /** Вопрос жестом. Задаёт MainActivity (пока она есть); null — экрана нет, тогда [onNoScreen]. */
     var onAsk: (() -> Unit)? = null
 
-    /** Жест есть, а приложения на экране нет (закрыто): сказать, что его нужно открыть. */
+    /** Жест есть, а экрана нет (приложение закрыто «Назад» или смахнуто): вопрос задаёт ассистент в службе (GlassesApp). */
     var onNoScreen: (() -> Unit)? = null
 
     private val _state = MutableStateFlow(GestureState.OFF)
