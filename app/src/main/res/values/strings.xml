@@ -386,7 +386,7 @@
     <string name="mic_glasses_soon">soon</string>
     <string name="mic_headset">Headset</string>
     <string name="mic_phone">Phone</string>
-    <string name="mic_auto_hint">Auto: the glasses or another Bluetooth headset if connected (glasses first), otherwise the phone microphone. In Translate the other person is always heard by the phone.</string>
+    <string name="mic_auto_hint">Auto: the glasses or another Bluetooth headset if connected (glasses first), otherwise the phone microphone. The Translator listens to the partner with the microphone chosen in its settings.</string>
     <string name="mic_glasses_not_connected">The glasses are not connected via Bluetooth — your voice is heard by the phone microphone. Check that the glasses are connected in the phone’s Bluetooth settings.</string>
     <string name="photos_source_title">Photos</string>
     <string name="glasses_connect_short">Connect glasses</string>
@@ -935,4 +935,13 @@
         <item>appointment</item>
         <item>remind</item>
     </string-array>
+    <string name="glasses_art_on">Glasses connected</string>
+    <string name="glasses_art_off">Glasses not connected</string>
+    <string name="glasses_disconnect">Disconnect glasses</string>
+    <string name="glasses_disconnect_title">Disconnect the glasses from Sputnik?</string>
+    <string name="glasses_disconnect_text">The app’s registration in Meta AI will be removed: photos from the glasses and the camera permission stop working until you connect again. The glasses themselves stay paired with the phone.</string>
+    <string name="glasses_photo_source">Photo by voice and gesture</string>
+    <string name="glasses_photo_source_hint">Which camera takes the photo for “What do I see”, “Translate what I see” and “Remember” by voice. In the input field the camera is chosen each time.</string>
+    <string name="glasses_mic">Microphone for my voice</string>
+    <string name="glasses_hey_meta_hint">“Hey Meta, start Sputnik” launches the assistant by voice — where Meta allows it (in Russia the glasses answer that the feature isn’t available in your region).</string>
 </resources>

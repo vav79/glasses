@@ -186,20 +186,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
         RolePicker(role, viewModel::setRole)
         BackgroundHint(stringResource(R.string.settings_role_hint))
 
-        Section(stringResource(R.string.settings_glasses)) {
-            SwitchRow(
-                title = stringResource(R.string.settings_gesture_title),
-                subtitle = stringResource(R.string.settings_gesture_subtitle),
-                checked = gestureEnabled,
-                onChange = viewModel::setGestureEnabled,
-            )
-            if (gestureEnabled) {
-                TapPicker(gestureTap, viewModel::setGestureTap)
-                Hint(stringResource(GesturesService.stateText(gestureState, gestureTap)))
-            }
-            Hint(stringResource(R.string.settings_gesture_hint))
-        }
-
         Section(stringResource(R.string.settings_headset)) {
             SwitchRow(
                 title = stringResource(R.string.settings_voice_stop_title),

@@ -65,6 +65,8 @@ import ru.vasev.glasses.ui.shell.ShellHeader
 import ru.vasev.glasses.ui.shell.ProfileOption
 import ru.vasev.glasses.ui.TranslateBar
 import ru.vasev.glasses.ui.MediaScreen
+import ru.vasev.glasses.ui.GlassesScreen
+import ru.vasev.glasses.ui.GlassesScreenState
 import ru.vasev.glasses.ui.TranslatorSettingsScreen
 import ru.vasev.glasses.ui.needsGenderHint
 import ru.vasev.glasses.profile.AssistantProfile
@@ -406,7 +408,7 @@ class MainActivity : AppCompatActivity() {
                     app.translator.setHeaderOn(on)
                     viewModel.translationToggled(on)
                 },
-                onGlasses = { selectTab(AppTab.CAMERA) },
+                onGlasses = { selectTab(AppTab.GLASSES) },
                 chatMenu = buildList {
                     // Удалить можно только сохранённый чат (новый, без обменов, ещё не в истории).
                     currentChatId?.let { id -> add(deleteLabel to { chatToDelete = ChatEntry(id, chatTitle, selected = true) }) }
@@ -436,8 +438,7 @@ class MainActivity : AppCompatActivity() {
                         selectTab(AppTab.ASSISTANT)
                     }
                     MenuItem.MEDIA -> selectTab(AppTab.MEDIA)
-                    // «Очки» до этапа 6 — старая «Камера»: подключение очков, источник снимков, микрофон.
-                    MenuItem.GLASSES -> selectTab(AppTab.CAMERA)
+                    MenuItem.GLASSES -> selectTab(AppTab.GLASSES)
                     MenuItem.SKILLS -> selectTab(AppTab.SKILLS)
                     MenuItem.CALENDAR -> selectTab(AppTab.CALENDAR)
                 }
@@ -527,6 +528,7 @@ class MainActivity : AppCompatActivity() {
                         runCatching { startActivity(open) }.onFailure { Toast.makeText(this, R.string.calendar_no_app, Toast.LENGTH_LONG).show() }
                     },
                 )
+                AppTab.GLASSES -> GlassesTab()
                 AppTab.MEDIA -> MediaScreen(
                     library = app.media,
                     viewModel = viewModel,
@@ -541,6 +543,45 @@ class MainActivity : AppCompatActivity() {
                 AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }
         }
+    }
+
+    /** Экран «Очки»: состояние из GlassesManager, жест, источник снимка, микрофон. */
+    @Composable
+    private fun GlassesTab() {
+        val app = application as GlassesApp
+        val status by app.glasses.status.collectAsStateWithLifecycle()
+        val battery by app.glasses.battery.collectAsStateWithLifecycle()
+        val names by app.glasses.deviceNames.collectAsStateWithLifecycle()
+        val notice by app.glasses.notice.collectAsStateWithLifecycle()
+        val gestureEnabled by app.gestureSettings.enabled.collectAsStateWithLifecycle()
+        val gestureTap by app.gestureSettings.tap.collectAsStateWithLifecycle()
+        val gestureState by app.gestures.state.collectAsStateWithLifecycle()
+        val source by app.imageSources.source.collectAsStateWithLifecycle()
+        val mic by app.micSettings.choice.collectAsStateWithLifecycle()
+        GlassesScreen(
+            state = GlassesScreenState(
+                ready = status.ready,
+                registered = status.registration == com.meta.wearable.dat.core.types.RegistrationState.REGISTERED,
+                statusText = status.textRes,
+                name = names.firstOrNull(),
+                battery = battery,
+                notice = notice,
+                gestureEnabled = gestureEnabled,
+                gestureTap = gestureTap,
+                gestureState = gestureState,
+                photoSource = source,
+                // Галерея — не источник снимка по голосу и жесту: её выбирают в поле ввода.
+                photoSources = app.imageSources.available.filter { it.pickable },
+                mic = mic,
+            ),
+            onConnect = { app.glasses.connect(this) },
+            onDisconnect = { app.glasses.disconnect(this) },
+            onDismissNotice = app.glasses::dismissNotice,
+            onGestureEnabled = app.gestureSettings::setEnabled,
+            onGestureTap = app.gestureSettings::setTap,
+            onPhotoSource = ::selectImageSource,
+            onMic = app.micSettings::set,
+        )
     }
 
     /** Низ чата, пока идёт перевод: язык, пауза собеседника, моя фраза. */
@@ -629,7 +670,7 @@ class MainActivity : AppCompatActivity() {
                 AppTab.TRANSLATE -> translation.stop()
                 AppTab.NAVIGATION -> navSession.cancel()
                 // Списки и заглушки — ни звука, ни микрофона.
-                AppTab.SKILLS, AppTab.CALENDAR, AppTab.CHATS, AppTab.MEDIA -> Unit
+                AppTab.SKILLS, AppTab.CALENDAR, AppTab.CHATS, AppTab.MEDIA, AppTab.GLASSES -> Unit
             }
         }
         tab = newTab

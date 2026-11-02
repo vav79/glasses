@@ -40,6 +40,8 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
     SKILLS(R.string.menu_skills, R.drawable.ic_sym_auto_awesome),
     CALENDAR(R.string.menu_calendar, R.drawable.ic_sym_calendar_month),
+    /** «Очки»: подключение, заряд, жест, источник снимка, микрофон. */
+    GLASSES(R.string.menu_glasses, R.drawable.ic_sym_eyeglasses),
     /** «Медиа»: снимки и заметки. */
     MEDIA(R.string.menu_media, R.drawable.ic_sym_photo_library),
     /** «Показать все» чаты. */

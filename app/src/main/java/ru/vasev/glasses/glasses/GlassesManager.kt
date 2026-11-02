@@ -165,6 +165,12 @@ class GlassesManager(private val context: Context) {
         _notice.value = R.string.glasses_reg_failed
     }
 
+    /** «Отключить очки»: отменить регистрацию приложения в Meta AI (подключить снова — «Подключить»). */
+    fun disconnect(activity: Activity) {
+        Log.d(TAG, "DAT unregistration requested")
+        Wearables.startUnregistration(activity)
+    }
+
     fun dismissNotice() {
         _notice.value = null
     }
