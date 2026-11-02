@@ -6,8 +6,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,13 +34,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -96,7 +104,7 @@ fun GlassesScreen(
     var confirmDisconnect by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val described = stringResource(if (state.ready) R.string.glasses_art_on else R.string.glasses_art_off)
-        GlassesArt(on = state.ready, modifier = Modifier.fillMaxWidth().height(150.dp).semantics { contentDescription = described })
+        GlassesPhoto(on = state.ready, modifier = Modifier.edgeToEdge(16.dp).semantics { contentDescription = described })
         Text(
             buildString {
                 append(stringResource(state.statusText))
@@ -181,48 +189,52 @@ private fun <T> Choices(choices: List<Pair<T, Int>>, selected: T, onSelect: (T) 
 }
 
 /**
- * Обобщённые очки (без логотипов и узнаваемого профиля): две линзы, перемычка, начало дужек.
- * Подключены — у камеры (левый верхний угол оправы) и на дужке «дышит» мягкое свечение; нет — оправа приглушена.
+ * Фото очков (`drawable-nodpi/glasses_hero.webp`, верх и низ уходят в прозрачность) по всей ширине экрана.
+ * Подключены — полная яркость и у объектива «дышит» мягкое свечение цвета «включено»; нет — без цвета, полупрозрачно.
+ * В светлой теме — на тёмной подложке: фон фото студийный, тёмный.
  */
 @Composable
-private fun GlassesArt(on: Boolean, modifier: Modifier) {
+private fun GlassesPhoto(on: Boolean, modifier: Modifier) {
     val p = LocalSputnikColors.current
     val breath = rememberInfiniteTransition(label = "glow")
     val pulse by breath.animateFloat(0.35f, 1f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
     val glow = if (on) pulse else 0f
-    val frame = if (on) p.text else p.iconMuted
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val lensW = w * 0.28f
-        val lensH = h * 0.55f
-        val gap = w * 0.08f
-        val left = (w - lensW * 2 - gap) / 2
-        val top = h * 0.25f
-        val stroke = Stroke(width = h * 0.045f)
-        val radius = CornerRadius(lensH * 0.35f)
-        // Свечение у камеры и вдоль дужки — радиальные пятна цвета «включено».
-        if (glow > 0f) {
-            val camera = Offset(left + lensW * 0.12f, top + lensH * 0.1f)
-            drawCircle(Brush.radialGradient(listOf(p.on.copy(alpha = 0.55f * glow), Color.Transparent), camera, h * 0.35f), h * 0.35f, camera)
-            val temple = Offset(left + lensW * 2 + gap + w * 0.1f, top + lensH * 0.15f)
-            drawCircle(Brush.radialGradient(listOf(p.on.copy(alpha = 0.35f * glow), Color.Transparent), temple, h * 0.25f), h * 0.25f, temple)
-        }
-        // Линзы — слегка затемнённые, оправа — линией.
-        listOf(left, left + lensW + gap).forEach { x ->
-            drawRoundRect(p.surface.copy(alpha = 0.6f), Offset(x, top), Size(lensW, lensH), radius)
-            drawRoundRect(frame, Offset(x, top), Size(lensW, lensH), radius, style = stroke)
-        }
-        // Перемычка.
-        val bridge = Path().apply {
-            moveTo(left + lensW, top + lensH * 0.3f)
-            quadraticTo(left + lensW + gap / 2, top + lensH * 0.05f, left + lensW + gap, top + lensH * 0.3f)
-        }
-        drawPath(bridge, frame, style = stroke)
-        // Начало дужек.
-        drawLine(frame, Offset(left, top + lensH * 0.15f), Offset(left - w * 0.1f, top + lensH * 0.05f), stroke.width)
-        drawLine(frame, Offset(left + lensW * 2 + gap, top + lensH * 0.15f), Offset(left + lensW * 2 + gap + w * 0.1f, top + lensH * 0.05f), stroke.width)
-        // Камера — маленькая точка в углу оправы.
-        drawCircle(if (on) p.on else frame, h * 0.035f, Offset(left + lensW * 0.12f, top + lensH * 0.1f))
-    }
+    val light = p.screen.luminance() > 0.5f
+    Image(
+        ImageBitmap.imageResource(R.drawable.glasses_hero),
+        contentDescription = null,
+        contentScale = ContentScale.FillWidth,
+        filterQuality = FilterQuality.High,
+        alpha = if (on) 1f else OFF_ALPHA,
+        colorFilter = if (on) null else ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
+        modifier = modifier
+            .aspectRatio(PHOTO_WIDTH / PHOTO_HEIGHT)
+            .then(if (light) Modifier.background(PHOTO_BACKING) else Modifier)
+            .drawWithContent {
+                drawContent()
+                if (glow > 0f) {
+                    // Объектив камеры на фото: центр и радиус кольца — доли ширины и высоты картинки.
+                    val lens = Offset(size.width * LENS_X, size.height * LENS_Y)
+                    val radius = size.width * LENS_RING * 2f
+                    drawCircle(Brush.radialGradient(listOf(p.on.copy(alpha = GLOW_ALPHA * glow), Color.Transparent), lens, radius), radius, lens)
+                }
+            },
+    )
 }
+
+/** Выводит элемент из-под боковых отступов колонки: шире на [inset] с каждой стороны, от края до края экрана. */
+private fun Modifier.edgeToEdge(inset: Dp) = layout { measurable, constraints ->
+    val extra = inset.roundToPx() * 2
+    val width = constraints.maxWidth + extra
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
+private const val PHOTO_WIDTH = 1536f
+private const val PHOTO_HEIGHT = 824f
+private const val LENS_X = 0.3327f
+private const val LENS_Y = 0.216f
+private const val LENS_RING = 0.0241f
+private const val GLOW_ALPHA = 0.5f
+private const val OFF_ALPHA = 0.5f
+private val PHOTO_BACKING = Color(0xFF0B0B0C)
