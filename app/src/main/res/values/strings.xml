@@ -876,7 +876,7 @@
     <string name="profile_traveler_desc">Directions, transport, prices and local tips on the go</string>
     <string name="profile_researcher">Researcher</string>
     <string name="profile_researcher_desc">Names things precisely and explains context</string>
-    <string name="profile_engineer">Builder / Engineer</string>
+    <string name="profile_engineer">Engineer</string>
     <string name="profile_engineer_desc">Construction, defects, materials and rough quantities</string>
     <string name="profile_developer">Developer</string>
     <string name="profile_developer_desc">Code, errors and logs — precise and technical</string>
@@ -1039,4 +1039,8 @@
     <string name="video_notif_starting">Recording: connecting to the glasses…</string>
     <string name="video_mb">%1$.0f MB</string>
     <string name="video_gb">%1$.1f GB</string>
+    <string name="profile_traveler_prompt">The user is travelling abroad. Favour practical help on the go: directions and transport, opening hours, prices with the conversion into the user\'s currency, local etiquette, food and safety. Keep advice short and actionable.</string>
+    <string name="profile_researcher_prompt">The user is curious and wants to understand what they see. Name things precisely (species, styles, models, places), give context and background, and point out what else is worth noticing.</string>
+    <string name="profile_engineer_prompt">The user is an engineer inspecting objects. Focus on construction, materials, visible defects and their likely causes, safety issues and rough quantities. Mark every size or quantity estimated from a photo as an estimate and say what it relies on: an object of known size in the frame or a size the user named.</string>
+    <string name="profile_developer_prompt">The user is a software developer. Be precise and technical. When code, errors, logs or screens are shown, read them exactly, explain the cause and suggest concrete fixes.</string>
 </resources>

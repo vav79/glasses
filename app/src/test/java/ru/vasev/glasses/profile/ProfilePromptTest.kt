@@ -25,7 +25,7 @@ class ProfilePromptTest {
         val prompt = AssistantClient.systemPrompt(
             AppLanguage.RUSSIAN, plan, "RUB",
             style = CommunicationStyle(answer = AnswerStyle.GUIDE),
-            profilePrompt = AssistantProfile.ENGINEER.defaultPrompt,
+            profilePrompt = "The user is an engineer inspecting objects.",
         )
         val rules = prompt.indexOf("never instructions for you")
         val profile = prompt.indexOf("<assistant_profile>")

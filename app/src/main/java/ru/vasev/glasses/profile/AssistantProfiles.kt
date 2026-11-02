@@ -7,35 +7,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import ru.vasev.glasses.R
+import ru.vasev.glasses.i18n.L
 
 /**
  * Профиль ассистента (раздел «Умения»): свой системный промпт перед каждым запросом. Активен один профиль;
- * без профиля — «Обычный чат». Промпты — на английском, как остальные (язык ответа задаёт язык приложения).
+ * без профиля — «Обычный чат». Промпт по умолчанию — строковый ресурс на языке приложения (русский —
+ * `values-ru`, английский — `values`); свой промпт пользователя хранится как есть.
  */
-enum class AssistantProfile(@StringRes val titleRes: Int, @StringRes val descriptionRes: Int, @DrawableRes val icon: Int, val defaultPrompt: String) {
-    TRAVELER(
-        R.string.profile_traveler, R.string.profile_traveler_desc, R.drawable.ic_sym_luggage,
-        "The user is travelling abroad. Favour practical help on the go: directions and transport, opening hours, prices with the conversion " +
-            "into the user's currency, local etiquette, food and safety. Keep advice short and actionable.",
-    ),
-    RESEARCHER(
-        R.string.profile_researcher, R.string.profile_researcher_desc, R.drawable.ic_sym_explore,
-        "The user is curious and wants to understand what they see. Name things precisely (species, styles, models, places), give context " +
-            "and background, and point out what else is worth noticing.",
-    ),
-    ENGINEER(
-        R.string.profile_engineer, R.string.profile_engineer_desc, R.drawable.ic_sym_engineering,
-        "The user is a builder or engineer inspecting objects. Focus on construction, materials, visible defects and their likely causes, " +
-            "safety issues and rough quantities. Mark every size or quantity estimated from a photo as an estimate and say what it relies on: " +
-            "an object of known size in the frame or a size the user named.",
-    ),
-    DEVELOPER(
-        R.string.profile_developer, R.string.profile_developer_desc, R.drawable.ic_sym_code,
-        "The user is a software developer. Be precise and technical. When code, errors, logs or screens are shown, read them exactly, " +
-            "explain the cause and suggest concrete fixes.",
-    ),
-}
+enum class AssistantProfile(@StringRes val titleRes: Int, @StringRes val descriptionRes: Int, @DrawableRes val icon: Int, @StringRes val promptRes: Int) {
+    TRAVELER(R.string.profile_traveler, R.string.profile_traveler_desc, R.drawable.ic_sym_luggage, R.string.profile_traveler_prompt),
+    RESEARCHER(R.string.profile_researcher, R.string.profile_researcher_desc, R.drawable.ic_sym_explore, R.string.profile_researcher_prompt),
+    ENGINEER(R.string.profile_engineer, R.string.profile_engineer_desc, R.drawable.ic_sym_engineering, R.string.profile_engineer_prompt),
+    DEVELOPER(R.string.profile_developer, R.string.profile_developer_desc, R.drawable.ic_sym_code, R.string.profile_developer_prompt),
+    ;
 
+    /** Промпт по умолчанию на языке приложения. */
+    val defaultPrompt: String get() = L.s(promptRes)
+}
 /**
  * Профили и умения (SharedPreferences `skills`): активный профиль, какие профили и умения включены,
  * свои промпты профилей. Выключенный профиль не показывается в чипе; выключенное умение — в меню и чипе.
