@@ -9,6 +9,27 @@ enum class ProviderId(val title: String) {
     OPENAI("OpenAI"),
 }
 
+/** Роли ИИ в настройках (В2): текст, фото, перевод. Аудио нет — речь распознаёт Android. */
+enum class AiRole { TEXT, PHOTO, TRANSLATION }
+
+/**
+ * Модель внутри провайдера закреплена (В1): Claude — Sonnet для текста и фото, Haiku для перевода (быстрее);
+ * DeepSeek — Flash (видит фото). Ручной выбор модели — в «Для разработчика».
+ */
+fun ProviderId.fixedModel(role: AiRole): ModelSpec? = when (this) {
+    ProviderId.ANTHROPIC -> if (role == AiRole.TRANSLATION) ModelCatalog.CLAUDE_HAIKU else ModelCatalog.CLAUDE_SONNET
+    ProviderId.DEEPSEEK -> ModelCatalog.DEEPSEEK_FLASH
+    ProviderId.OPENAI -> null
+}
+
+/** Название ассистента для пользователя: провайдер по имени модели (Claude, а не Anthropic). */
+val ProviderId.assistantName: String
+    get() = when (this) {
+        ProviderId.ANTHROPIC -> "Claude"
+        ProviderId.DEEPSEEK -> "DeepSeek"
+        ProviderId.OPENAI -> "ChatGPT"
+    }
+
 /** Кто спрашивает: от роли зависят модель по умолчанию, лимит токенов и глубина размышлений. */
 enum class Role { ASSISTANT, TRANSLATION }
 

@@ -140,19 +140,7 @@ fun StyleScreen(viewModel: StyleViewModel, onClose: () -> Unit) {
                 Hint(stringResource(R.string.style_custom_note))
             }
 
-            Section(stringResource(R.string.style_section_translation)) {
-                Label(stringResource(R.string.style_formality_title))
-                Segmented(Formality.entries, draft.formality, { stringResource(it.title) }) { v -> viewModel.edit { it.copy(formality = v) } }
-                Label(stringResource(R.string.style_gender_title))
-                Segmented(SpeakerGender.entries, draft.gender, { stringResource(it.title) }) { v -> viewModel.edit { it.copy(gender = v) } }
-                Hint(stringResource(R.string.style_gender_hint))
-            }
-
-            Section(stringResource(R.string.style_section_pace)) {
-                Segmented(SpeechPace.entries, draft.pace, { stringResource(it.title) }) { v -> viewModel.edit { it.copy(pace = v) } }
-                Hint(stringResource(R.string.style_pace_hint))
-            }
-
+            // Обращение и пол — в настройках «Переводчика», скорость речи — в «Голосе и звуке» (В5).
             GlassCard(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Свой пробный вопрос; пусто — пример из ресурсов. Enter — «Проверить».
                 OutlinedTextField(

@@ -30,12 +30,16 @@ data class MapsLink(val uri: String, val packageName: String?)
  */
 object NavigatorLinks {
 
+    /** Где Яндекс Карты работают полноценно — «Авто» выбирает их; в остальных странах (например, в Таиланде) — Google. */
+    val YANDEX_COUNTRIES = setOf("RU", "BY", "KZ", "UZ", "KG", "AM")
+
+
     /** Какое приложение открыть: выбранное, если установлено, иначе — что есть. */
     fun pick(choice: NavigatorChoice, country: String?, installed: Set<MapsApp>): MapsApp {
         val preferred = when (choice) {
             NavigatorChoice.YANDEX -> MapsApp.YANDEX
             NavigatorChoice.GOOGLE -> MapsApp.GOOGLE
-            NavigatorChoice.AUTO -> if (country.equals("RU", ignoreCase = true)) MapsApp.YANDEX else MapsApp.GOOGLE
+            NavigatorChoice.AUTO -> if (country?.uppercase() in YANDEX_COUNTRIES) MapsApp.YANDEX else MapsApp.GOOGLE
         }
         return listOf(preferred, MapsApp.GOOGLE, MapsApp.YANDEX).firstOrNull { it in installed } ?: MapsApp.GEO
     }

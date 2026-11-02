@@ -326,8 +326,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val headsets: StateFlow<List<Headset>> = router.headsets
 
     /** Метку модели у ответов показываем всегда только разработчику; остальным — когда ответила не основная модель. */
-    val showAllModelLabels: StateFlow<Boolean> = profile.role.map { it == UserRole.DEVELOPER }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, profile.role.value == UserRole.DEVELOPER)
+    val showAllModelLabels: StateFlow<Boolean> = profile.allModelLabels
 
     private var job: Job? = null
     private var idleJob: Job? = null

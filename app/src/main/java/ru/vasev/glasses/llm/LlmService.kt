@@ -161,6 +161,11 @@ class LlmService(
     ): Pair<ChatRequest, Boolean> {
         if (!isOnline()) throw LlmException(L.s(R.string.no_internet))
         val request = ChatRequest(role, settings.model(role).value, system, turns, maxTokens, effort, tools = tools, webSearch = webSearch, noWebSearchNote = noWebSearchNote, cache = cache)
+        // Роль «Фото»: вопрос со снимком — модели выбранного для фото провайдера (если он не тот же, что для текста).
+        val photoProvider = settings.photoProvider.value
+        if (role == Role.ASSISTANT && request.photoInCurrentTurn && photoProvider != null && photoProvider != request.model.provider) {
+            photoProvider.fixedModel(AiRole.PHOTO)?.let { return fitWebSearch(request.copy(model = it)) to false }
+        }
         if (request.photoInCurrentTurn && !request.model.vision) {
             // Выбрана модель без фото (DeepSeek V4-Pro), а запрос со снимком — берём модель того же провайдера с фото.
             ModelCatalog.visionFor(request.model)?.let { return fitWebSearch(request.copy(model = it)) to true }

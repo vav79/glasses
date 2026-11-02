@@ -95,6 +95,27 @@ class ProfileSettings(context: Context) {
         _journalTexts.value = enabled
     }
 
+    private val _devUnlocked = MutableStateFlow(prefs.getBoolean(KEY_DEV_UNLOCKED, false))
+
+    /** Раздел «Для разработчика» открыт (7 нажатий на версию в «О приложении»). */
+    val devUnlocked: StateFlow<Boolean> = _devUnlocked.asStateFlow()
+
+    fun unlockDeveloper() {
+        prefs.edit().putBoolean(KEY_DEV_UNLOCKED, true).apply()
+        _devUnlocked.value = true
+    }
+
+    // По умолчанию — как у прежней роли «Разработчик»: она показывала метку модели у каждого ответа.
+    private val _allModelLabels = MutableStateFlow(prefs.getBoolean(KEY_ALL_LABELS, _role.value == UserRole.DEVELOPER))
+
+    /** Метка модели у каждого ответа (иначе — только когда ответила не основная модель). */
+    val allModelLabels: StateFlow<Boolean> = _allModelLabels.asStateFlow()
+
+    fun setAllModelLabels(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ALL_LABELS, enabled).apply()
+        _allModelLabels.value = enabled
+    }
+
     private val _voiceStop = MutableStateFlow(prefs.getBoolean(KEY_VOICE_STOP, false))
 
     /**
@@ -110,6 +131,8 @@ class ProfileSettings(context: Context) {
 
     private companion object {
         const val KEY_VOICE_STOP = "voice_stop"
+        const val KEY_DEV_UNLOCKED = "dev_unlocked"
+        const val KEY_ALL_LABELS = "all_model_labels"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ROLE = "role"
         const val KEY_SHOW_ADVANCED = "show_advanced"

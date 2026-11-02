@@ -1,5 +1,9 @@
 package ru.vasev.glasses.ui
 
+import ru.vasev.glasses.llm.AiRole
+import ru.vasev.glasses.llm.KeyCheck
+import ru.vasev.glasses.llm.KeyCheckResult
+import ru.vasev.glasses.llm.fixedModel
 import ru.vasev.glasses.ui.theme.ThemeMode
 import ru.vasev.glasses.speech.GestureState
 import ru.vasev.glasses.speech.Tap
@@ -108,6 +112,28 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             return L.s(R.string.about_agreement_accepted, agreement.acceptedVersion.value.orEmpty(), date)
         }
 
+    /** «Голос и звук»: чем слушать мой голос. */
+    private val micSettings = (app as GlassesApp).micSettings
+    val micChoice: StateFlow<ru.vasev.glasses.speech.MicChoice> = micSettings.choice
+    fun setMicChoice(choice: ru.vasev.glasses.speech.MicChoice) = micSettings.set(choice)
+
+    /** Скрытый «Для разработчика» и метки модели у всех ответов. */
+    val devUnlocked: StateFlow<Boolean> = profile.devUnlocked
+    val allModelLabels: StateFlow<Boolean> = profile.allModelLabels
+    fun unlockDeveloper() = profile.unlockDeveloper()
+    fun setAllModelLabels(enabled: Boolean) = profile.setAllModelLabels(enabled)
+
+    /** «Региональные»: мой язык (= язык приложения; на него переводит «Переводчик»). */
+    val myLanguageTitle: Int
+        get() = ru.vasev.glasses.translate.PartnerLanguage.forApp(ru.vasev.glasses.i18n.LanguageSettings.current.value).titleRes
+
+    /** Страна пребывания: мобильная сеть, без неё — GPS и геокодер (если разрешение уже есть). */
+    private val _countryOfStay = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val countryOfStay: StateFlow<String?> = _countryOfStay
+    init {
+        viewModelScope.launch { _countryOfStay.value = runCatching { (app as GlassesApp).location.country() }.getOrNull() }
+    }
+
     /** Тема и размер шрифта приложения. */
     private val appearance = (app as GlassesApp).appearance
     val theme: StateFlow<ThemeMode> = appearance.theme
@@ -137,6 +163,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setModel(role: Role, model: ModelSpec) = ai.setModel(role, model)
+
+    /** Роль «Фото»: отдельный провайдер или как для текста (null). */
+    val photoProvider: StateFlow<ProviderId?> = ai.photoProvider
+    fun setPhotoProvider(provider: ProviderId?) = ai.setPhotoProvider(provider)
+
+    /** Роль «Текст» или «Перевод» — провайдер; модель внутри него закреплена ([fixedModel]). */
+    fun setRoleProvider(role: AiRole, provider: ProviderId) {
+        val model = provider.fixedModel(role) ?: return
+        ai.setModel(if (role == AiRole.TRANSLATION) Role.TRANSLATION else Role.ASSISTANT, model)
+    }
+
+    /** «Расходы по API»: журнал запросов (оценка по токенам и ценам). */
+    val journal: StateFlow<List<ru.vasev.glasses.llm.JournalEntry>> = (app as GlassesApp).journal.entries
     fun setFallbackEnabled(enabled: Boolean) = ai.setFallbackEnabled(enabled)
     fun setFallbackPhotos(enabled: Boolean) = ai.setFallbackPhotos(enabled)
 
@@ -160,12 +199,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save(provider: ProviderId, input: String) = viewModelScope.launch {
         update(provider) { it.copy(busy = true, error = null, message = null) }
+        // Ключ проверяется бесплатным запросом списка моделей; отклонённый не сохраняется.
+        val check = KeyCheck.check(provider, input)
+        if (check == KeyCheckResult.REJECTED) {
+            update(provider) { it.copy(busy = false, error = L.s(R.string.key_rejected)) }
+            return@launch
+        }
         try {
             val key = withContext(Dispatchers.Default) {
                 store.save(provider, input)
                 store.describe(provider)
             }
-            update(provider) { it.copy(key = key, editing = false, busy = false, message = L.s(R.string.key_saved_message)) }
+            val message = if (check == KeyCheckResult.OK) L.s(R.string.key_checked_saved) else L.s(R.string.key_saved_unchecked)
+            update(provider) { it.copy(key = key, editing = false, busy = false, message = message) }
         } catch (e: ApiKeyException) {
             update(provider) { it.copy(busy = false, error = e.message) }
         } catch (e: Exception) {

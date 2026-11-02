@@ -99,6 +99,12 @@ class StyleViewModel(app: Application) : AndroidViewModel(app) {
     /** «Очистить» — стирает только свой промпт. */
     fun clearCustom() = _draft.update { it.copy(customPrompt = "") }
 
+    /** Скорость речи из «Голоса и звука» — сразу в сохранённый стиль (и в черновик). */
+    fun savePace(pace: ru.vasev.glasses.profile.SpeechPace) {
+        settings.save(settings.current.value.copy(pace = pace))
+        _draft.value = _draft.value.copy(pace = pace)
+    }
+
     fun save() {
         settings.save(_draft.value)
         _draft.value = settings.current.value

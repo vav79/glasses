@@ -144,11 +144,6 @@ fun GlassesScreen(
             Text(stringResource(R.string.glasses_photo_source_hint), style = MaterialTheme.typography.bodySmall, color = p.text2)
         }
 
-        GlassCard(Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.glasses_mic), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
-            Choices(MicChoice.entries.filter { it.available }.map { it to it.titleRes }, state.mic, onMic)
-            Text(stringResource(R.string.mic_auto_hint), style = MaterialTheme.typography.bodySmall, color = p.text2)
-        }
         Text(stringResource(R.string.glasses_hey_meta_hint), style = MaterialTheme.typography.bodySmall, color = p.text2)
     }
     if (confirmDisconnect) {

@@ -65,6 +65,11 @@ import ru.vasev.glasses.ui.shell.ShellHeader
 import ru.vasev.glasses.ui.shell.ProfileOption
 import ru.vasev.glasses.ui.TranslateBar
 import ru.vasev.glasses.ui.MediaScreen
+import ru.vasev.glasses.ui.SettingsPage
+import ru.vasev.glasses.llm.assistantName
+import ru.vasev.glasses.llm.Attempt
+import ru.vasev.glasses.llm.ModelHealth
+import ru.vasev.glasses.llm.ModelHealthRules
 import ru.vasev.glasses.ui.GlassesScreen
 import ru.vasev.glasses.ui.GlassesScreenState
 import ru.vasev.glasses.ui.TranslatorSettingsScreen
@@ -126,6 +131,9 @@ class MainActivity : AppCompatActivity() {
     /** Разрешение на чтение календаря — только для списка «Ближайшие» на экране «Календарь». */
     private var calendarGranted by mutableStateOf(false)
     private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { calendarGranted = it }
+
+    /** Раздел, с которого открыть настройки (чип модели — «ИИ-ассистенты»). */
+    private var settingsStartPage by mutableStateOf<SettingsPage?>(null)
 
     /** Чат, удаление которого ждёт подтверждения. */
     private var chatToDelete by mutableStateOf<ChatEntry?>(null)
@@ -352,6 +360,7 @@ class MainActivity : AppCompatActivity() {
         val notesLabel = stringResource(R.string.notes_open)
         val deleteLabel = stringResource(R.string.chat_delete)
         val chatMetas by viewModel.chats.collectAsStateWithLifecycle()
+        val journalEntries by app.journal.entries.collectAsStateWithLifecycle()
         val activeProfile by app.skills.active.collectAsStateWithLifecycle()
         val disabledSkills by app.skills.disabled.collectAsStateWithLifecycle()
         val translateHeaderOn by app.translator.headerOn.collectAsStateWithLifecycle()
@@ -421,15 +430,12 @@ class MainActivity : AppCompatActivity() {
             chats = ::entries,
             onShowAllChats = { selectTab(AppTab.CHATS) },
             onChatLongPress = { chatToDelete = it },
-            modelName = when (model.provider) {
-                ProviderId.ANTHROPIC -> "Claude"
-                ProviderId.DEEPSEEK -> "DeepSeek"
-                ProviderId.OPENAI -> "ChatGPT"
-            },
-            modelStatus = when {
-                !hasKey -> ModelStatus.NO_KEY
-                !app.llm.isOnline() -> ModelStatus.UNAVAILABLE
-                else -> ModelStatus.AVAILABLE
+            modelName = model.provider.assistantName,
+            modelStatus = when (ModelHealthRules.status(hasKey, app.llm.isOnline(), attempts(journalEntries, model.provider), System.currentTimeMillis())) {
+                ModelHealth.AVAILABLE -> ModelStatus.AVAILABLE
+                ModelHealth.SLOW -> ModelStatus.SLOW
+                ModelHealth.UNAVAILABLE -> ModelStatus.UNAVAILABLE
+                ModelHealth.NO_KEY -> ModelStatus.NO_KEY
             },
             onMenuItem = { item ->
                 when (item) {
@@ -446,10 +452,13 @@ class MainActivity : AppCompatActivity() {
             onChat = openChat,
             onNotifications = { Toast.makeText(this, R.string.notifications_soon, Toast.LENGTH_SHORT).show() },
             onSettings = {
+                settingsStartPage = null
                 settingsOpen = true
                 developerOpen = false
             },
+            // Чип модели — сразу Настройки → ИИ-ассистенты.
             onModel = {
+                settingsStartPage = SettingsPage.AI
                 settingsOpen = true
                 developerOpen = false
             },
@@ -465,7 +474,7 @@ class MainActivity : AppCompatActivity() {
                     val journal = app.journal
                     DevScreen(journal.entries, onExport = ::shareJournal, onClear = journal::clear, onClose = { developerOpen = false })
                 } else {
-                    SettingsScreen(settings, onOpenDeveloper = { developerOpen = true })
+                    SettingsScreen(settings, onOpenDeveloper = { developerOpen = true }, onOpenVoices = ::openVoiceInstaller, startPage = settingsStartPage)
                 }
                 return@AppShell
             }
@@ -544,6 +553,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    /** Попытки запросов провайдера из журнала — для статуса чипа модели (новые первыми). */
+    private fun attempts(entries: List<ru.vasev.glasses.llm.JournalEntry>, provider: ProviderId): List<Attempt> =
+        entries.filter { it.provider == provider }
+            .map { Attempt(it.time.toEpochMilli(), it.status, it.latencyMs) }
+            .sortedByDescending { it.at }
 
     /** Экран «Очки»: состояние из GlassesManager, жест, источник снимка, микрофон. */
     @Composable

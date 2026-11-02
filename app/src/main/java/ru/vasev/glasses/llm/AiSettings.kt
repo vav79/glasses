@@ -14,6 +14,16 @@ class AiSettings(context: Context) {
         MutableStateFlow(ModelCatalog.byId(prefs.getString(modelKey(role), null)) ?: ModelCatalog.default(role))
     }
 
+    private val _photoProvider = MutableStateFlow(ProviderId.entries.firstOrNull { it.name == prefs.getString(KEY_PHOTO, null) })
+
+    /** Роль «Фото»: провайдер для вопросов со снимком; null — тот же, что для текста. */
+    val photoProvider: StateFlow<ProviderId?> = _photoProvider.asStateFlow()
+
+    fun setPhotoProvider(provider: ProviderId?) {
+        prefs.edit().apply { if (provider == null) remove(KEY_PHOTO) else putString(KEY_PHOTO, provider.name) }.apply()
+        _photoProvider.value = provider
+    }
+
     private val _fallbackEnabled = MutableStateFlow(prefs.getBoolean(KEY_FALLBACK, true))
     private val _fallbackPhotos = MutableStateFlow(prefs.getBoolean(KEY_FALLBACK_PHOTOS, false))
 
@@ -44,6 +54,7 @@ class AiSettings(context: Context) {
 
     private companion object {
         const val KEY_FALLBACK = "fallback_enabled"
+        const val KEY_PHOTO = "photo_provider"
         const val KEY_FALLBACK_PHOTOS = "fallback_photos"
     }
 }
