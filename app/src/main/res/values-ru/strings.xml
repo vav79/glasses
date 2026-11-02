@@ -867,4 +867,15 @@
     <string name="chat_delete">Удалить чат</string>
     <string name="chat_delete_title">Удалить чат «%1$s»?</string>
     <string name="chat_delete_text">Вся переписка будет удалена. Восстановить её будет нельзя. Фото и видео из этого чата останутся в «Медиа».</string>
+    <string name="composer_hint">Спросите что-нибудь</string>
+    <string name="composer_camera">Камера</string>
+    <string name="composer_shoot">Снять</string>
+    <string name="attach_phone_camera">Камера телефона</string>
+    <string name="attach_gallery">Галерея</string>
+    <string name="attach_glasses">Снять очками</string>
+    <string name="attach_open">Прикреплённый снимок, открыть на весь экран</string>
+    <string name="attach_remove">Убрать снимок</string>
+    <string name="action_describe">Описать</string>
+    <string name="action_translate_text">Перевести текст</string>
+    <string name="action_remember">Запомнить</string>
 </resources>

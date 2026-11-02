@@ -830,4 +830,15 @@
     <string name="chat_delete">Delete chat</string>
     <string name="chat_delete_title">Delete chat “%1$s”?</string>
     <string name="chat_delete_text">The whole conversation will be deleted and can’t be restored. Photos and videos from this chat stay in Media.</string>
+    <string name="composer_hint">Ask anything</string>
+    <string name="composer_camera">Camera</string>
+    <string name="composer_shoot">Take photo</string>
+    <string name="attach_phone_camera">Phone camera</string>
+    <string name="attach_gallery">Gallery</string>
+    <string name="attach_glasses">Shoot with glasses</string>
+    <string name="attach_open">Attached photo, open full screen</string>
+    <string name="attach_remove">Remove photo</string>
+    <string name="action_describe">Describe</string>
+    <string name="action_translate_text">Translate text</string>
+    <string name="action_remember">Remember</string>
 </resources>

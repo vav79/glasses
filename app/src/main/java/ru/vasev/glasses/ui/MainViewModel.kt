@@ -312,7 +312,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * «Спросить»: голос → модель → голос. Во время ответа это же — «перебить»: запрос и речь
      * останавливаются, и сразу начинается прослушивание нового вопроса.
      */
-    fun ask() = run(withFrame = false)
+    fun ask() = run(withFrame = _attachment.value != null)
 
     /**
      * «Hey Meta, start Sputnik»: сразу слушать вопрос (идущий ответ прерывается, как кнопкой).
@@ -348,11 +348,71 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** «Переведи, что вижу» кнопкой: снимок → перевод всего текста на нём, без вопроса голосом. */
     fun translateWhatISee() = run(withFrame = true, presetQuestion = L.s(R.string.translate_view_question), mode = AssistantMode.TRANSLATE_VIEW)
 
-    /** «Написать текстом»: ответ только на экране (печатают там, где говорить неудобно), «Озвучить» — по кнопке. */
+    /** Вопрос текстом из поля ввода: ответ только на экране, «Озвучить» — по кнопке. Снимок в поле — уходит с вопросом. */
     fun askText(text: String) {
         if (text.isBlank()) return
-        run(withFrame = false, presetQuestion = text.trim(), silent = true)
+        run(withFrame = _attachment.value != null, presetQuestion = text.trim(), silent = true)
     }
+
+    /** Снимок в поле ввода: с ним уходит следующий вопрос (текстом или голосом) или действие над ним. */
+    class Attachment(val jpeg: ByteArray, val preview: Bitmap, val source: ImageSource)
+
+    private val _attachment = MutableStateFlow<Attachment?>(null)
+    val attachment: StateFlow<Attachment?> = _attachment.asStateFlow()
+
+    /**
+     * Снять или выбрать снимок для поля ввода: камера телефона (из видоискателя — он уже на экране), галерея,
+     * очки (DAT, снимок по запросу приложения: кнопка съёмки на очках до приложения на Android не доходит).
+     */
+    fun attach(source: ImageSource): Job {
+        job?.cancel()
+        audio.stop()
+        return viewModelScope.launch {
+            setPhase(Phase.CAPTURING)
+            try {
+                val jpeg = when (source) {
+                    ImageSource.PHONE_CAMERA -> phoneCamera.capture()
+                    ImageSource.GALLERY -> {
+                        val uri = galleryPicker?.invoke() ?: return@launch setPhase(Phase.IDLE)
+                        val resolver = getApplication<Application>().contentResolver
+                        withContext(Dispatchers.Default) { ImagePrep.fromUri(resolver, uri) }
+                    }
+                    ImageSource.GLASSES, ImageSource.SIMULATOR -> {
+                        if (!glasses.status.value.ready) {
+                            failAloud(L.s(if (source == ImageSource.GLASSES) R.string.glasses_not_connected else R.string.simulator_not_ready))
+                            return@launch
+                        }
+                        glasses.captureJpeg(cameraPermissionRequester ?: { false })
+                    }
+                }
+                shotStore.add(jpeg, source)
+                _attachment.value = Attachment(jpeg, BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size), source)
+                Log.d(TAG, "Composer: attached photo from $source")
+                setPhase(Phase.IDLE)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: GlassesException) {
+                failAloud(e.message.orEmpty())
+            } catch (e: PhoneCameraException) {
+                failAloud(e.message.orEmpty())
+            }
+        }.also { job = it }
+    }
+
+    /** «Снять очками»: очки, а в debug с выбранным симулятором — симулятор. */
+    fun glassesSource(): ImageSource = if (imageSources.source.value == ImageSource.SIMULATOR) ImageSource.SIMULATOR else ImageSource.GLASSES
+
+    fun clearAttachment() {
+        _attachment.value = null
+    }
+
+    /** Действия над снимком в поле ввода — то, что раньше делали кнопки вкладки «Камера». */
+    fun describeAttachment() = run(withFrame = true, presetQuestion = L.s(R.string.what_do_i_see_question))
+
+    fun translateAttachment() =
+        run(withFrame = true, presetQuestion = L.s(R.string.translate_view_question), mode = AssistantMode.TRANSLATE_VIEW)
+
+    fun rememberAttachment() = cameraRemember(Origin.ASSISTANT)
 
     /** «Озвучить» у ответа на вопрос текстом. */
     fun speakAnswer(id: Long) {
@@ -429,15 +489,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * «Запомни» в «Камере»: снимок, вопрос «Что запомнить?» и ответ голосом — текст заметки. Молчание —
      * заметка без текста: снимок, время и место. Модель не участвует.
      */
-    fun cameraRemember() {
+    fun cameraRemember(origin: Origin = Origin.CAMERA) {
         linkOffer?.cancel()
         job?.cancel()
         audio.stop()
         job = viewModelScope.launch {
             val language = LanguageSettings.current.value
-            _state.update { it.copy(cameraTurn = true, cameraSheetId = null, pendingQuestion = "", pendingAnswer = "", pendingDetails = "", error = null) }
+            _state.update { it.copy(cameraTurn = origin == Origin.CAMERA, cameraSheetId = null, pendingQuestion = "", pendingAnswer = "", pendingDetails = "", error = null) }
             try {
-                val jpeg = captureFrame(Origin.CAMERA) ?: return@launch
+                val jpeg = captureFrame(origin) ?: return@launch
                 val place = viewModelScope.async { noteLocation() }
                 setPhase(Phase.SPEAKING)
                 audio.speak(L.s(R.string.say_what_to_remember), language.locale, AudioChannel.ME)
@@ -465,7 +525,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val card = NoteCard(note, noteStore.photo(note, NOTE_PREVIEW_SIDE), saved = true)
                 commit(
                     question, question, jpeg, answerText, "", refused = false, tag = null, wasInterrupted = false,
-                    extra = Extras(notes = listOf(card)), origin = Origin.CAMERA, silent = false,
+                    extra = Extras(notes = listOf(card)), origin = origin, silent = false,
                 )
                 setPhase(Phase.SPEAKING)
                 audio.speak(answerText, language.locale, AudioChannel.ME)
@@ -617,6 +677,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         linkOffer?.cancel()
         job?.cancel()
         audio.stop()
+        // Без очков и гарнитуры ответ — только текстом (решение В14): «Озвучить» — по кнопке.
+        val quiet = silent || !hasVoiceOutput()
         job = viewModelScope.launch {
             linkScan?.cancel()
             linkScan = null
@@ -668,8 +730,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                 if (Conversation.isResetCommand(question, L.array(R.array.reset_commands))) {
                     startNewChat()
-                    setPhase(Phase.SPEAKING)
-                    audio.speak(L.s(R.string.say_new_conversation), language.locale, AudioChannel.ME)
+                    if (!quiet) {
+                        setPhase(Phase.SPEAKING)
+                        audio.speak(L.s(R.string.say_new_conversation), language.locale, AudioChannel.ME)
+                    }
                     setPhase(Phase.IDLE)
                     return@launch
                 }
@@ -696,8 +760,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     jpeg = captureFrame(origin) ?: return@launch
                 }
 
-                val links = answer(question, jpeg, language, TurnMetrics(endOfSpeechAt), turnMode, silent, origin)
-                if (links.isNotEmpty() && !silent) offerLinks(links, language)
+                val links = answer(question, jpeg, language, TurnMetrics(endOfSpeechAt), turnMode, quiet, origin)
+                if (links.isNotEmpty() && !quiet) offerLinks(links, language)
                 setPhase(Phase.IDLE)
             } catch (e: CancellationException) {
                 throw e
@@ -710,6 +774,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: PhoneCameraException) {
                 Log.w(TAG, "Phone camera: ${e.message}")
                 failAloud(e.message.orEmpty())
+            } catch (e: SpeechException) {
+                // «Не расслышал» и прочие ошибки распознавания — подсказка на экране, без трассировки в логе.
+                Log.d(TAG, "Speech: ${e.message} noSpeech=${e.noSpeech}")
+                _state.update { it.copy(phase = Phase.IDLE, error = e.message) }
             } catch (e: Exception) {
                 Log.w(TAG, "Request failed", e)
                 val message = e.message ?: L.s(R.string.something_went_wrong)
@@ -773,6 +841,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 linkScan = viewModelScope.async { linkScanner.scan(jpeg) }
                 return jpeg
             }
+        }
+        // Снимок из поля ввода: уже в ленте, второй раз не добавляем.
+        _attachment.value?.let { attached ->
+            _attachment.value = null
+            _state.update { it.copy(pendingFrame = attached.preview, pendingFrameSource = attached.source) }
+            linkScan = viewModelScope.async { linkScanner.scan(attached.jpeg) }
+            return attached.jpeg
         }
         val jpeg = takeFrame() ?: return null
         // Каждый снимок — в ленту «Камеры» (только на телефоне, последние 30).
@@ -1176,12 +1251,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Ошибка на экран и голосом: с очками на экран не смотрят («нет интернета», «очки не подключены» и т. п.). */
+    /**
+     * Ошибка на экран и голосом: с очками на экран не смотрят («нет интернета», «очки не подключены» и т. п.).
+     * Без очков и гарнитуры — только на экране.
+     */
     private suspend fun failAloud(message: String) {
+        if (!hasVoiceOutput()) {
+            _state.update { it.copy(phase = Phase.IDLE, error = message) }
+            return
+        }
         _state.update { it.copy(phase = Phase.SPEAKING, error = message) }
         runCatching { audio.speak(message, LanguageSettings.current.value.locale, AudioChannel.ME) }
         setPhase(Phase.IDLE)
     }
+
+    /** Есть куда говорить: очки или Bluetooth-гарнитура со звуком. Иначе ответы — только текстом (В14). */
+    private fun hasVoiceOutput(): Boolean = router.headset.value?.output != null
 
     private fun resetConversation() {
         idleJob?.cancel()

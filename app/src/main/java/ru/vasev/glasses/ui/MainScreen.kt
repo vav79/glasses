@@ -56,6 +56,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -98,8 +100,9 @@ import java.time.format.DateTimeFormatter
 fun MainScreen(
     viewModel: MainViewModel,
     onAsk: () -> Unit,
-    onWhatDoISee: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** Разрешение на камеру телефона (спрашивает Activity); true — можно открыть видоискатель. */
+    requestPhoneCamera: suspend () -> Boolean,
     /** «Заметки» — из меню ⋮ шапки. */
     notesOpen: Boolean,
     onCloseNotes: () -> Unit,
@@ -112,13 +115,16 @@ fun MainScreen(
     val busy = state.phase != Phase.IDLE
     var photo by remember { mutableStateOf<Pair<Bitmap, String?>?>(null) }
     var fullText by remember { mutableStateOf<String?>(null) }
-    var typing by rememberSaveable { mutableStateOf(false) }
+    val attachment by viewModel.attachment.collectAsStateWithLifecycle()
+    var viewfinder by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().imePadding()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .padding(top = 8.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -140,45 +146,38 @@ fun MainScreen(
             )
         }
 
-        // Управление: «Написать текстом» — капля микрофона — «Что я вижу». Состояние — короткой подписью над каплей.
-        // Пока идёт ответ, капля перебивает его и сразу слушает новый вопрос; пока снимаем или слушаем — останавливает.
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val phaseLabel = state.phase.labelRes?.let { stringResource(it) }.orEmpty()
-            Text(
-                when {
-                    state.phase.interruptible -> stringResource(R.string.status_interrupt, phaseLabel)
-                    busy -> stringResource(R.string.status_busy, phaseLabel)
-                    else -> stringResource(R.string.status_idle)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = glassBackgroundText(),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                GlassIconButton(R.drawable.ic_sym_keyboard, stringResource(R.string.type_question), onClick = { typing = true }, size = 56.dp, enabled = !busy && hasApiKey, blur = true)
-                MicButton(
-                    phase = state.phase,
-                    level = micLevel,
-                    enabled = busy || hasApiKey,
-                    onClick = if (busy && !state.phase.interruptible) viewModel::stop else onAsk,
-                )
-                // Не блокируем, когда очки не подключены: кнопка сама скажет «Очки не подключены» и что делать.
-                GlassIconButton(R.drawable.ic_sym_visibility, stringResource(R.string.what_do_i_see), onClick = onWhatDoISee, size = 56.dp, enabled = !busy && hasApiKey, blur = true)
-            }
-        }
+        Composer(
+            phase = state.phase,
+            micLevel = micLevel,
+            hasApiKey = hasApiKey,
+            attachment = attachment,
+            onAsk = onAsk,
+            onStop = viewModel::stop,
+            onSend = viewModel::askText,
+            onPhoneCamera = { scope.launch { if (requestPhoneCamera()) viewfinder = true } },
+            onGallery = { viewModel.attach(ImageSource.GALLERY) },
+            onGlasses = { viewModel.attach(viewModel.glassesSource()) },
+            onRemoveAttachment = viewModel::clearAttachment,
+            onDescribe = viewModel::describeAttachment,
+            onTranslate = viewModel::translateAttachment,
+            onRemember = viewModel::rememberAttachment,
+            onOpenAttachment = { photo = it to null },
+        )
     }
-
     AssistantOverlays(viewModel)
-    if (typing) TypeQuestionSheet(onSend = { viewModel.askText(it); typing = false }, onDismiss = { typing = false })
+    if (viewfinder) {
+        ComposerViewfinder(
+            camera = viewModel.phoneCamera,
+            // Видоискатель закрывается после снимка: камера привязана к нему и нужна до конца съёмки.
+            onShoot = {
+                scope.launch {
+                    viewModel.attach(ImageSource.PHONE_CAMERA).join()
+                    viewfinder = false
+                }
+            },
+            onBack = { viewfinder = false },
+        )
+    }
     if (notesOpen) {
         NotesScreen(
             viewModel = viewModel,
@@ -203,34 +202,6 @@ fun AssistantOverlays(viewModel: MainViewModel) {
     state.confirmLink?.let { link ->
         LinkConfirmDialog(link, onOpen = { viewModel.confirmLink(link) }, onDismiss = viewModel::dismissLink)
     }
-}
-
-/** Вопрос с клавиатуры: ответ — только на экране, «Озвучить» — по кнопке. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TypeQuestionSheet(onSend: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by rememberSaveable { mutableStateOf("") }
-    val focus = remember { FocusRequester() }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = text,
-                    // Enter с клавиатуры (в том числе аппаратной) — «Отправить», а не перенос строки.
-                    onValueChange = { value -> if (value.contains(CHAR_NEWLINE)) { if (value.isNotBlank()) onSend(value.replace(CHAR_NEWLINE, CHAR_SPACE)) } else text = value },
-                    modifier = Modifier.weight(1f).focusRequester(focus),
-                    label = { Text(stringResource(R.string.type_question_hint)) },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { if (text.isNotBlank()) onSend(text) }),
-                    shape = RoundedCornerShape(24.dp),
-                    maxLines = 4,
-                )
-                GlassIconButton(R.drawable.ic_sym_send, stringResource(R.string.send), onClick = { onSend(text) }, size = 52.dp, enabled = text.isNotBlank(), kind = GlassButtonKind.PRIMARY)
-            }
-            Text(stringResource(R.string.type_question_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-    LaunchedEffect(Unit) { focus.requestFocus() }
 }
 
 @Composable
@@ -265,13 +236,13 @@ private fun Chat(
         modifier = modifier.glassContentSource(),
         state = listState,
         // Снизу — место под панель управления: последний ответ можно докрутить над ней.
-        contentPadding = PaddingValues(top = 4.dp, bottom = CONTROLS_SPACE),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (rowCount == 0) {
             // Пустой чат — короткая подсказка мелким шрифтом, без карточки, посередине.
             item(key = "empty") {
-                Box(Modifier.fillParentMaxSize().padding(bottom = CONTROLS_SPACE), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         stringResource(R.string.assistant_empty_hint),
                         style = MaterialTheme.typography.bodyMedium,
@@ -611,6 +582,5 @@ private const val MAX_LINK_TITLE = 32
 private const val SCROLL_TO_END_PX = 100_000f
 
 /** Высота нижней панели управления: подсказка, капля и подписи кнопок. */
-private val CONTROLS_SPACE = 190.dp
 private val CHAR_NEWLINE = 0x0A.toChar()
 private val CHAR_SPACE = 0x20.toChar()

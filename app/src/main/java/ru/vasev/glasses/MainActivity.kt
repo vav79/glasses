@@ -399,8 +399,8 @@ class MainActivity : AppCompatActivity() {
                 AppTab.ASSISTANT -> MainScreen(
                     viewModel = viewModel,
                     onAsk = { withMic(viewModel::ask) },
-                    onWhatDoISee = viewModel::whatDoISee,
                     onOpenSettings = { settingsOpen = true },
+                    requestPhoneCamera = ::requestPhoneCamera,
                     notesOpen = notesOpen,
                     onCloseNotes = { notesOpen = false },
                 )
