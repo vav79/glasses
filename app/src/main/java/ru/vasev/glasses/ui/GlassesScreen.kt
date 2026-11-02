@@ -190,7 +190,7 @@ private fun <T> Choices(choices: List<Pair<T, Int>>, selected: T, onSelect: (T) 
 
 /**
  * Фото очков (`drawable-nodpi/glasses_hero.webp`, верх и низ уходят в прозрачность) по всей ширине экрана.
- * Подключены — полная яркость и у объектива «дышит» мягкое свечение цвета «включено»; нет — без цвета, полупрозрачно.
+ * Подключены — полная яркость и у объектива «дышит» мягкое белое свечение; нет — без цвета, полупрозрачно.
  * В светлой теме — на тёмной подложке: фон фото студийный, тёмный.
  */
 @Composable
@@ -216,7 +216,7 @@ private fun GlassesPhoto(on: Boolean, modifier: Modifier) {
                     // Объектив камеры на фото: центр и радиус кольца — доли ширины и высоты картинки.
                     val lens = Offset(size.width * LENS_X, size.height * LENS_Y)
                     val radius = size.width * LENS_RING * 2f
-                    drawCircle(Brush.radialGradient(listOf(p.on.copy(alpha = GLOW_ALPHA * glow), Color.Transparent), lens, radius), radius, lens)
+                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = GLOW_ALPHA * glow), Color.Transparent), lens, radius), radius, lens)
                 }
             },
     )
