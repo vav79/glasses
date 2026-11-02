@@ -81,7 +81,9 @@ import ru.vasev.glasses.profile.SpeechPace
 import ru.vasev.glasses.ui.AppTab
 import ru.vasev.glasses.ui.DevScreen
 import ru.vasev.glasses.ui.glass.GlassRoot
-import ru.vasev.glasses.ui.OnboardingScreen
+import ru.vasev.glasses.ui.AgreementScreen
+import ru.vasev.glasses.ui.ModelSetupScreen
+import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.ui.MainScreen
 import ru.vasev.glasses.ui.CameraScreen
 import ru.vasev.glasses.ui.AssistantOverlays
@@ -268,18 +270,23 @@ class MainActivity : AppCompatActivity() {
             // Значки строки состояния — под тему приложения, а не системы (тёмная тема при светлой системе).
             LaunchedEffect(dark) { applySystemBars(dark) }
             GlassesTheme(dark = dark, fontScalePercent = fontScale) {
+                val app = application as GlassesApp
+                val agreed by app.agreement.acceptedVersion.collectAsStateWithLifecycle()
                 val onboarded by profile.onboarded.collectAsStateWithLifecycle()
+                // Самый первый экран — соглашение (и при новой редакции): без него приложение дальше не запускается.
+                if (!AgreementSettings.isCurrent(agreed)) {
+                    GlassRoot { AgreementScreen(readOnly = false, onAccept = app.agreement::accept, onExit = ::finishAffinity) }
+                    return@GlassesTheme
+                }
+                // Затем — выбор модели и ключ (один раз); дальше приложение открывается сразу в чат.
                 if (!onboarded) {
-                    val language by settings.language.collectAsStateWithLifecycle()
-                    val role by profile.role.collectAsStateWithLifecycle()
+                    val savedKeys by app.apiKeys.saved.collectAsStateWithLifecycle()
                     GlassRoot {
-                        OnboardingScreen(
-                            language = language,
-                            systemLanguage = LanguageSettings.system(),
-                            onLanguage = settings::setLanguage,
-                            initialRole = role,
-                            onFinish = { chosen ->
-                                profile.completeOnboarding(chosen)
+                        ModelSetupScreen(
+                            savedKeys = savedKeys,
+                            onSaveKey = ::saveFirstKey,
+                            onDone = {
+                                profile.completeOnboarding(profile.role.value)
                                 selectTab(AppTab.ASSISTANT)
                             },
                         )
@@ -288,6 +295,23 @@ class MainActivity : AppCompatActivity() {
                 }
                 Shell()
             }
+        }
+    }
+
+    /**
+     * Ключ из первого запуска — зашифровать и сохранить; null — сохранён, иначе текст ошибки (формат ключа).
+     * Есть только ключ DeepSeek — ассистент и перевод сразу на DeepSeek Flash (иначе модель по умолчанию — Claude без ключа).
+     */
+    private fun saveFirstKey(provider: ProviderId, key: String): String? {
+        val app = application as GlassesApp
+        return try {
+            app.apiKeys.save(provider, key)
+            if (provider == ProviderId.DEEPSEEK && !app.apiKeys.has(ProviderId.ANTHROPIC)) {
+                Role.entries.forEach { app.aiSettings.setModel(it, ModelCatalog.DEEPSEEK_FLASH) }
+            }
+            null
+        } catch (e: Exception) {
+            e.message ?: getString(R.string.something_went_wrong)
         }
     }
 
@@ -608,7 +632,7 @@ class MainActivity : AppCompatActivity() {
      *  - вкладка:    --es tab assistant|camera|translate|navigation|settings|development (журнал в настройках)
      *  - навигация: --es nav_to "Wat Arun" (поиск цели, как в поле «Куда?»)
      *  - компас за столом: --es fake_location "55.7539,37.6208" (подменить место, каждый интент — новая точка)
- *  - первый запуск: --ez reset_onboarding true (данные приложения не стираются)
+     *  - первый запуск: --ez reset_onboarding true (выбор модели) / --ez reset_agreement true (соглашение); данные не стираются
      * Порядок внутри одного интента: источник, модели и сбой применяются до вопроса.
      */
     private fun handleDebugIntent(intent: Intent) {
@@ -618,6 +642,10 @@ class MainActivity : AppCompatActivity() {
             intent.removeExtra("reset_onboarding")
             // Только флаг первого запуска: роль, ключи и история остаются.
             app.profile.resetOnboarding()
+        }
+        if (intent.getBooleanExtra("reset_agreement", false)) {
+            intent.removeExtra("reset_agreement")
+            app.agreement.reset()
         }
         intent.getStringExtra("tab")?.let { name ->
             intent.removeExtra("tab")

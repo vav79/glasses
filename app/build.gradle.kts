@@ -1,3 +1,4 @@
+import java.time.LocalDate
 import java.util.Properties
 
 plugins {
@@ -40,6 +41,8 @@ android {
         manifestPlaceholders["mwdat_client_token"] = mwdat("mwdat.clientToken", "mwdat_client_token")
         // Режим в лог при запуске (сами значения не пишем).
         buildConfigField("boolean", "MWDAT_DEV_MODE", (mwdatAppId == "0").toString())
+        // «О приложении»: дата сборки (день, без времени — сборки за день не отличаются).
+        buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now()}\"")
     }
 
     buildTypes {

@@ -841,4 +841,33 @@
     <string name="action_describe">Describe</string>
     <string name="action_translate_text">Translate text</string>
     <string name="action_remember">Remember</string>
+    <!-- Первый запуск: соглашение и выбор модели; «О приложении». -->
+    <string name="agreement_title">User agreement</string>
+    <string name="agreement_check">I have read the agreement, understand the risks in section 3 and accept them</string>
+    <string name="agreement_accept">Accept and continue</string>
+    <string name="agreement_exit">Exit</string>
+    <string name="setup_title">Choose an AI model</string>
+    <string name="setup_subtitle">Enter your API key — it is checked right away and stored only on this phone, encrypted. Models and keys can be changed later in Settings.</string>
+    <string name="setup_enter_key">Enter API key</string>
+    <string name="setup_key_added">Key added</string>
+    <string name="setup_in_development">In development</string>
+    <string name="setup_in_development_text">This model isn’t supported yet. It will appear in a future version.</string>
+    <string name="setup_warning">Without an API key, AI features won’t be available. Features of the connected glasses will remain. You can add a key later in Settings.</string>
+    <string name="setup_skip">Skip</string>
+    <string name="setup_continue">Continue</string>
+    <string name="ok">OK</string>
+    <string name="key_dialog_title">%1$s API key</string>
+    <string name="key_dialog_hint">API key</string>
+    <string name="key_dialog_note">The key is checked with a free request for the list of models — no tokens are spent.</string>
+    <string name="key_check_and_save">Check and save</string>
+    <string name="key_checking">Checking the key…</string>
+    <string name="key_rejected">The provider rejected this key. Make sure you copied it in full.</string>
+    <string name="key_no_network">No connection to the provider — the key wasn’t checked.</string>
+    <string name="key_check_error">The provider answered with an error — the key wasn’t checked.</string>
+    <string name="key_save_anyway">Save without checking</string>
+    <string name="about_title">About</string>
+    <string name="about_version">Version %1$s, built %2$s</string>
+    <string name="about_developer">Developer: %1$s</string>
+    <string name="about_developer_name">vav79</string>
+    <string name="about_agreement_accepted">Agreement version %1$s accepted on %2$s</string>
 </resources>

@@ -878,4 +878,33 @@
     <string name="action_describe">Описать</string>
     <string name="action_translate_text">Перевести текст</string>
     <string name="action_remember">Запомнить</string>
+    <!-- Первый запуск: соглашение и выбор модели; «О приложении». -->
+    <string name="agreement_title">Пользовательское соглашение</string>
+    <string name="agreement_check">Я прочитал(а) соглашение, понимаю риски из раздела 3 и принимаю их на себя</string>
+    <string name="agreement_accept">Принять и продолжить</string>
+    <string name="agreement_exit">Выйти</string>
+    <string name="setup_title">Выберите модель ИИ</string>
+    <string name="setup_subtitle">Введите свой API-ключ — он сразу проверяется и хранится только на этом телефоне, в зашифрованном виде. Модели и ключи можно сменить позже в настройках.</string>
+    <string name="setup_enter_key">Ввести API-ключ</string>
+    <string name="setup_key_added">Ключ добавлен</string>
+    <string name="setup_in_development">В разработке</string>
+    <string name="setup_in_development_text">Эта модель пока не поддерживается. Она появится в одной из следующих версий.</string>
+    <string name="setup_warning">Без API-ключа функции ИИ будут недоступны. Останутся функции подключённых очков. Ключ можно добавить позже в настройках.</string>
+    <string name="setup_skip">Пропустить</string>
+    <string name="setup_continue">Продолжить</string>
+    <string name="ok">ОК</string>
+    <string name="key_dialog_title">API-ключ %1$s</string>
+    <string name="key_dialog_hint">API-ключ</string>
+    <string name="key_dialog_note">Ключ проверяется бесплатным запросом списка моделей — токены не тратятся.</string>
+    <string name="key_check_and_save">Проверить и сохранить</string>
+    <string name="key_checking">Проверяю ключ…</string>
+    <string name="key_rejected">Провайдер отклонил этот ключ. Проверьте, что скопировали его целиком.</string>
+    <string name="key_no_network">Нет связи с провайдером — ключ не проверен.</string>
+    <string name="key_check_error">Провайдер ответил ошибкой — ключ не проверен.</string>
+    <string name="key_save_anyway">Сохранить без проверки</string>
+    <string name="about_title">О приложении</string>
+    <string name="about_version">Версия %1$s, сборка от %2$s</string>
+    <string name="about_developer">Разработчик: %1$s</string>
+    <string name="about_developer_name">vav79</string>
+    <string name="about_agreement_accepted">Соглашение (редакция %1$s) принято %2$s</string>
 </resources>

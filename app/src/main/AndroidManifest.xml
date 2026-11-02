@@ -71,6 +71,10 @@
         <meta-data
             android:name="com.meta.wearable.mwdat.CLIENT_TOKEN"
             android:value="${mwdat_client_token}" />
+        <!-- Телеметрия DAT SDK (идентификаторы устройства, сессии, ошибки) в Meta — выключена: соглашение обещает, что данные не уходят. -->
+        <meta-data
+            android:name="com.meta.wearable.mwdat.ANALYTICS_OPT_OUT"
+            android:value="true" />
 
         <!-- configChanges: смена языка приложения (Android 13+) без пересоздания — экран не моргает, Compose сам перерисует строки. -->
 

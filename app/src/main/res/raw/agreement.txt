@@ -1,0 +1,94 @@
+Version 1.0 of 1 November 2026
+
+This is a translation. If the English and Russian texts differ, the Russian text prevails.
+
+Please read this agreement to the end. It is short but important: it explains what the app is for, which risks you take on, what you are responsible for and what the developer is responsible for.
+
+**1. Purpose of the app**
+
+1.1. “Sputnik — AI for glasses” is a free, open-source app that extends what smart glasses can do: it lets you talk to AI assistants, translate speech, analyze photos and use other features (the “App”).
+
+1.2. The App was created only to extend the functionality of the glasses. It is not intended to bypass regional restrictions, blocks or the rules of Meta or other companies whose services it uses, and it contains no means for such bypassing.
+
+1.3. The App is an independent project. It is not a product of Meta, EssilorLuxottica (Ray-Ban), Anthropic (Claude), OpenAI (ChatGPT), DeepSeek or Sberbank (GigaChat), and it is not endorsed or supported by them. The names and trademarks of these services belong to their owners and are mentioned only to indicate compatibility.
+
+1.4. The developer of the App is vav79, contact: alexandr21975@gmail.com (the “Developer”).
+
+**2. Accepting the agreement**
+
+2.1. By checking “I have read the agreement, understand the risks in section 3 and accept them” and tapping “Accept and continue”, you confirm that you have read this agreement, understand it and accept all its terms.
+
+2.2. If you disagree with at least one term, do not use the App. The App does not start without accepting the agreement.
+
+2.3. By accepting the agreement, you confirm that you are at least 18 years old.
+
+**3. Third-party services and restrictions in Russia — important**
+
+3.1. The App only connects you with third-party services: Ray-Ban Meta glasses and Meta services, and the AI models Claude, ChatGPT, DeepSeek and GigaChat. Each service works under its own rules, which you accept separately and directly with the company that owns it.
+
+3.2. You are informed that, as of the date of this version:
+
+- Anthropic (Claude) and OpenAI (ChatGPT) do not list Russia among supported countries, and their rules do not allow using their services while in Russia;
+- Meta Platforms Inc. has been designated an extremist organization in Russia, its activities in Russia are banned, and access to a number of its services in Russia is restricted.
+
+3.3. If you are in Russia, using these services may violate their rules. Possible consequences include blocking of your account, API key or device, loss of paid funds and data, and disabling of glasses features. You take all these risks on yourself.
+
+3.4. The Developer does not encourage breaking the rules of third-party services or the law and does not help to bypass them. You decide on your own which services to use and from where.
+
+3.5. The availability of services and their rules may change at any time. Check the current terms on the companies’ websites before use.
+
+**4. API keys and costs**
+
+4.1. AI features require your own API keys. You obtain them from the providers yourself, on their terms.
+
+4.2. Keys are stored only on your device, in encrypted form, and are not sent to the Developer.
+
+4.3. You bear all costs of using AI models. The cost tracking in the App is an approximate estimate; exact amounts are in the provider’s account.
+
+4.4. Do not share your keys with other people. You are responsible for everything done with your key.
+
+**5. Your data**
+
+5.1. The Developer does not collect, receive or store your data: conversations, photos, videos, audio recordings, location or keys. All of this is stored on your device.
+
+5.2. When you send a request, its content — text, images, audio — is sent to the chosen AI provider, including outside Russia, and processed under its privacy policy. Speech recognition and address search on the map are performed by Google services on your phone: recordings of your speech and addresses may be sent to Google and are processed under its privacy policy. The glasses connect through the Meta AI app and work under Meta’s rules. Text and QR codes in photos are recognized on the phone itself. You decide whether to send it.
+
+5.3. Do not send the AI anything you are not ready to disclose to third parties: passport and bank details, passwords, health information, personal data of other people.
+
+**6. Photographing and recording other people**
+
+6.1. The glasses take photos and videos and record audio. When using them, you must comply with the law of the country you are in.
+
+6.2. In Russia, a person’s image may as a rule be published and used only with their consent (Article 152.1 of the Civil Code of the Russian Federation), and collecting and disclosing information about someone’s private life without consent is prohibited.
+
+6.3. Warn people about photographing and recording, including when you translate a conversation. You are responsible for violations when photographing and recording.
+
+**7. AI answers, translation and navigation**
+
+7.1. AI answers, translations, object recognition, price conversion and routes may be inaccurate or wrong. Check anything important.
+
+7.2. Do not make decisions about health, money, safety or legal matters based only on AI answers — consult a specialist.
+
+7.3. Do not get distracted by the App while driving, crossing the road or in other situations that require attention.
+
+**8. Liability**
+
+8.1. The App is provided “as is”. The Developer does not guarantee that it will work without errors or interruptions, suit your purposes or be compatible with your devices.
+
+8.2. You use the App at your own risk and are responsible for the consequences.
+
+8.3. To the extent permitted by law, the Developer is not liable for: damage from using or being unable to use the App; blocks and restrictions by third-party services; your API costs; loss of data; errors of AI, translation and navigation; actions and omissions of third-party services.
+
+8.4. If the law does not allow limiting liability in a particular case, the limitation does not apply in that case, and the other terms remain in effect.
+
+**9. Final provisions**
+
+9.1. The Developer may update the agreement. The App will announce a new version at launch and ask you to accept it again.
+
+9.2. The source code is distributed under a free license. The use of the code is governed by the license; the use of the App is governed by this agreement.
+
+9.3. This agreement is governed by the law of the Russian Federation.
+
+9.4. If any term is found invalid, the other terms remain in effect.
+
+9.5. Questions and suggestions: alexandr21975@gmail.com.

@@ -98,6 +98,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setGestureEnabled(enabled: Boolean) = gestureSettings.setEnabled(enabled)
     fun setGestureTap(tap: Tap) = gestureSettings.setTap(tap)
 
+    /** «О приложении»: когда и какая редакция соглашения принята; null — не принята. */
+    val agreementAccepted: String?
+        get() {
+            val agreement = (getApplication<Application>() as GlassesApp).agreement
+            val at = agreement.acceptedAt.takeIf { it > 0 } ?: return null
+            val date = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale.getDefault())
+                .format(java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()))
+            return L.s(R.string.about_agreement_accepted, agreement.acceptedVersion.value.orEmpty(), date)
+        }
+
     /** Тема и размер шрифта приложения. */
     private val appearance = (app as GlassesApp).appearance
     val theme: StateFlow<ThemeMode> = appearance.theme

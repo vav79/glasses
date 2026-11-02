@@ -29,6 +29,7 @@ import ru.vasev.glasses.nav.NavigatorSettings
 import ru.vasev.glasses.nav.TaxiAddresses
 import ru.vasev.glasses.notes.NoteStore
 import ru.vasev.glasses.places.PlaceStore
+import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.profile.ProfileSettings
 import ru.vasev.glasses.profile.StyleSettings
 import ru.vasev.glasses.rates.CbrRates
@@ -160,6 +161,10 @@ class GlassesApp : Application() {
     lateinit var chats: ChatStore
         private set
 
+    /** Принятая редакция пользовательского соглашения. */
+    lateinit var agreement: AgreementSettings
+        private set
+
     /** Тема и размер шрифта. */
     lateinit var appearance: AppearanceSettings
         private set
@@ -174,6 +179,7 @@ class GlassesApp : Application() {
         aiSettings = AiSettings(this)
         profile = ProfileSettings(this)
         appearance = AppearanceSettings(this)
+        agreement = AgreementSettings(this)
         style = StyleSettings(this)
         journal = RequestJournal(this)
         llm = LlmService(this, apiKeys, aiSettings, journal) { profile.journalTexts.value }

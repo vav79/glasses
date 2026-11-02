@@ -1,5 +1,7 @@
 package ru.vasev.glasses.ui
 
+import androidx.activity.compose.BackHandler
+import ru.vasev.glasses.BuildConfig
 import ru.vasev.glasses.ui.theme.AppearanceSettings
 import ru.vasev.glasses.ui.theme.ThemeMode
 import ru.vasev.glasses.speech.GesturesService
@@ -111,6 +113,13 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
     val styleViewModel: StyleViewModel = viewModel()
     val style by styleViewModel.saved.collectAsStateWithLifecycle()
     var styleOpen by rememberSaveable { mutableStateOf(false) }
+    var agreementOpen by rememberSaveable { mutableStateOf(false) }
+    // Текст соглашения из «О приложении» — вместо настроек, «Назад» возвращает к ним.
+    if (agreementOpen) {
+        BackHandler { agreementOpen = false }
+        AgreementScreen(readOnly = true, onAccept = {}, onExit = { agreementOpen = false })
+        return
+    }
     // «Стиль общения» — вместо содержимого настроек, на том же стеклянном фоне.
     if (styleOpen) {
         StyleScreen(styleViewModel) { styleOpen = false }
@@ -208,6 +217,14 @@ fun SettingsScreen(viewModel: SettingsViewModel, onOpenDeveloper: () -> Unit) {
             }
         }
         BackgroundHint(stringResource(R.string.settings_keys_hint))
+
+        Section(stringResource(R.string.about_title)) {
+            Text(stringResource(R.string.app_full_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Hint(stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.BUILD_DATE))
+            Hint(stringResource(R.string.about_developer, stringResource(R.string.about_developer_name)))
+            viewModel.agreementAccepted?.let { Hint(it) }
+            GlassButton(stringResource(R.string.agreement_title), onClick = { agreementOpen = true }, modifier = Modifier.fillMaxWidth())
+        }
 
         // Расширенные: разработчику — сразу, остальным — по кнопке. Значения действуют независимо от видимости.
         if (!role.advancedAlwaysVisible) {
