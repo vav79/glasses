@@ -30,7 +30,8 @@ data class Shot(val id: String, val takenAt: Instant, val source: ImageSource) {
  */
 class ShotStore(context: Context) {
 
-    private val dir = File(context.filesDir, DIR)
+    /** Папка ленты — её читает и «Медиа». */
+    val dir = File(context.filesDir, DIR)
     private val resolver = context.contentResolver
     private val lock = Any()
 

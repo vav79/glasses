@@ -29,7 +29,8 @@ enum class AssistantMode { CHAT, TRANSLATE_VIEW }
  * инструкции для модели, поэтому удаление заметок даётся, только если в МОЕЙ фразе есть явная просьба удалить
  * или забыть, и никогда — вместе с веб-поиском и в «Переведи, что вижу».
  */
-data class ToolPlan(val notes: Boolean, val deleteNotes: Boolean, val rates: Boolean, val webSearch: Boolean) {
+/** [calendar] — событие в календарь: только если в МОЕЙ фразе есть слово про календарь (`R.array.calendar_triggers`). */
+data class ToolPlan(val notes: Boolean, val deleteNotes: Boolean, val rates: Boolean, val webSearch: Boolean, val calendar: Boolean = false) {
     companion object {
         fun of(mode: AssistantMode, phrase: String, deleteTriggers: Collection<String>): ToolPlan = when (mode) {
             AssistantMode.TRANSLATE_VIEW -> ToolPlan(notes = false, deleteNotes = false, rates = true, webSearch = false)
@@ -75,6 +76,8 @@ class AssistantTools(
     private val notePhoto: suspend () -> ByteArray?,
     /** Координаты для заметки; null — нет разрешения или фиксации. */
     private val noteLocation: suspend () -> DeviceLocation.Fix?,
+    /** Событие для календаря телефона: приложение открывает системное окно, сохраняет его пользователь (В12). */
+    private val onCalendarEvent: (CalendarEvent) -> Unit = {},
 ) {
     val saved = mutableListOf<Note>()
     val found = mutableListOf<Note>()
@@ -92,6 +95,7 @@ class AssistantTools(
             }
             if (plan.deleteNotes) add(DELETE_NOTES)
             if (plan.rates) add(convertPrices(myCurrency))
+            if (plan.calendar) add(ADD_CALENDAR_EVENT)
         }
         return if (specs.isEmpty()) null else ToolSet(specs, ::execute)
     }
@@ -103,6 +107,7 @@ class AssistantTools(
             FIND_NOTES.name -> if (plan.notes) find(call.input) else unavailable(call)
             DELETE_NOTES.name -> if (plan.deleteNotes) delete(call.input) else unavailable(call)
             CONVERT_PRICES -> if (plan.rates) convert(call.input) else unavailable(call)
+            ADD_CALENDAR_EVENT.name -> if (plan.calendar) calendar(call.input) else unavailable(call)
             else -> unavailable(call)
         }
     } catch (e: CancellationException) {
@@ -171,6 +176,17 @@ class AssistantTools(
         )
     }
 
+    /** Событие — в системное окно календаря; модели — что окно открыто и сохраняет пользователь. */
+    private fun calendar(input: JSONObject): ToolOutput {
+        val event = CalendarEvent.parse(input) ?: return ToolOutput("title and start (yyyy-MM-ddTHH:mm) are required", isError = true)
+        onCalendarEvent(event)
+        Log.d(TAG, "calendar event window opened allDay=${event.allDay}")
+        return ToolOutput(
+            "The phone calendar window is open with this event filled in. The event is not saved yet: tell the user briefly " +
+                "to check it and tap Save.",
+        )
+    }
+
     private fun round(value: Double): Double = if (value >= 100) value.roundToLong().toDouble() else (value * 100).roundToLong() / 100.0
 
     private fun noteForModel(note: Note): JSONObject = JSONObject()
@@ -223,6 +239,21 @@ class AssistantTools(
                 "ids" to mapOf("type" to "array", "items" to mapOf("type" to "string"), "description" to "Ids from find_notes."),
             ),
             required = listOf("ids"),
+        )
+
+        val ADD_CALENDAR_EVENT = ToolSpec(
+            name = "add_calendar_event",
+            description = "Add an event to the phone calendar when the user asks for it in their message. The app opens the " +
+                "system calendar window with the event filled in; the user checks it and saves it. Call it once per event.",
+            properties = mapOf(
+                "title" to mapOf("type" to "string", "description" to "Short event title in the user's language."),
+                "start" to mapOf("type" to "string", "description" to "Local start time, yyyy-MM-ddTHH:mm (for an all-day event the time is ignored)."),
+                "end" to mapOf("type" to "string", "description" to "Local end time, yyyy-MM-ddTHH:mm; omit if unknown."),
+                "all_day" to mapOf("type" to "boolean", "description" to "True for an all-day event."),
+                "location" to mapOf("type" to "string", "description" to "Place, if the user named one."),
+                "notes" to mapOf("type" to "string", "description" to "Extra details, if any."),
+            ),
+            required = listOf("title", "start"),
         )
 
         const val CONVERT_PRICES = "convert_prices"

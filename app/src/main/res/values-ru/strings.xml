@@ -948,4 +948,30 @@
     <string name="translator_speak_mine_hint">Выключено: моя фраза переводится только текстом — «Показать» её собеседнику.</string>
     <string name="translator_formality">Обращение к собеседнику</string>
     <string name="translator_gender">Мой пол</string>
+    <string name="media_photos">Фото</string>
+    <string name="media_empty">Снимков пока нет. Здесь появятся снимки из чатов и с камер — очков, телефона, галереи.</string>
+    <string name="media_open_photo">Снимок от %1$s</string>
+    <string name="media_to_chat">В чат</string>
+    <string name="media_save">Сохранить</string>
+    <string name="media_saved">Сохранено в галерею (Pictures/Sputnik)</string>
+    <string name="media_delete_title">Удалить снимок?</string>
+    <string name="media_delete_text">Он пропадёт из «Медиа» и из чатов, куда был отправлен.</string>
+    <string name="calendar_hint">События пишутся в календарь телефона. Попросите в чате: «добавь в календарь встречу завтра в 15:00» — откроется окно события с заполненными полями, вы проверяете и сохраняете.</string>
+    <string name="calendar_add">Добавить событие</string>
+    <string name="calendar_open">Открыть календарь</string>
+    <string name="calendar_upcoming">Ближайшие (14 дней)</string>
+    <string name="calendar_read_hint">Чтобы показать ваши события здесь, нужно разрешение на чтение календаря. Добавление работает и без него.</string>
+    <string name="calendar_show_mine">Показать мои события</string>
+    <string name="calendar_none">На ближайшие 14 дней событий нет.</string>
+    <string name="calendar_no_app">На телефоне нет приложения календаря</string>
+    <string-array name="calendar_triggers">
+        <item>календар</item>
+        <item>событи</item>
+        <item>встреч</item>
+        <item>запланир</item>
+        <item>запиши</item>
+        <item>напомн</item>
+        <item>calendar</item>
+        <item>event</item>
+    </string-array>
 </resources>

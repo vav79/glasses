@@ -64,6 +64,7 @@ import ru.vasev.glasses.ui.shell.ModelStatus
 import ru.vasev.glasses.ui.shell.ShellHeader
 import ru.vasev.glasses.ui.shell.ProfileOption
 import ru.vasev.glasses.ui.TranslateBar
+import ru.vasev.glasses.ui.MediaScreen
 import ru.vasev.glasses.ui.TranslatorSettingsScreen
 import ru.vasev.glasses.ui.needsGenderHint
 import ru.vasev.glasses.profile.AssistantProfile
@@ -75,7 +76,7 @@ import ru.vasev.glasses.chats.ChatRules
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ru.vasev.glasses.ui.SkillsScreen
-import ru.vasev.glasses.ui.CalendarPlaceholder
+import ru.vasev.glasses.ui.CalendarScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.activity.SystemBarStyle
@@ -119,6 +120,10 @@ class MainActivity : AppCompatActivity() {
 
     /** Прослушивание собеседника в переводе поставлено на паузу. */
     private var translatePaused by mutableStateOf(false)
+
+    /** Разрешение на чтение календаря — только для списка «Ближайшие» на экране «Календарь». */
+    private var calendarGranted by mutableStateOf(false)
+    private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { calendarGranted = it }
 
     /** Чат, удаление которого ждёт подтверждения. */
     private var chatToDelete by mutableStateOf<ChatEntry?>(null)
@@ -242,6 +247,12 @@ class MainActivity : AppCompatActivity() {
         val navVoice = (application as GlassesApp).navVoice
         viewModel.navVocabulary = navVoice::vocabulary
         viewModel.navCommandHandler = navVoice::handle
+        // Событие от ассистента — системное окно календаря с заполненными полями; сохраняет пользователь (В12).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.calendarEvents.collect { event -> openCalendarInsert(event) }
+            }
+        }
         // Реплики «Переводчика» — в ленту чата и в его историю.
         translation.onLine = { line -> viewModel.addTranslatedLine(line.line, line.model) }
         // Вкладка «Навигация» — когда ход ассистента закончен, следующим кадром: иначе размытие (Haze) получает
@@ -397,7 +408,6 @@ class MainActivity : AppCompatActivity() {
                 },
                 onGlasses = { selectTab(AppTab.CAMERA) },
                 chatMenu = buildList {
-                    add(notesLabel to { notesOpen = true })
                     // Удалить можно только сохранённый чат (новый, без обменов, ещё не в истории).
                     currentChatId?.let { id -> add(deleteLabel to { chatToDelete = ChatEntry(id, chatTitle, selected = true) }) }
                 },
@@ -425,8 +435,9 @@ class MainActivity : AppCompatActivity() {
                         viewModel.newConversation()
                         selectTab(AppTab.ASSISTANT)
                     }
-                    // «Медиа» и «Очки» до этапов 5–6 — старая «Камера»: лента снимков, подключение очков.
-                    MenuItem.MEDIA, MenuItem.GLASSES -> selectTab(AppTab.CAMERA)
+                    MenuItem.MEDIA -> selectTab(AppTab.MEDIA)
+                    // «Очки» до этапа 6 — старая «Камера»: подключение очков, источник снимков, микрофон.
+                    MenuItem.GLASSES -> selectTab(AppTab.CAMERA)
                     MenuItem.SKILLS -> selectTab(AppTab.SKILLS)
                     MenuItem.CALENDAR -> selectTab(AppTab.CALENDAR)
                 }
@@ -507,7 +518,26 @@ class MainActivity : AppCompatActivity() {
                     // «Переводчик» — его настройки, «Навигация» — её экран (места, цель, компас, такси).
                     selectTab(if (skill == Skill.TRANSLATOR) AppTab.TRANSLATE else AppTab.NAVIGATION, stopOthers = false)
                 })
-                AppTab.CALENDAR -> CalendarPlaceholder()
+                AppTab.CALENDAR -> CalendarScreen(
+                    canRead = calendarGranted,
+                    onRequestRead = { calendarPermission.launch(Manifest.permission.READ_CALENDAR) },
+                    onAdd = { openCalendarInsert(null) },
+                    onOpenCalendar = {
+                        val open = Intent(Intent.ACTION_VIEW, android.provider.CalendarContract.CONTENT_URI.buildUpon().appendPath("time").appendPath(System.currentTimeMillis().toString()).build())
+                        runCatching { startActivity(open) }.onFailure { Toast.makeText(this, R.string.calendar_no_app, Toast.LENGTH_LONG).show() }
+                    },
+                )
+                AppTab.MEDIA -> MediaScreen(
+                    library = app.media,
+                    viewModel = viewModel,
+                    onToChat = { item ->
+                        lifecycleScope.launch {
+                            app.media.bytes(item)?.let { viewModel.attachJpeg(it, item.source) }
+                            selectTab(AppTab.ASSISTANT)
+                        }
+                    },
+                    onRoute = { ru.vasev.glasses.ui.openRoute(this@MainActivity, it) },
+                )
                 AppTab.CHATS -> AllChatsScreen(chats = ::entries, onChat = openChat, onLongPress = { chatToDelete = it })
             }
         }
@@ -542,6 +572,23 @@ class MainActivity : AppCompatActivity() {
         val wasListening = (application as GlassesApp).translator.let { it.headerOn.value || it.profile.value } && !translatePaused
         translation.setLanguage(language)
         if (wasListening) translation.startConversation()
+    }
+
+    /** Системное окно нового события календаря (без разрешений: сохраняет пользователь). */
+    private fun openCalendarInsert(event: ru.vasev.glasses.claude.CalendarEvent?) {
+        val intent = Intent(Intent.ACTION_INSERT).setData(android.provider.CalendarContract.Events.CONTENT_URI)
+        if (event != null) {
+            intent.putExtra(android.provider.CalendarContract.Events.TITLE, event.title)
+                .putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, event.startMillis())
+                .putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, event.endMillis())
+                .putExtra(android.provider.CalendarContract.EXTRA_EVENT_ALL_DAY, event.allDay)
+            event.location?.let { intent.putExtra(android.provider.CalendarContract.Events.EVENT_LOCATION, it) }
+            event.notes?.let { intent.putExtra(android.provider.CalendarContract.Events.DESCRIPTION, it) }
+        }
+        runCatching { startActivity(intent) }.onFailure {
+            Log.w(TAG, "No calendar app: ${it.javaClass.simpleName}")
+            Toast.makeText(this, R.string.calendar_no_app, Toast.LENGTH_LONG).show()
+        }
     }
 
     /** Строка состояния и навигации: прозрачные, значки — светлые в тёмной теме и тёмные в светлой. */
@@ -582,7 +629,7 @@ class MainActivity : AppCompatActivity() {
                 AppTab.TRANSLATE -> translation.stop()
                 AppTab.NAVIGATION -> navSession.cancel()
                 // Списки и заглушки — ни звука, ни микрофона.
-                AppTab.SKILLS, AppTab.CALENDAR, AppTab.CHATS -> Unit
+                AppTab.SKILLS, AppTab.CALENDAR, AppTab.CHATS, AppTab.MEDIA -> Unit
             }
         }
         tab = newTab
@@ -680,6 +727,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         cameraGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        calendarGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onDestroy() {

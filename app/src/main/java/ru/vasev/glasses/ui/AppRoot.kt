@@ -40,6 +40,8 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
     SKILLS(R.string.menu_skills, R.drawable.ic_sym_auto_awesome),
     CALENDAR(R.string.menu_calendar, R.drawable.ic_sym_calendar_month),
+    /** «Медиа»: снимки и заметки. */
+    MEDIA(R.string.menu_media, R.drawable.ic_sym_photo_library),
     /** «Показать все» чаты. */
     CHATS(R.string.chats_all, R.drawable.ic_sym_history),
 }
@@ -49,12 +51,3 @@ enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
  * экраном, а не поверх него, поэтому отступ — небольшой.
  */
 val LocalTabBarInset = compositionLocalOf { 8.dp }
-
-/** «Календарь» — до этапа 5. */
-@Composable
-fun CalendarPlaceholder() {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(painterResource(R.drawable.ic_sym_calendar_month), contentDescription = null, modifier = Modifier.size(48.dp), tint = glassBackgroundText())
-        Text(stringResource(R.string.calendar_soon), style = MaterialTheme.typography.bodyLarge, color = glassBackgroundText(), modifier = Modifier.padding(top = 12.dp))
-    }
-}

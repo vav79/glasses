@@ -139,7 +139,8 @@ class AnthropicProvider(private val keys: ApiKeyStore) : ChatProvider {
                 val params = params(request, history)
                 val accumulator = MessageAccumulator.create()
                 // Текст после поиска или инструмента — новая мысль: отделяем пробелом от написанного до него.
-                var afterTool = false
+                // Новый раунд после наших инструментов (календарь, заметки) — тоже новая мысль («…вторник. Окно…»).
+                var afterTool = rounds > 0
                 var round = Usage()
                 coroutineScope {
                     val response = mapErrors { client.messages().createStreaming(params) }

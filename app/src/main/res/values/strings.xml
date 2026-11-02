@@ -911,4 +911,28 @@
     <string name="translator_speak_mine_hint">Off: your phrase is translated as text only — “Show” it to the partner.</string>
     <string name="translator_formality">Addressing the partner</string>
     <string name="translator_gender">My gender</string>
+    <string name="media_photos">Photos</string>
+    <string name="media_empty">No photos yet. Photos from chats and from the camera (glasses, phone, gallery) appear here.</string>
+    <string name="media_open_photo">Photo from %1$s</string>
+    <string name="media_to_chat">To chat</string>
+    <string name="media_save">Save</string>
+    <string name="media_saved">Saved to the gallery (Pictures/Sputnik)</string>
+    <string name="media_delete_title">Delete the photo?</string>
+    <string name="media_delete_text">It will disappear from Media and from the chats where it was sent.</string>
+    <string name="calendar_hint">Events go to the phone calendar. Ask in the chat: “add to the calendar a meeting tomorrow at 3 pm” — the event window opens filled in, you check it and save.</string>
+    <string name="calendar_add">Add an event</string>
+    <string name="calendar_open">Open the calendar</string>
+    <string name="calendar_upcoming">Upcoming (14 days)</string>
+    <string name="calendar_read_hint">To show your events here, the app needs permission to read the calendar. Adding events works without it.</string>
+    <string name="calendar_show_mine">Show my events</string>
+    <string name="calendar_none">No events in the next 14 days.</string>
+    <string name="calendar_no_app">No calendar app on the phone</string>
+    <string-array name="calendar_triggers">
+        <item>calendar</item>
+        <item>event</item>
+        <item>meeting</item>
+        <item>schedule</item>
+        <item>appointment</item>
+        <item>remind</item>
+    </string-array>
 </resources>

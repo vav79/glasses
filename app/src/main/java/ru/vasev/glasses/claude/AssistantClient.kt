@@ -103,6 +103,11 @@ class AssistantClient(private val llm: LlmService) {
             if (plan.deleteNotes) {
                 appendLine("The user asks to delete or forget notes: find them with find_notes, delete only the matching ones with delete_notes and say what was deleted.")
             }
+            if (plan.calendar) {
+                val now = java.time.ZonedDateTime.now()
+                val stamp = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm, EEEE", java.util.Locale.US).format(now)
+                appendLine("To add an event to the phone calendar, call add_calendar_event once per event. Now it is $stamp (${now.zone.id}); resolve relative dates such as tomorrow from it.")
+            }
             if (plan.rates) {
                 appendLine("To convert money into the user's currency ($myCurrency), use convert_prices: it has the official Bank of Russia rates.")
             }

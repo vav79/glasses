@@ -25,6 +25,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- «Календарь»: только список ближайших событий; добавление — системным окном, без разрешения на запись. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 
     <!-- Android 11+: доступ к системным сервисам распознавания речи и синтеза. -->
     <queries>

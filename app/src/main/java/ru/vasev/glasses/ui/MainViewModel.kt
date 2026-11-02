@@ -83,6 +83,7 @@ import ru.vasev.glasses.rates.CurrencySettings
 import ru.vasev.glasses.profile.UserRole
 import ru.vasev.glasses.profile.AssistantProfile
 import ru.vasev.glasses.profile.Skill
+import ru.vasev.glasses.claude.CalendarEvent
 import ru.vasev.glasses.translate.Line
 import ru.vasev.glasses.translate.Who
 import ru.vasev.glasses.speech.AudioChannel
@@ -216,6 +217,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val linkScanner = LinkScanner()
     private var linkScan: Deferred<List<FoundLink>>? = null
     private var linkOffer: Job? = null
+
+    /** Событие для календаря: Activity открывает системное окно, сохраняет его пользователь. */
+    private val _calendarEvents = MutableSharedFlow<CalendarEvent>(extraBufferCapacity = 2)
+    val calendarEvents: SharedFlow<CalendarEvent> = _calendarEvents.asSharedFlow()
 
     /** Открыть ссылку — после подтверждения; открывает экран (нужен контекст Activity для Custom Tabs). */
     private val _openLink = MutableSharedFlow<LinkInfo>(extraBufferCapacity = 1)
@@ -464,6 +469,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** «Снять очками»: очки, а в debug с выбранным симулятором — симулятор. */
     fun glassesSource(): ImageSource = if (imageSources.source.value == ImageSource.SIMULATOR) ImageSource.SIMULATOR else ImageSource.GLASSES
+
+    /** Снимок из «Медиа» — в поле ввода чата («В чат»): с ним уйдёт следующий вопрос или действие. */
+    fun attachJpeg(jpeg: ByteArray, source: ImageSource?) {
+        val preview = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: return
+        _attachment.value = Attachment(jpeg, preview, source ?: ImageSource.GALLERY)
+        Log.d(TAG, "Composer: attached photo from media")
+    }
 
     fun clearAttachment() {
         _attachment.value = null
@@ -1023,7 +1035,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         origin: Origin = Origin.ASSISTANT,
     ): List<FoundLink> {
         _state.update { it.copy(phase = Phase.THINKING, pendingTranslation = mode == AssistantMode.TRANSLATE_VIEW) }
-        val plan = ToolPlan.of(mode, question, L.array(R.array.delete_note_triggers))
+        // Календарь — только если я сам о нём попросил (слово из calendar_triggers в моей фразе), как и удаление заметок.
+        val plan = ToolPlan.of(mode, question, L.array(R.array.delete_note_triggers)).let {
+            if (mode == AssistantMode.CHAT && ToolPlan.asksToDelete(question, L.array(R.array.calendar_triggers))) it.copy(calendar = true) else it
+        }
         val myCurrency = currency.currency.value
         val where = whereabouts(mode)
         Log.d(TAG, "Assistant: mode=$mode web=${plan.webSearch} notes=${plan.notes} delete=${plan.deleteNotes} country=${where.country}")
@@ -1084,6 +1099,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     myCurrency,
                     notePhoto = { earlyPhoto?.await() ?: if (earlyPhoto == null) notePhoto(jpeg) else null },
                     noteLocation = { earlyLocation?.await() ?: if (earlyLocation == null) noteLocation() else null },
+                    onCalendarEvent = { _calendarEvents.tryEmit(it) },
                 )
 
                 val result = assistant.stream(

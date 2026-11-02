@@ -13,6 +13,7 @@ import ru.vasev.glasses.camera.ImageSourceSettings
 import ru.vasev.glasses.camera.PhoneCamera
 import ru.vasev.glasses.camera.ShotStore
 import ru.vasev.glasses.chats.ChatStore
+import ru.vasev.glasses.media.MediaLibrary
 import ru.vasev.glasses.glasses.GlassesManager
 import ru.vasev.glasses.glasses.VoiceLaunch
 import ru.vasev.glasses.i18n.L
@@ -159,6 +160,10 @@ class GlassesApp : Application() {
     lateinit var style: StyleSettings
         private set
 
+    /** «Медиа»: снимки из чатов и ленты. */
+    lateinit var media: MediaLibrary
+        private set
+
     /** История чатов ассистента — только на телефоне. */
     lateinit var chats: ChatStore
         private set
@@ -209,6 +214,7 @@ class GlassesApp : Application() {
         // Имена очков DAT присылает позже, чем Bluetooth подключает очки, — тогда переопределяем, где очки.
         scope.launch(Dispatchers.Main) { glasses.deviceNames.collect { audioRouter.refresh() } }
         shots = ShotStore(this)
+        media = MediaLibrary(this, shots)
         speechSource = RoutedSpeechSource(PhoneMicSpeechSource(this), audioRouter)
         speaker = Speaker(this)
         navigatorVoice = NavigatorVoice(this)
