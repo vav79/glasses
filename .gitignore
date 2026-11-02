@@ -1,15 +1,27 @@
-# Секреты: ключ Anthropic и путь к SDK
+# Секреты и личные настройки сборки: идентификаторы Meta, путь к SDK (пример — local.properties.example)
 local.properties
+*.jks
+*.keystore
+signing.properties
+.env
+.env.*
+google-services.json
 
+# Сборка и кеши
 .gradle/
 .kotlin/
 build/
 /captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+
+# Файлы IDE и системы
 .idea/
 *.iml
 .DS_Store
-.externalNativeBuild
-.cxx
+Thumbs.db
 
 # Граф кода graphify (пересобирается локально)
 graphify-out/

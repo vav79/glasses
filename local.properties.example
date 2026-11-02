@@ -1,0 +1,10 @@
+# Пример local.properties — скопируйте в local.properties (он в .gitignore, в репозиторий не попадает).
+# API-ключи ИИ-провайдеров сюда НЕ пишутся: они вводятся в приложении и хранятся на телефоне зашифрованными.
+
+# Путь к Android SDK — с прямыми слешами (экранированные обратные ломают сборку).
+sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk
+
+# Проект в Meta Wearables Developer Center (https://wearables.developer.meta.com) → ваше приложение.
+# Без этих строк сборка работает в режиме разработчика Meta AI (Developer Mode), «Hey Meta» тогда недоступен.
+#mwdat.applicationId=<Application ID>
+#mwdat.clientToken=<Client Token>
