@@ -30,12 +30,10 @@ import ru.vasev.glasses.ui.glass.GlassCard
 import ru.vasev.glasses.ui.glass.glassBackgroundText
 
 /**
- * Экраны приложения. Главный — [ASSISTANT] (чат). [CAMERA], [TRANSLATE], [NAVIGATION] — старые вкладки:
- * пока не перенесены на новые места, открываются из бокового меню («Медиа», «Очки», «Умения»).
+ * Экраны приложения. Главный — [ASSISTANT] (чат); остальные открываются из бокового меню и шапки.
  */
 enum class AppTab(@StringRes val titleRes: Int, @DrawableRes val icon: Int) {
     ASSISTANT(R.string.tab_assistant, R.drawable.ic_sym_assistant),
-    CAMERA(R.string.tab_camera, R.drawable.ic_sym_photo_camera),
     TRANSLATE(R.string.tab_translate, R.drawable.ic_sym_g_translate),
     NAVIGATION(R.string.tab_navigation, R.drawable.ic_sym_navigation),
     SKILLS(R.string.menu_skills, R.drawable.ic_sym_auto_awesome),

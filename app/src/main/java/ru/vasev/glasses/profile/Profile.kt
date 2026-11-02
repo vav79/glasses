@@ -24,15 +24,15 @@ enum class UserRole(
 ) {
     TRAVELER(
         R.string.role_traveler, R.string.role_traveler_desc, R.drawable.ic_sym_luggage,
-        listOf(AppTab.TRANSLATE, AppTab.NAVIGATION, AppTab.ASSISTANT, AppTab.CAMERA), advancedAlwaysVisible = false,
+        listOf(AppTab.TRANSLATE, AppTab.NAVIGATION, AppTab.ASSISTANT), advancedAlwaysVisible = false,
     ),
     RESEARCHER(
         R.string.role_researcher, R.string.role_researcher_desc, R.drawable.ic_sym_explore,
-        listOf(AppTab.ASSISTANT, AppTab.CAMERA, AppTab.TRANSLATE, AppTab.NAVIGATION), advancedAlwaysVisible = false,
+        listOf(AppTab.ASSISTANT, AppTab.TRANSLATE, AppTab.NAVIGATION), advancedAlwaysVisible = false,
     ),
     DEVELOPER(
         R.string.role_developer, R.string.role_developer_desc, R.drawable.ic_sym_code,
-        listOf(AppTab.ASSISTANT, AppTab.CAMERA, AppTab.TRANSLATE, AppTab.NAVIGATION), advancedAlwaysVisible = true,
+        listOf(AppTab.ASSISTANT, AppTab.TRANSLATE, AppTab.NAVIGATION), advancedAlwaysVisible = true,
     ),
     ;
 

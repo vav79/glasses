@@ -19,7 +19,7 @@ class UserRoleTest {
     fun `every role has the same four tabs, at most four - development lives in settings`() {
         for (role in UserRole.entries) {
             // Вкладок больше нет (боковое меню), но порядок прежних экранов у роли пока остаётся — до профилей (этап 4).
-            assertEquals(setOf(AppTab.ASSISTANT, AppTab.CAMERA, AppTab.TRANSLATE, AppTab.NAVIGATION), role.tabs.toSet())
+            assertEquals(setOf(AppTab.ASSISTANT, AppTab.TRANSLATE, AppTab.NAVIGATION), role.tabs.toSet())
             assertTrue(role.tabs.size <= 4)
             assertEquals(role == UserRole.DEVELOPER, role.advancedAlwaysVisible)
         }
@@ -27,7 +27,7 @@ class UserRoleTest {
 
     @Test
     fun `switching role keeps the open tab when it exists`() {
-        assertEquals(AppTab.CAMERA, UserRole.TRAVELER.keep(AppTab.CAMERA))
+        assertEquals(AppTab.ASSISTANT, UserRole.TRAVELER.keep(AppTab.ASSISTANT))
         assertEquals(AppTab.NAVIGATION, UserRole.DEVELOPER.keep(AppTab.NAVIGATION))
         // Путешественнику навигация — второй вкладкой, сразу после перевода.
         assertEquals(AppTab.NAVIGATION, UserRole.TRAVELER.tabs[1])

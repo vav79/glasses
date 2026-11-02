@@ -99,14 +99,12 @@ import ru.vasev.glasses.ui.AgreementScreen
 import ru.vasev.glasses.ui.ModelSetupScreen
 import ru.vasev.glasses.profile.AgreementSettings
 import ru.vasev.glasses.ui.MainScreen
-import ru.vasev.glasses.ui.CameraScreen
 import ru.vasev.glasses.ui.AssistantOverlays
 import ru.vasev.glasses.ui.MainViewModel
 import ru.vasev.glasses.ui.NavigationScreen
 import ru.vasev.glasses.ui.openMapsLink
 import ru.vasev.glasses.ui.SettingsScreen
 import ru.vasev.glasses.ui.SettingsViewModel
-import ru.vasev.glasses.ui.TranslationScreen
 import ru.vasev.glasses.ui.theme.GlassesTheme
 
 class MainActivity : AppCompatActivity() {
@@ -488,20 +486,6 @@ class MainActivity : AppCompatActivity() {
                     onCloseNotes = { notesOpen = false },
                     translateBar = if (!translateActive) null else ({ ChatTranslateBar() }),
                 )
-                AppTab.CAMERA -> {
-                    CameraScreen(
-                        viewModel = viewModel,
-                        cameraGranted = cameraGranted,
-                        onSelectSource = ::selectImageSource,
-                        onConnectGlasses = { app.glasses.connect(this) },
-                        onDescribe = viewModel::cameraDescribe,
-                        onAsk = { withMic(viewModel::cameraAsk) },
-                        onTranslate = viewModel::cameraTranslate,
-                        onRemember = { withMic(viewModel::cameraRemember) },
-                        onFollowUp = { withMic(viewModel::cameraFollowUp) },
-                    )
-                    AssistantOverlays(viewModel)
-                }
                 AppTab.TRANSLATE -> {
                     val tState by translation.state.collectAsStateWithLifecycle()
                     val partnerMic by app.translator.partnerMic.collectAsStateWithLifecycle()
@@ -677,11 +661,9 @@ class MainActivity : AppCompatActivity() {
             tab = newTab
             return
         }
-        // «Ассистент» и «Камера» — один разговор: между ними ответ не прерывается.
-        val sameConversation = tab in CONVERSATION_TABS && newTab in CONVERSATION_TABS
-        if (!sameConversation) {
+        run {
             when (tab) {
-                AppTab.ASSISTANT, AppTab.CAMERA -> viewModel.stop()
+                AppTab.ASSISTANT -> viewModel.stop()
                 AppTab.TRANSLATE -> translation.stop()
                 AppTab.NAVIGATION -> navSession.cancel()
                 // Списки и заглушки — ни звука, ни микрофона.
@@ -1036,6 +1018,5 @@ class MainActivity : AppCompatActivity() {
         const val STATE_TAB = "tab"
         const val STATE_SETTINGS = "settings_open"
         const val STATE_DEVELOPER = "developer_open"
-        val CONVERSATION_TABS = setOf(AppTab.ASSISTANT, AppTab.CAMERA)
     }
 }
