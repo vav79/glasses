@@ -24,7 +24,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import android.content.Intent
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import java.util.Locale
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import ru.vasev.glasses.speech.AudioChannel
 import kotlinx.coroutines.launch
 import ru.vasev.glasses.GlassesApp
 import ru.vasev.glasses.speech.SpeechException
@@ -55,6 +64,8 @@ class MicProbeActivity : ComponentActivity() {
                             Button(onClick = { listen(Talker.USER) }) { Text("Очки") }
                             Button(onClick = { listen(Talker.PARTNER) }) { Text("Телефон") }
                             Button(onClick = ::nextPhrase) { Text("Другая фраза") }
+                            Button(onClick = { detectLanguages(onDevice = false) }) { Text("Автоязык") }
+                            Button(onClick = { detectLanguages(onDevice = true) }) { Text("Автоязык (на телефоне)") }
                         }
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             items(lines.reversed()) { Text(it, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
@@ -62,6 +73,10 @@ class MicProbeActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+        when (intent.getStringExtra("detect")) {
+            "cloud" -> detectLanguages(onDevice = false)
+            "device" -> detectLanguages(onDevice = true)
         }
     }
 
@@ -88,6 +103,60 @@ class MicProbeActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Автоопределение языка (Android 14+: EXTRA_ENABLE_LANGUAGE_DETECTION). Телефон сам произносит фразу на языке
+     * через динамик, распознаватель слушает с основным языком ru-RU и списком разрешённых; в лог — какой язык он
+     * определил и что распознал. [onDevice] — распознаватель на телефоне (createOnDeviceSpeechRecognizer).
+     */
+    private fun detectLanguages(onDevice: Boolean) {
+        job?.cancel()
+        val app = application as GlassesApp
+        job = lifecycleScope.launch {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return@launch log("detect: needs Android 14+")
+            val available = if (onDevice) SpeechRecognizer.isOnDeviceRecognitionAvailable(this@MicProbeActivity) else SpeechRecognizer.isRecognitionAvailable(this@MicProbeActivity)
+            log("detect: onDevice=$onDevice available=$available")
+            if (!available) return@launch
+            for ((tag, text) in DETECT_SAMPLES) {
+                val recognizer = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(this@MicProbeActivity) else SpeechRecognizer.createSpeechRecognizer(this@MicProbeActivity)
+                val result = CompletableDeferred<String>()
+                recognizer.setRecognitionListener(object : RecognitionListener {
+                    override fun onResults(results: Bundle) {
+                        val heard = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                        val lang = results.getString(SpeechRecognizer.DETECTED_LANGUAGE)
+                        val conf = results.getInt(SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL, -1)
+                        result.complete("detected=$lang conf=$conf «$heard»")
+                    }
+                    override fun onLanguageDetection(results: Bundle) {
+                        log("detect: [$tag] partial language=${results.getString(SpeechRecognizer.DETECTED_LANGUAGE)}")
+                    }
+                    override fun onError(error: Int) { result.complete("error=$error") }
+                    override fun onReadyForSpeech(params: Bundle?) = Unit
+                    override fun onBeginningOfSpeech() = Unit
+                    override fun onRmsChanged(rmsdB: Float) = Unit
+                    override fun onBufferReceived(buffer: ByteArray?) = Unit
+                    override fun onEndOfSpeech() = Unit
+                    override fun onPartialResults(partialResults: Bundle?) = Unit
+                    override fun onEvent(eventType: Int, params: Bundle?) = Unit
+                })
+                recognizer.startListening(
+                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+                        putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                        putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf("ru-RU", "en-US", "th-TH", "de-DE"))
+                        putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_QUICK_RESPONSE)
+                    },
+                )
+                delay(700)
+                runCatching { app.audioOutput.speak(text, Locale.forLanguageTag(tag), AudioChannel.PARTNER) }
+                val outcome = withTimeoutOrNull(12_000) { result.await() } ?: "timeout"
+                log("detect: [$tag] $outcome")
+                recognizer.destroy()
+                delay(800)
+            }
+        }
+    }
+
     private fun List<Float>.averageOrZero(): Float = if (isEmpty()) 0f else average().toFloat()
 
     private fun log(text: String) {
@@ -102,6 +171,14 @@ class MicProbeActivity : ComponentActivity() {
             "Добрый день. Подскажите, пожалуйста, как пройти до ближайшей станции метро и сколько стоит билет.",
             "Мы работаем с девяти утра до восьми вечера, обед с часу до двух, оплата картой или наличными.",
             "Возьмите такси у главного входа, дорога до аэропорта займёт около сорока минут.",
+        )
+
+        /** Фразы для автоопределения языка: язык → фраза (произносит сам телефон). */
+        private val DETECT_SAMPLES = listOf(
+            "en-US" to "Excuse me, where is the nearest train station?",
+            "th-TH" to "สวัสดีครับ ห้องน้ำอยู่ที่ไหนครับ",
+            "de-DE" to "Entschuldigung, wie komme ich zum Bahnhof?",
+            "ru-RU" to "Подскажите, пожалуйста, где здесь вокзал?",
         )
 
         /** Доля слов образца (без регистра и знаков), которые есть в распознанном тексте, — в процентах. */
