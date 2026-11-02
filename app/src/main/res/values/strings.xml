@@ -58,6 +58,7 @@
     <string name="source_phone_camera">Phone camera</string>
     <string name="source_gallery">From gallery</string>
     <string name="source_simulator">Glasses simulator</string>
+    <string name="source_simulator_short">Simulator</string>
     <string name="source_label_glasses">glasses</string>
     <string name="source_label_phone">phone</string>
     <string name="source_label_gallery">gallery</string>
@@ -125,7 +126,7 @@
     <string name="llm_network">No connection to %1$s.</string>
     <string name="llm_bad_request">Request to %1$s failed%2$s.</string>
     <string name="llm_empty">%1$s returned an empty answer.</string>
-    <string name="missing_key_notice">The “%1$s” model needs a %2$s API key. It is stored only on this phone, encrypted.</string>
+    <string name="missing_key_notice">The “%1$s” model needs an API key from %2$s. It is stored only on this phone, encrypted.</string>
     <string name="open_settings">Open settings</string>
 
     <!-- Translation -->

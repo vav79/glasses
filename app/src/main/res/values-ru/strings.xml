@@ -57,6 +57,7 @@
     <string name="source_phone_camera">Камера телефона</string>
     <string name="source_gallery">Из галереи</string>
     <string name="source_simulator">Симулятор очков</string>
+    <string name="source_simulator_short">Симулятор</string>
     <string name="source_label_glasses">очки</string>
     <string name="source_label_phone">телефон</string>
     <string name="source_label_gallery">галерея</string>

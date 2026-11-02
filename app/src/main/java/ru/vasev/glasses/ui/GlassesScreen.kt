@@ -140,7 +140,8 @@ fun GlassesScreen(
 
         GlassCard(Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.glasses_photo_source), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
-            Choices(state.photoSources.map { it to it.titleRes }, state.photoSource, onPhotoSource)
+            // В узком сегменте «Симулятор очков» обрезался до «Очки» — короткое имя.
+            Choices(state.photoSources.map { it to if (it == ImageSource.SIMULATOR) R.string.source_simulator_short else it.titleRes }, state.photoSource, onPhotoSource)
             Text(stringResource(R.string.glasses_photo_source_hint), style = MaterialTheme.typography.bodySmall, color = p.text2)
         }
 
