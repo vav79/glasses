@@ -904,7 +904,7 @@
     <string name="divider_translate_off">%1$s · translation off</string>
     <string name="translator_partner_language">Partner’s language</string>
     <string name="translator_my_language">Translation into my language: %1$s (the app language).</string>
-    <string name="translator_auto_detect_soon">Detecting the partner’s language automatically — coming after a check on the phone.</string>
+    <string name="translator_auto_detect_soon">Choose the language by hand: automatic detection on this phone recognized the speech incorrectly (test 2026-11-02).</string>
     <string name="translator_partner_mic">Listen to the partner with</string>
     <string name="translator_partner_mic_hint">The glasses microphone is aimed at your voice: in a test it didn’t recognize a partner 1–2 m away. The phone hears them well.</string>
     <string name="translator_speak_mine">Speak my phrase through the phone speaker</string>

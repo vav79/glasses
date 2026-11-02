@@ -941,7 +941,7 @@
     <string name="divider_translate_off">%1$s · перевод выкл</string>
     <string name="translator_partner_language">Язык собеседника</string>
     <string name="translator_my_language">Перевод на мой язык: %1$s (язык приложения).</string>
-    <string name="translator_auto_detect_soon">Автоопределение языка собеседника — после проверки на телефоне.</string>
+    <string name="translator_auto_detect_soon">Язык выбирается вручную: автоопределение на этом телефоне распознаёт речь неверно (проба 2026-11-02).</string>
     <string name="translator_partner_mic">Слушать собеседника</string>
     <string name="translator_partner_mic_hint">Микрофон очков направлен на ваш голос: в пробе он не распознал собеседника на 1–2 м. Телефон слышит его хорошо.</string>
     <string name="translator_speak_mine">Озвучивать мою фразу через динамик телефона</string>
