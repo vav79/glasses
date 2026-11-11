@@ -12,6 +12,17 @@ val localProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Подпись релизов — отдельный ключ вне репозитория: %USERPROFILE%\.sputnik-signing\ (keystore + signing.properties
+// с паролями). Нет папки — release собирается неподписанным.
+val signingProps = Properties().apply {
+    val file = File(System.getProperty("user.home"), ".sputnik-signing/signing.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+// Публичный APK: -Pmwdat.devMode=true — идентификаторы Meta из local.properties не берутся (режим разработчика),
+// чтобы наш токен не попал в файл, который выкладывается для всех.
+val forceMwdatDevMode = (findProperty("mwdat.devMode") as String?) == "true"
+
 android {
     namespace = "ru.vasev.glasses"
     compileSdk = 37
@@ -35,7 +46,7 @@ android {
         // mwdat.applicationId и mwdat.clientToken (старые имена mwdat_application_id / mwdat_client_token тоже читаются).
         // Нет строк — "0": режим разработчика Meta AI, аттестация не используется.
         fun mwdat(name: String, legacy: String): String =
-            (localProps.getProperty(name) ?: localProps.getProperty(legacy))?.trim()?.takeIf { it.isNotEmpty() } ?: "0"
+            if (forceMwdatDevMode) "0" else (localProps.getProperty(name) ?: localProps.getProperty(legacy))?.trim()?.takeIf { it.isNotEmpty() } ?: "0"
         val mwdatAppId = mwdat("mwdat.applicationId", "mwdat_application_id")
         manifestPlaceholders["mwdat_application_id"] = mwdatAppId
         manifestPlaceholders["mwdat_client_token"] = mwdat("mwdat.clientToken", "mwdat_client_token")
@@ -45,9 +56,24 @@ android {
         buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now()}\"")
     }
 
+    signingConfigs {
+        if (signingProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: сжатие и удаление недостижимого кода (в т. ч. веток BuildConfig.DEBUG). Правила — proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
@@ -77,7 +103,8 @@ android {
 dependencies {
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
-    implementation(libs.mwdat.mockdevice)
+    // Симулятор очков (MockDeviceKit) — только debug: в release вместо MockGlassesController — заглушка из src/release.
+    debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.anthropic.java)
     // OpenAI-совместимые провайдеры (DeepSeek); та же версия, что приходит транзитивно от SDK.
     implementation(libs.okhttp)
