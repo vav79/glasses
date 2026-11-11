@@ -1,8 +1,9 @@
 ﻿# Прогон сценариев ассистента на телефоне (debug-сборка, ключ Anthropic введён в приложении) — до и после переделок.
 # Каждый сценарий — debug-команда + проверка по logcat. Свой чат на прогон; после — чат, тестовая заметка и снимки удаляются.
 #   .\scripts\assistant-smoke.ps1 [-Package ru.vasev.glasses] [-Out result.json]
-# Запросы к модели настоящие (~8 шт., центы). Ответы звучат в очки или в динамик.
-param([string]$Package = 'ru.vasev.glasses', [string]$Out = '')
+# Запросы к модели настоящие (~9 шт., центы). Ответы звучат в очки или в динамик.
+# Сценарии 8–9 останавливают процесс Google (-TtsEngine): в нём и синтез, и распознаватель.
+param([string]$Package = 'ru.vasev.glasses', [string]$Out = '', [string]$TtsEngine = 'com.google.android.tts')
 # Continue: в PowerShell 5 предупреждения adb в stderr при Stop становятся ошибками.
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -17,7 +18,8 @@ function Files([string]$dir) { (& $adb shell "run-as $Package ls $dir 2>/dev/nul
 function WaitFor([string]$pattern, [int]$timeoutSec = 60) {
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     do {
-        $hit = Log | Select-String -Pattern $pattern
+        # С учётом регистра: «Speech: » (ошибка ассистента) ≠ «speech: » (служебная строка распознавателя).
+        $hit = Log | Select-String -Pattern $pattern -CaseSensitive
         if ($hit) { return $hit }
         Start-Sleep -Milliseconds 700
     } while ((Get-Date) -lt $deadline)
@@ -95,6 +97,28 @@ $after = WaitFor 'gesture question cancelled|role=assistant .*status=' 25
 $what = if (-not $h) { 'жест не дошёл' } elseif (-not $after) { 'ask, но ни отбоя, ни вопроса за 25 с' } elseif (($after | Select-Object -Last 1).Line -match 'cancelled') { 'ask + отбой (тишина)' } else { 'ask + вопрос (что-то услышал)' }
 Check 'gesture-ask' ([bool]($h -and $after)) $what
 Send "--es gesture $gestureWas"; Start-Sleep 2
+Start-Sleep 3; & $adb logcat -c
+
+# 8. Движок синтеза убит (как бывает за дни жизни процесса) → вопрос как от жеста → TextToSpeech пересоздан, ответ звучит.
+# Приложение говорит через Google TTS: частный движок Samsung стороннему приложению недоступен.
+& $adb shell am force-stop $TtsEngine
+Start-Sleep 2
+Send "--es gesture_question 'Сколько будет шесть плюс шесть? Ответь одним словом.'"
+$sound = WaitFor 'end_of_speech→sound=|tts: still failing|Speech: ' 60
+$recreated = Log | Select-String -Pattern 'tts: recreated'
+$soundOk = [bool]($sound -and ($sound | Select-Object -Last 1).Line -match 'sound=')
+Check 'tts-engine-restart' ($soundOk -and [bool]$recreated) ($(if (-not $soundOk) { 'ответа голосом нет: ' + ($sound | Select-Object -Last 1).Line } elseif (-not $recreated) { 'голос есть, но пересоздания в логе нет' } else { 'пересоздан, ' + (($sound | Select-Object -Last 1).Line -replace '^.*(sound=\d+ms).*$', '$1') }))
+Start-Sleep 4; & $adb logcat -c
+
+# 9. Тот же перезапуск процесса Google глазами распознавателя: жест → SpeechRecognizer пересоздан, слушает (тишина → «отбой»).
+Send '--es gesture double'; Start-Sleep 3
+& $adb shell am force-stop $TtsEngine
+Start-Sleep 2
+& $adb shell input keyevent KEYCODE_MEDIA_NEXT
+$after = WaitFor 'gesture question cancelled|role=assistant .*status=|Speech: ' 25
+$line = ($after | Select-Object -Last 1).Line
+Check 'recognizer-restart' ([bool]($after -and $line -notmatch 'Speech: ')) ($(if (-not $after) { 'ни отбоя, ни вопроса за 25 с' } elseif ($line -match 'Speech: ') { 'распознаватель не ожил: ' + $line } elseif ($line -match 'cancelled') { 'слушает (тишина → отбой)' } else { 'слушает (что-то услышал)' }))
+Send "--es gesture $gestureWas"; Start-Sleep 4
 
 # Уборка: чат прогона и новые снимки.
 Send '--ez delete_current_chat true'; Start-Sleep 2

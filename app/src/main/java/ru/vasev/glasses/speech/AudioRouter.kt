@@ -207,6 +207,18 @@ class AudioRouter(context: Context) {
         if (micHolds == 0) releaseMic()
     }
 
+    /**
+     * Сбросить удержания микрофона, оставшиеся без хозяина (процесс со службой жестов живёт днями — потерянное
+     * удержание навсегда оставило бы телефон «в звонке»). Вызывать, только когда точно никто не держит:
+     * ассистент молчит и запись видео не идёт.
+     */
+    fun resetMicHolds(why: String) {
+        if (micHolds == 0) return
+        Log.w(TAG, "in: mic holds reset ($why): holds=$micHolds → 0")
+        micHolds = 0
+        releaseMic()
+    }
+
     /** Дождаться, пока после [releaseMic] телефон реально вышел из режима связи (или таймаута). */
     suspend fun awaitRouteSettled() {
         val pending = settled ?: return
@@ -227,7 +239,7 @@ class AudioRouter(context: Context) {
         }
         val comm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) describe(audio.communicationDevice) else "-"
         val volume = "${audio.getStreamVolume(AudioManager.STREAM_MUSIC)}/${audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)}"
-        return "mode=$mode, comm=$comm, media_volume=$volume"
+        return "mode=$mode, comm=$comm, media_volume=$volume, holds=$micHolds"
     }
 
     @Suppress("DEPRECATION")

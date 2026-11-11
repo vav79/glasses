@@ -597,6 +597,12 @@ class AssistantEngine(private val app: Application) {
     /** Только для debug-сборок: прогон сценария с готовым текстом вместо распознавания речи. */
     fun debugAsk(question: String, withFrame: Boolean) = run(withFrame, presetQuestion = question)
 
+    /** Только debug: ход как от жеста на дужке (озвучивается всегда), но вопрос — готовый текст вместо микрофона. */
+    fun debugGestureAsk(question: String) {
+        Log.d(TAG, "gesture: debug ask with preset question")
+        run(withFrame = false, presetQuestion = question, byGesture = true)
+    }
+
     /** Только debug: следующий снимок — из файла на телефоне вместо выбранного источника (проверка QR и ссылок). */
     var debugFrameFile: java.io.File? = null
 
@@ -738,8 +744,6 @@ class AssistantEngine(private val app: Application) {
         linkOffer?.cancel()
         job?.cancel()
         audio.stop()
-        // Без очков и гарнитуры ответ — только текстом (решение В14): «Озвучить» — по кнопке.
-        val quiet = silent || !hasVoiceOutput()
         job = scope.launch {
             linkScan?.cancel()
             linkScan = null
@@ -788,6 +792,12 @@ class AssistantEngine(private val app: Application) {
                     }
                 }
                 _state.update { it.copy(pendingQuestion = question) }
+
+                // Без очков и гарнитуры ответ — только текстом (решение В14): «Озвучить» — по кнопке. Решается, когда
+                // вопрос уже есть, а не в момент нажатия. Вопрос жестом, «Hey Meta» или микрофоном очков озвучивается
+                // всегда: куда — решает вывод перед каждой фразой (очки на связи — в них, иначе динамик).
+                val quiet = silent || (!turnFromGlasses && !hasVoiceOutput())
+                if (turnFromGlasses && !hasVoiceOutput()) Log.d(TAG, "Assistant: turn from glasses, no headset output now — answer aloud anyway")
 
                 if (Conversation.isResetCommand(question, L.array(R.array.reset_commands))) {
                     startNewChat()
@@ -1243,6 +1253,7 @@ class AssistantEngine(private val app: Application) {
         val commands = L.array(R.array.stop_commands)
         val heard = CompletableDeferred<Unit>()
         while (isActive && !heard.isCompleted) {
+            val startedAt = SystemClock.elapsedRealtime()
             try {
                 val phrase = speech.listen(language.speechTag, Talker.USER, onPartial = { partial ->
                     if (Conversation.isCommand(partial, commands)) heard.complete(Unit)
@@ -1251,6 +1262,9 @@ class AssistantEngine(private val app: Application) {
             } catch (e: SpeechException) {
                 // Тишина и временные сбои — слушаем дальше, остальное (нет разрешения и т. п.) — выходим.
                 if (!e.noSpeech && !e.transient) return
+                // Распознаватель падает сразу (его процесс перезапускается — он общий с Google TTS): без паузы
+                // цикл крутился вхолостую, ~2000 попыток за полсекунды.
+                if (SystemClock.elapsedRealtime() - startedAt < FAST_FAIL_MS) delay(FAST_FAIL_MS)
             }
         }
         if (heard.isCompleted) {
@@ -1424,6 +1438,9 @@ class AssistantEngine(private val app: Application) {
         const val VOICE_CONFIRM_MS = 10_000L
         const val REMEMBER_LISTEN_MS = 12_000L
         const val ECHO_GUARD_MS = 1_000L
+
+        /** Голосовое «стоп»: распознаватель упал быстрее — пауза перед следующей попыткой. */
+        const val FAST_FAIL_MS = 500L
         const val GESTURE_SILENCE_MS = 5_000L
         const val NOTE_PREVIEW_SIDE = 640
         const val MAX_FOUND_CARDS = 3

@@ -30,6 +30,7 @@ import ru.vasev.glasses.R
 import ru.vasev.glasses.i18n.L
 import ru.vasev.glasses.links.FoundLink
 import ru.vasev.glasses.ui.Phase
+import ru.vasev.glasses.video.RecPhase
 import java.util.UUID
 
 /**
@@ -52,9 +53,11 @@ class GesturesService : Service() {
         if (intent?.action == ACTION_OFF) {
             Log.d(TAG, "gesture: service turned off from notification")
             app.gestureSettings.setEnabled(false)
+            resetStaleMicHolds(app, "gestures off")
             stopSelf()
             return START_NOT_STICKY
         }
+        resetStaleMicHolds(app, "gestures service start")
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
         } else {
@@ -88,6 +91,12 @@ class GesturesService : Service() {
         Log.d(TAG, "gesture: service destroyed")
         scope.cancel()
         super.onDestroy()
+    }
+
+    /** Удержания микрофона без хозяина — сбросить, если ассистент молчит и запись видео не идёт (их удержания настоящие). */
+    private fun resetStaleMicHolds(app: GlassesApp, why: String) {
+        if (app.assistant.state.value.phase != Phase.IDLE || app.recorder.status.value.phase != RecPhase.IDLE) return
+        app.audioRouter.resetMicHolds(why)
     }
 
     /** Что показывает уведомление. */

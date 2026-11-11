@@ -948,6 +948,12 @@ class MainActivity : AppCompatActivity() {
             selectTab(AppTab.ASSISTANT)
             viewModel.debugAsk(question, intent.getBooleanExtra("with_frame", false))
         }
+        // Вопрос как от жеста на дужке (без микрофона): проверка озвучки после перезапуска движка синтеза.
+        intent.getStringExtra("gesture_question")?.let { question ->
+            intent.removeExtra("gesture_question")
+            selectTab(AppTab.ASSISTANT)
+            viewModel.debugGestureAsk(question)
+        }
         // Уступка навигатору: через [delay] мс 3 секунды «говорит навигатор» (usage NAVIGATION_GUIDANCE).
         if (intent.hasExtra("fake_navigator_after_ms")) {
             val delayMs = intent.getIntExtra("fake_navigator_after_ms", 0)
